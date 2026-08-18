@@ -167,3 +167,4 @@ frontend/
 
 ### Consideraciones personales
 - No usar comentarios explicativos largos (simplificar), a menos que se soliciten.
+- No usar emojis ni caracteres extraños para decorar textos.
