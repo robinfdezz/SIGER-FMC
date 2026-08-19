@@ -3,11 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import logoFmcWhite from '../../assets/logo-FMC White.png';
 import logoFmcBlack from '../../assets/logo-FMC Black.png';
+import { MorphIcon } from 'morphicons/react';
+import { Eye, EyeOff } from 'lucide';
 import {
   User,
   Lock,
-  Eye,
-  EyeOff,
   AlertCircle,
   Loader2,
   ArrowRight,
@@ -106,11 +106,9 @@ const LoginPage = () => {
           </div>
 
           {activeError && (
-            <div className="mb-6 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-start gap-3 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
-              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-rose-500" />
-              <div className="flex-1">
-                <p className="font-medium text-xs leading-relaxed">{activeError}</p>
-              </div>
+            <div className="mb-4 flex items-center gap-2 text-red-500 text-xs sm:text-sm animate-in fade-in duration-150">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <p className="font-medium leading-tight">{activeError}</p>
             </div>
           )}
 
@@ -169,14 +167,14 @@ const LoginPage = () => {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={isSubmitting}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-400 hover:text-zinc-200 focus:outline-none"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 focus:outline-none cursor-pointer"
                   aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
+                  <MorphIcon
+                    icon={showPassword ? EyeOff : Eye}
+                    size={18}
+                    spring="smooth"
+                  />
                 </button>
               </div>
             </div>

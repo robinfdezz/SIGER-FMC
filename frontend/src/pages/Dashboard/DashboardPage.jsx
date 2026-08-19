@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import DashboardLayout from '../../components/DashboardLayout';
 import { 
   User, 
-  Building2, 
+  Store, 
   Shield, 
   Activity, 
   Clock 
@@ -28,10 +28,10 @@ const DashboardPage = () => {
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-medium text-zinc-300 border border-white/10">
-              <Building2 className="w-3.5 h-3.5 text-brand-400" />
+              <Store className="w-3.5 h-3.5 text-brand-400" />
               <span>{user?.sucursal_nombre || 'Franyer Mobile Center - SFM'}</span>
               <span className="text-zinc-500">&bull;</span>
-              <span className="font-mono text-[11px] text-zinc-400">{user?.sucursal_codigo || 'SUC-01'}</span>
+              <span className="font-mono text-[11px] text-zinc-400">{user?.sucursal_codigo || 'MATRIZ'}</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               ¡Bienvenido de nuevo, {user?.nombre || 'Usuario'}!

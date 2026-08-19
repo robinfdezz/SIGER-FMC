@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { MorphIcon } from 'morphicons/react';
+import { Sun, Moon } from 'lucide';
 import {
   LayoutDashboard,
   Ticket,
@@ -8,8 +10,6 @@ import {
   Image as ImageIcon,
   Users,
   Settings,
-  Sun,
-  Moon,
   PanelLeft,
   PanelLeftClose,
   MousePointer,
@@ -68,7 +68,7 @@ const Sidebar = () => {
           setShowConfigMenu(false);
         }
       }}
-      className={`relative z-20 h-full flex flex-col border-r border-zinc-200 dark:border-dark-border bg-white dark:bg-dark-surface transition-all duration-300 ease-in-out select-none flex-shrink-0 ${
+      className={`relative z-20 h-full hidden lg:flex flex-col border-r border-zinc-200 dark:border-dark-border bg-white dark:bg-dark-surface transition-all duration-300 ease-in-out select-none flex-shrink-0 ${
         sidebarMode === 'hover' && isHovered
           ? 'w-64 shadow-2xl absolute md:relative left-0 top-0 bottom-0'
           : sidebarMode === 'collapsed' || (sidebarMode === 'hover' && !isHovered)
@@ -116,18 +116,18 @@ const Sidebar = () => {
       {/* Sección Inferior / Controles */}
       <div className="p-2 border-t border-zinc-100 dark:border-dark-border space-y-1 relative" ref={configMenuRef}>
         
-        {/* 1. Botón de Tema (Icono central) */}
+        {/* 1. Botón de Tema (Icono animado MorphIcon) */}
         <button
           onClick={toggleTheme}
           type="button"
           title={isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
           className="w-full flex items-center justify-center p-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
         >
-          {isDark ? (
-            <Sun className="w-5 h-5 text-amber-400" />
-          ) : (
-            <Moon className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
-          )}
+          <MorphIcon 
+            icon={isDark ? Moon : Sun} 
+            size={20} 
+            className={isDark ? "text-red-500" : "text-zinc-600 dark:text-zinc-400"} 
+          />
         </button>
 
         {/* 2. Botón de Modo del Sidebar (Icono central) */}
@@ -149,11 +149,7 @@ const Sidebar = () => {
 
           {/* Menú Popover de Selección de Modos (Solo Texto Limpio) */}
           {showConfigMenu && (
-            <div className="absolute bottom-full mb-2 left-2 bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border rounded-xl shadow-xl p-1.5 z-50 min-w-[180px] text-xs animate-in fade-in zoom-in-95 duration-150">
-              <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 border-b border-zinc-100 dark:border-zinc-800/60 mb-1">
-                Barra Lateral
-              </div>
-
+            <div className="absolute bottom-full mb-2 left-2 bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border rounded-xl shadow-xl p-1.5 z-50 min-w-[170px] text-xs animate-in fade-in zoom-in-95 duration-150 space-y-0.5">
               <button
                 onClick={() => handleModeChange('expanded')}
                 type="button"
@@ -176,7 +172,7 @@ const Sidebar = () => {
                     : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                 }`}
               >
-                <span>Auto-expandir (Hover)</span>
+                <span>Auto-expandir</span>
                 {sidebarMode === 'hover' && <Check className="w-3.5 h-3.5" />}
               </button>
 

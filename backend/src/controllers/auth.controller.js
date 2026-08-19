@@ -63,7 +63,7 @@ const login = async (req, res) => {
     if (result.recordset.length === 0) {
       return res.status(401).json({
         success: false,
-        message: 'Credenciales inválidas. Verifique el correo y la contraseña ingresados.'
+        message: 'Credenciales inválidas. Verifique el usuario y la contraseña ingresados.'
       });
     }
 
@@ -82,7 +82,7 @@ const login = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Credenciales inválidas. Verifique el correo y la contraseña ingresados.'
+        message: 'Credenciales inválidas. Verifique el usuario y la contraseña ingresados.'
       });
     }
 

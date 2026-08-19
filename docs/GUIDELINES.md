@@ -8,11 +8,14 @@
 
 ## 2. Stack Tecnológico
 
-* **Frontend:** React.js (Vite), React Router v6, Tailwind CSS, Lucide React (Íconos), Axios.
+* **Frontend:** React.js (Vite), React Router v6, Tailwind CSS, Lucide React (Íconos), Morphicons (Iconos animados interactivos), Axios.
 * **Backend:** Node.js, Express.js.
 * **Base de Datos:** Microsoft SQL Server (driver `mssql` con Connection Pool).
 * **Autenticación:** JSON Web Tokens (JWT) + Hashing de contraseñas con `bcryptjs` (salt rounds = 10).
 * **Multimedia:** Cloudinary con compresión previa en el cliente (`browser-image-compression`).
+* **Control de Versiones (Git):**
+  * `main`: Rama principal / producción estable.
+  * `develop`: Rama base de desarrollo e integración continua.
 
 ---
 
@@ -143,15 +146,19 @@ frontend/
 
 * **Header Superior (Navbar):**
   * Extensión completa de extremo a extremo (100% ancho).
-  * Izquierda: Logo institucional (`logo-FMC Black/White.png`) + Badge con nombre y código de sucursal.
-  * Derecha: Avatar de usuario, nombre, rol y botón de logout.
-* **Barra Lateral (Sidebar):**
-  * Ubicada verticalmente debajo del Header.
+  * Izquierda: Logo institucional (`logo-FMC Black/White.png`) + Badge con nombre y código de sucursal (`MATRIZ`).
+  * Derecha Desktop (>= 1024px): Avatar de usuario, nombre, rol y botón de logout.
+  * Derecha Móvil (< 1024px): Botón hamburguesa animado con `MorphIcon` (`Menu` / `X` de `lucide`).
+* **Barra Lateral Desktop (Sidebar):**
+  * Ubicada verticalmente debajo del Header, visible en pantallas grandes (`hidden lg:flex`).
   * 3 Modos con persistencia en `localStorage ('siger_sidebar_mode')`:
     1. `expanded`: Fijo expandido (`w-64`).
     2. `hover`: Auto-expandir al posar cursor (`w-16` a `w-64`).
     3. `collapsed`: Fijo colapsado compacto (`w-16`).
-  * Controles inferiores (solo icono): Botón de cambio de tema (`Sun`/`Moon`) y botón selector de modo con menú desplegable en texto limpio.
+  * Controles inferiores (solo icono): Botón de cambio de tema (`Sun`/`Moon` con `MorphIcon`) y selector de modo con menú en texto limpio.
+* **Diseño Responsivo y Menú Móvil (< 1024px):**
+  * Menú fullscreen a pantalla completa (`fixed inset-0 top-16 z-50`) con animación suave de apertura y cierre.
+  * Contenido móvil: Badge de sucursal, lista de módulos con cierre automático al navegar, y sección inferior compacta con perfil, toggle de tema (`MorphIcon`) y botón de logout.
 
 ---
 

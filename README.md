@@ -7,8 +7,11 @@ Sistema web especializado para el taller de servicio técnico **Franyer Mobile C
 ## 🛠️ Stack Tecnológico
 
 - **Backend:** Node.js, Express, Microsoft SQL Server (`mssql` Connection Pool), JWT, BcryptJS.
-- **Frontend:** React (Vite), React Router v6, Tailwind CSS (Estilo Supabase Dark/Light), Lucide React, Axios.
+- **Frontend:** React (Vite), React Router v6, Tailwind CSS (Estilo Supabase Dark/Light), Lucide React, Morphicons (Iconos animados), Axios.
 - **Base de Datos:** Microsoft SQL Server (`SIGER_FMC_DB`).
+- **Flujo de Ramas Git:**
+  - `main`: Rama principal / producción estable.
+  - `develop`: Rama de integración activa para desarrollo.
 
 ---
 
