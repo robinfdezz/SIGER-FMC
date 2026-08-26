@@ -239,7 +239,7 @@ const WorkerModal = ({
       telefono: formData.telefono.trim(),
       correo: formData.correo.trim().toLowerCase(),
       rol_id: parseInt(formData.rol_id, 10),
-      sucursal_id: formData.sucursal_id ? parseInt(formData.sucursal_id, 10) : null,
+      sucursal_id: isSuperAdminRole ? null : (formData.sucursal_id ? parseInt(formData.sucursal_id, 10) : null),
       foto_perfil_url: formData.foto_perfil_url.trim() || null
     };
 
@@ -291,245 +291,239 @@ const WorkerModal = ({
       }
       maxWidth="max-w-3xl"
     >
-      <form onSubmit={handleSubmit} noValidate className="space-y-3">
-        {/* Fila 1: Nombre y Apellido */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
-              Nombre <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="nombre"
-              value={formData.nombre}
-              onChange={handleChange}
-              placeholder="Ej. Franyer"
-              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
-                errors.nombre
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
-              }`}
-            />
-            {errors.nombre && (
-              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.nombre}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
-              Apellido <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="apellido"
-              value={formData.apellido}
-              onChange={handleChange}
-              placeholder="Ej. Fernández"
-              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
-                errors.apellido
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
-              }`}
-            />
-            {errors.apellido && (
-              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.apellido}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Fila 2: Usuario y Cédula */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
-              Nombre de Usuario <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400 text-sm">
-                @
-              </span>
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
+        {/* Cuerpo Scroleable */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-3.5">
+          {/* Fila 1: Nombre y Apellido */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
+                Nombre <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
-                name="usuario"
-                value={formData.usuario}
+                name="nombre"
+                value={formData.nombre}
                 onChange={handleChange}
-                onKeyDown={handleKeyDownNoSpace}
-                placeholder="usuario.login"
-                className={`w-full pl-8 pr-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
-                  errors.usuario
+                placeholder="Ej. Franyer"
+                className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${errors.nombre
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+                  }`}
+              />
+              {errors.nombre && (
+                <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.nombre}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
+                Apellido <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="apellido"
+                value={formData.apellido}
+                onChange={handleChange}
+                placeholder="Ej. Fernández"
+                className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${errors.apellido
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+                  }`}
+              />
+              {errors.apellido && (
+                <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.apellido}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Fila 2: Usuario y Cédula */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
+                Nombre de Usuario <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400 text-sm">
+                  @
+                </span>
+                <input
+                  type="text"
+                  name="usuario"
+                  value={formData.usuario}
+                  onChange={handleChange}
+                  onKeyDown={handleKeyDownNoSpace}
+                  placeholder="usuario.login"
+                  className={`w-full pl-8 pr-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${errors.usuario
                     ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
                     : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
-                }`}
-              />
-            </div>
-            {errors.usuario && (
-              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.usuario}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
-              Cédula de Identidad <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="cedula"
-              value={formData.cedula}
-              onChange={handleChange}
-              placeholder="05600000001 (solo números)"
-              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
-                errors.cedula
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
-              }`}
-            />
-            {errors.cedula && (
-              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.cedula}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Fila 3: Correo y Teléfono */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
-              Correo Electrónico <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              name="correo"
-              value={formData.correo}
-              onChange={handleChange}
-              onKeyDown={handleKeyDownNoSpace}
-              placeholder="correo@franyermobile.com"
-              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
-                errors.correo
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
-              }`}
-            />
-            {errors.correo && (
-              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.correo}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
-              Teléfono / WhatsApp <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="tel"
-              name="telefono"
-              value={formData.telefono}
-              onChange={handleChange}
-              placeholder="8095550101 (solo números)"
-              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
-                errors.telefono
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
-              }`}
-            />
-            {errors.telefono && (
-              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.telefono}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Fila 4: Rol y Sucursal */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
-              Rol en el Equipo <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="rol_id"
-              value={formData.rol_id}
-              onChange={handleChange}
-              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 transition-colors cursor-pointer ${
-                errors.rol_id
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
-              }`}
-            >
-              <option value="" disabled>Seleccione un rol</option>
-              {rolesList.map((r) => (
-                <option key={r.id} value={String(r.id)}>
-                  {formatRoleName(r.nombre_rol || r.nombre)}
-                </option>
-              ))}
-            </select>
-            {errors.rol_id && (
-              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.rol_id}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
-              Sucursal Asignada {!isSuperAdminRole && <span className="text-red-500">*</span>}
-            </label>
-            <select
-              name="sucursal_id"
-              disabled={isSuperAdminRole}
-              value={isSuperAdminRole ? '' : formData.sucursal_id}
-              onChange={handleChange}
-              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-neutral-100 dark:disabled:bg-neutral-800 ${
-                errors.sucursal_id
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
-              }`}
-            >
-              {isSuperAdminRole ? (
-                <option value="">Global / Sin Asignar (SuperAdmin)</option>
-              ) : (
-                <option value="" disabled>Seleccione una sucursal</option>
+                    }`}
+                />
+              </div>
+              {errors.usuario && (
+                <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.usuario}</p>
               )}
-              {sucursalesList.map((s) => (
-                <option key={s.id} value={String(s.id)}>
-                  {s.nombre_sucursal || s.nombre}
-                </option>
-              ))}
-            </select>
-            {errors.sucursal_id && (
-              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.sucursal_id}</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
+                Cédula de Identidad <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="cedula"
+                value={formData.cedula}
+                onChange={handleChange}
+                placeholder="05600000001 (solo números)"
+                className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${errors.cedula
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+                  }`}
+              />
+              {errors.cedula && (
+                <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.cedula}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Fila 3: Correo y Teléfono */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
+                Correo Electrónico <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                name="correo"
+                value={formData.correo}
+                onChange={handleChange}
+                onKeyDown={handleKeyDownNoSpace}
+                placeholder="correo@franyermobile.com"
+                className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${errors.correo
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+                  }`}
+              />
+              {errors.correo && (
+                <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.correo}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
+                Teléfono / WhatsApp <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                name="telefono"
+                value={formData.telefono}
+                onChange={handleChange}
+                placeholder="8095550101 (solo números)"
+                className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${errors.telefono
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+                  }`}
+              />
+              {errors.telefono && (
+                <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.telefono}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Fila 4: Rol y Sucursal */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
+                Rol en el Equipo <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="rol_id"
+                value={formData.rol_id}
+                onChange={handleChange}
+                className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 transition-colors cursor-pointer ${errors.rol_id
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+                  }`}
+              >
+                <option value="" disabled>Seleccione un rol</option>
+                {rolesList.map((r) => (
+                  <option key={r.id} value={String(r.id)}>
+                    {formatRoleName(r.nombre_rol || r.nombre)}
+                  </option>
+                ))}
+              </select>
+              {errors.rol_id && (
+                <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.rol_id}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
+                Sucursal Asignada {!isSuperAdminRole && <span className="text-red-500">*</span>}
+              </label>
+              <select
+                name="sucursal_id"
+                disabled={isSuperAdminRole}
+                value={isSuperAdminRole ? '' : formData.sucursal_id}
+                onChange={handleChange}
+                className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-neutral-100 dark:disabled:bg-neutral-800 ${errors.sucursal_id
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+                  }`}
+              >
+                {isSuperAdminRole ? (
+                  <option value="">Global / Sin Asignar (SuperAdmin)</option>
+                ) : (
+                  <option value="" disabled>Seleccione una sucursal</option>
+                )}
+                {sucursalesList.map((s) => (
+                  <option key={s.id} value={String(s.id)}>
+                    {s.nombre_sucursal || s.nombre}
+                  </option>
+                ))}
+              </select>
+              {errors.sucursal_id && (
+                <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.sucursal_id}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Fila 5: Contraseña */}
+          <div>
+            <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
+              {isEdit ? 'Nueva Contraseña (Opcional)' : 'Contraseña de Acceso'}{' '}
+              {!isEdit && <span className="text-red-500">*</span>}
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                onKeyDown={handleKeyDownNoSpace}
+                placeholder={isEdit ? 'Dejar en blanco para mantener la actual' : 'Mínimo 8 caracteres'}
+                className={`w-full pl-3.5 pr-11 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${errors.password
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+                  }`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label="Ver u ocultar contraseña"
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+              >
+                <MorphIcon icon={showPassword ? EyeOff : Eye} size={18} spring="smooth" />
+              </button>
+            </div>
+            {errors.password && (
+              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.password}</p>
             )}
           </div>
         </div>
 
-        {/* Fila 5: Contraseña */}
-        <div>
-          <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
-            {isEdit ? 'Nueva Contraseña (Opcional)' : 'Contraseña de Acceso'}{' '}
-            {!isEdit && <span className="text-red-500">*</span>}
-          </label>
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              onKeyDown={handleKeyDownNoSpace}
-              placeholder={isEdit ? 'Dejar en blanco para mantener la actual' : 'Mínimo 8 caracteres'}
-              className={`w-full pl-3.5 pr-11 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
-                errors.password
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
-              }`}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              aria-label="Ver u ocultar contraseña"
-              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors cursor-pointer"
-            >
-              <MorphIcon icon={showPassword ? EyeOff : Eye} size={18} spring="smooth" />
-            </button>
-          </div>
-          {errors.password && (
-            <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.password}</p>
-          )}
-        </div>
-
-        {/* Botones de Acción */}
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-100 dark:border-neutral-800/80">
+        {/* Footer Fijo Abajo */}
+        <div className="px-4 py-3 sm:px-6 sm:py-4 shrink-0 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/70 dark:bg-[#141416] flex items-center justify-end gap-3 rounded-b-2xl">
           <button
             type="button"
             onClick={onClose}

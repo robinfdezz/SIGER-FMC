@@ -272,9 +272,9 @@ const WorkersPage = () => {
 
           {/* Fila Inferior: Buscador y Filtros */}
           <div className="space-y-3">
-            <div className="flex flex-col md:flex-row items-center gap-3">
-              {/* Buscador Prominente */}
-              <div className="relative flex-1 w-full">
+            <div className="flex flex-wrap items-center gap-3 w-full">
+              {/* Buscador Prominente Dinámico */}
+              <div className="relative flex-1 min-w-[240px] sm:min-w-[280px] w-full">
                 <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
                   <Search size={16} />
                 </span>
@@ -287,10 +287,10 @@ const WorkersPage = () => {
                 />
               </div>
 
-              {/* Selectores Compactos y Botón Limpiar */}
-              <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full md:w-auto shrink-0">
+              {/* Selectores Dinámicos y Botón Limpiar */}
+              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto flex-1 lg:flex-initial">
                 {/* Selector Rol */}
-                <div className="w-full sm:w-auto min-w-[145px]">
+                <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[150px]">
                   <select
                     value={selectedRole}
                     onChange={(e) => setSelectedRole(e.target.value)}
@@ -306,7 +306,7 @@ const WorkersPage = () => {
                 </div>
 
                 {/* Selector Sucursal */}
-                <div className="w-full sm:w-auto min-w-[145px]">
+                <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[160px]">
                   <select
                     value={selectedBranch}
                     onChange={(e) => setSelectedBranch(e.target.value)}
@@ -323,7 +323,7 @@ const WorkersPage = () => {
                 </div>
 
                 {/* Selector Estado */}
-                <div className="w-full sm:w-auto min-w-[135px]">
+                <div className="flex-1 sm:flex-initial min-w-[130px] sm:min-w-[140px]">
                   <select
                     value={selectedStatus}
                     onChange={(e) => setSelectedStatus(e.target.value)}

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 const ConfirmModal = ({
@@ -33,26 +34,23 @@ const ConfirmModal = ({
   const getConfirmButtonStyles = () => {
     switch (variant) {
       case 'danger':
-        return 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500/20';
       case 'success':
       case 'warning':
-        return 'bg-emerald-600 hover:bg-emerald-700 text-white focus:ring-emerald-500/20';
-      case 'info':
       default:
-        return 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500/20';
+        return 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500/20';
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+  const modalContent = (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs w-full h-full min-h-screen">
       {/* Backdrop con desenfoque suave */}
       <div
         onClick={() => !isLoading && onClose()}
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-fade-in"
+        className="fixed inset-0 bg-transparent transition-opacity"
       />
 
       {/* Tarjeta Modal */}
-      <div className="relative w-full max-w-md bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-2xl p-6 z-10 my-8 transition-all animate-scale-up">
+      <div className="relative w-full max-w-md bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-2xl p-6 z-10 my-auto transition-all animate-scale-up">
         {/* Botón cerrar */}
         <button
           onClick={onClose}
@@ -95,6 +93,8 @@ const ConfirmModal = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default ConfirmModal;
