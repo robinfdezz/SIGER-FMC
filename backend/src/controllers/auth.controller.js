@@ -127,7 +127,7 @@ const login = async (req, res) => {
         rol_nombre: worker.rol_nombre,
         sucursal_id: worker.sucursal_id,
         sucursal_nombre: worker.sucursal_nombre || 'Todas las Sucursales',
-        sucursal_codigo: worker.sucursal_codigo || 'MATRIZ',
+        sucursal_codigo: worker.sucursal_codigo || 'GLOBAL',
         ultimo_login: worker.ultimo_login
       }
     });
@@ -214,7 +214,7 @@ const getMe = async (req, res) => {
         rol_nombre: worker.rol_nombre,
         sucursal_id: worker.sucursal_id,
         sucursal_nombre: worker.sucursal_nombre || 'Todas las Sucursales',
-        sucursal_codigo: worker.sucursal_codigo || 'MATRIZ',
+        sucursal_codigo: worker.sucursal_codigo || 'GLOBAL',
         ultimo_login: worker.ultimo_login
       }
     });

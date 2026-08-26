@@ -48,16 +48,16 @@
 | Campo | Tipo | Nulo | Descripción |
 | :--- | :--- | :--- | :--- |
 | `id` | SERIAL / INT | NO | Llave Primaria (PK) |
-| `sucursal_id` | INT | SÍ | FK -> `datos_sucursales(id)` ON UPDATE CASCADE ON DELETE SET NULL (NULL = SuperAdmin) |
+| `sucursal_id` | INT | SÍ | FK -> `datos_sucursales(id)` ON UPDATE CASCADE ON DELETE SET NULL (NULL = SuperAdmin / Acceso Global) |
 | `rol_id` | INT | NO | FK -> `roles_equipo(id)` ON UPDATE CASCADE ON DELETE RESTRICT |
-| `usuario` | VARCHAR(50) | NO | Nombre de usuario para autenticación (Único) |
-| `nombre` | VARCHAR(50) | NO | Nombre de pila |
-| `apellido` | VARCHAR(50) | NO | Apellidos |
-| `cedula` | VARCHAR(20) | NO | Cédula de identidad y electoral |
-| `telefono` | VARCHAR(20) | NO | Teléfono móvil |
-| `correo` | VARCHAR(100) | NO | Correo electrónico institucional / login (Único) |
-| `password` | TEXT | NO | Contraseña con hash Bcrypt |
-| `foto_perfil_url` | VARCHAR(255) | SÍ | URL del avatar |
+| `usuario` | VARCHAR(50) | NO | Nombre de usuario para autenticación (Único, min. 6 caracteres, sin espacios) |
+| `nombre` | VARCHAR(50) | NO | Nombre de pila (min. 2 caracteres) |
+| `apellido` | VARCHAR(50) | NO | Apellidos (min. 2 caracteres) |
+| `cedula` | VARCHAR(20) | NO | Cédula de identidad (solo dígitos numéricos, min. 11) |
+| `telefono` | VARCHAR(20) | NO | Teléfono móvil / WhatsApp (solo dígitos numéricos, min. 10) |
+| `correo` | VARCHAR(100) | NO | Correo electrónico institucional / login (Único, sin espacios) |
+| `password` | TEXT | NO | Contraseña con hash Bcrypt (min. 8 caracteres, sin espacios) |
+| `foto_perfil_url` | VARCHAR(255) | SÍ | URL del avatar / foto de perfil |
 | `ultimo_login` | TIMESTAMPTZ | SÍ | Último acceso al sistema |
 | `created_at` | TIMESTAMPTZ | SÍ | Timestamp de creación |
 | `updated_at` | TIMESTAMPTZ | SÍ | Timestamp de actualización |

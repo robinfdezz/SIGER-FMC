@@ -21,6 +21,33 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 ### Changed
 - Configuración global de `Toaster` (Sileo) reubicada a `top-center` y sincronizada dinámicamente con `ThemeContext` (Dark/Light).
 
+## [0.4.0] - 2026-08-26
+
+### Added
+- **Diseño y Tipografía Global:**
+  - Integración global de la fuente `Sora` de Google Fonts con soporte multilenguaje y visualización nítida en componentes.
+  - Botón interactivo de limpiar filtros con morphing animado (`MorphIcon` con transiciones `X` y `Check`).
+- **Validaciones Visuales y Sanitización en Formularios (`WorkerModal.jsx`):**
+  - Desactivación de validación nativa del navegador e implementación de avisos de error personalizados en color rojo bajo cada campo.
+  - Bloqueo de la barra espaciadora en tiempo real y sanitización de espacios en blanco en `usuario`, `correo` y `password`.
+  - Sanitización automática de caracteres no numéricos en `cedula` y `telefono`.
+  - Comparación reactiva (`hasChanges`) para bloquear y advertir submits redundantes en modo edición si no hay diferencias.
+- **Soporte de Avatares Fotográficos (`foto_perfil_url`):**
+  - Renderizado de fotos de perfil en la barra superior (`Navbar.jsx`), menú móvil (`DashboardLayout.jsx`) y tabla de usuarios (`WorkersPage.jsx`).
+  - Fallback automático a iniciales de usuario si la imagen no existe o falla su carga (`onError`).
+- **Control de Acceso y Sucursal Global para SuperAdmin:**
+  - Deshabilitado y forzado de selección a *"Global / Sin Asignar"* cuando el rol seleccionado es `SuperAdmin`.
+  - Soporte en backend de `sucursal_id: null` para SuperAdmin en creación y actualización.
+
+### Changed
+- **Controlador de Catálogos (`catalogs.controller.js`):**
+  - Depuración y sincronización del endpoint `GET /api/catalogos/sucursales`, eliminando la columna obsoleta `es_matriz`.
+  - Habilitación de alias de ruta directos en `app.js` (`/api/sucursales` y `/api/roles`).
+- **Validación Estricta en Backend (`workers.controller.js`):**
+  - Validación rigurosa de longitudes mínimas, ausencia de espacios en blanco y verificación de unicidad con códigos HTTP `400` y `409`.
+
+---
+
 ## [0.3.0] - 2026-08-26
 
 ### Added

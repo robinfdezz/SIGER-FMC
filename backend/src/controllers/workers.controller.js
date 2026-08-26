@@ -1,6 +1,140 @@
 const bcrypt = require('bcryptjs');
 const { getPool } = require('../config/db');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Función auxiliar para validar reglas de negocio en payloads de trabajadores
+ */
+const validateWorkerPayload = async (pool, data, isEdit = false, currentWorker = null) => {
+  const {
+    nombre,
+    apellido,
+    usuario,
+    cedula,
+    correo,
+    telefono,
+    rol_id,
+    sucursal_id,
+    password
+  } = data;
+
+  // 1. Nombre
+  if (!isEdit || nombre !== undefined) {
+    if (!nombre || typeof nombre !== 'string' || nombre.trim().length < 2) {
+      return 'El nombre es obligatorio y debe tener al menos 2 caracteres.';
+    }
+  }
+
+  // 2. Apellido
+  if (!isEdit || apellido !== undefined) {
+    if (!apellido || typeof apellido !== 'string' || apellido.trim().length < 2) {
+      return 'El apellido es obligatorio y debe tener al menos 2 caracteres.';
+    }
+  }
+
+  // 3. Nombre de Usuario (sin espacios, mínimo 6 caracteres)
+  if (!isEdit || usuario !== undefined) {
+    if (!usuario || typeof usuario !== 'string') {
+      return 'El nombre de usuario es obligatorio.';
+    }
+    if (/\s/.test(usuario)) {
+      return 'El nombre de usuario no puede contener espacios en blanco.';
+    }
+    const cleanUser = usuario.trim();
+    if (cleanUser.length < 6) {
+      return 'El nombre de usuario debe tener al menos 6 caracteres.';
+    }
+  }
+
+  // 4. Cédula (solo dígitos numéricos, mínimo 11)
+  if (!isEdit || cedula !== undefined) {
+    if (!cedula) {
+      return 'La cédula de identidad es obligatoria.';
+    }
+    const cleanCed = String(cedula).replace(/\D/g, '');
+    if (cleanCed.length < 11) {
+      return 'La cédula debe contener al menos 11 dígitos numéricos.';
+    }
+  }
+
+  // 5. Correo Electrónico (sin espacios, formato válido)
+  if (!isEdit || correo !== undefined) {
+    if (!correo || typeof correo !== 'string') {
+      return 'El correo electrónico es obligatorio.';
+    }
+    if (/\s/.test(correo)) {
+      return 'El correo electrónico no puede contener espacios en blanco.';
+    }
+    const cleanMail = correo.trim();
+    if (!EMAIL_REGEX.test(cleanMail)) {
+      return 'Ingrese un correo electrónico con formato válido (ej. usuario@dominio.com).';
+    }
+  }
+
+  // 6. Teléfono (solo dígitos numéricos, mínimo 10)
+  if (!isEdit || telefono !== undefined) {
+    if (!telefono) {
+      return 'El teléfono de contacto es obligatorio.';
+    }
+    const cleanTel = String(telefono).replace(/\D/g, '');
+    if (cleanTel.length < 10) {
+      return 'El teléfono debe contener al menos 10 dígitos numéricos.';
+    }
+  }
+
+  // 7. Rol y Sucursal
+  let targetRoleId = rol_id !== undefined ? parseInt(rol_id, 10) : currentWorker?.rol_id;
+  if (!isEdit || rol_id !== undefined) {
+    if (!targetRoleId || isNaN(targetRoleId)) {
+      return 'Debe seleccionar un rol de usuario válido.';
+    }
+  }
+
+  let roleName = null;
+  if (targetRoleId) {
+    const roleRes = await pool.query('SELECT id, nombre_rol FROM roles_equipo WHERE id = $1', [targetRoleId]);
+    if (roleRes.rows.length === 0) {
+      return 'El rol seleccionado no existe en el sistema.';
+    }
+    roleName = roleRes.rows[0].nombre_rol;
+  }
+
+  // Si no es SuperAdmin, la sucursal es obligatoria y debe existir
+  if (roleName && roleName !== 'SuperAdmin') {
+    const targetBranchId = sucursal_id !== undefined ? (sucursal_id ? parseInt(sucursal_id, 10) : null) : currentWorker?.sucursal_id;
+    if (!targetBranchId) {
+      return 'Debe asignar una sucursal activa para este rol de usuario.';
+    }
+    const branchRes = await pool.query('SELECT id FROM datos_sucursales WHERE id = $1 AND activo = TRUE', [targetBranchId]);
+    if (branchRes.rows.length === 0) {
+      return 'La sucursal asignada no existe o se encuentra inactiva.';
+    }
+  }
+
+  // 8. Contraseña (sin espacios, mínimo 8 caracteres)
+  if (!isEdit) {
+    if (!password || typeof password !== 'string') {
+      return 'La contraseña es obligatoria.';
+    }
+    if (/\s/.test(password)) {
+      return 'La contraseña no puede contener espacios en blanco.';
+    }
+    if (password.length < 8) {
+      return 'La contraseña debe tener al menos 8 caracteres.';
+    }
+  } else if (password !== undefined && password !== null && String(password).length > 0) {
+    if (/\s/.test(password)) {
+      return 'La nueva contraseña no puede contener espacios en blanco.';
+    }
+    if (String(password).length < 8) {
+      return 'La nueva contraseña debe tener al menos 8 caracteres.';
+    }
+  }
+
+  return null;
+};
+
 /**
  * Obtener listado de todos los trabajadores con sus roles y sucursales.
  * GET /api/trabajadores
@@ -142,6 +276,17 @@ const getWorkerById = async (req, res) => {
  */
 const createWorker = async (req, res) => {
   try {
+    const pool = getPool();
+
+    // 1. Validar reglas de negocio del payload
+    const validationError = await validateWorkerPayload(pool, req.body, false);
+    if (validationError) {
+      return res.status(400).json({
+        ok: false,
+        message: validationError
+      });
+    }
+
     const {
       usuario,
       password,
@@ -155,25 +300,16 @@ const createWorker = async (req, res) => {
       foto_perfil_url
     } = req.body;
 
-    // 1. Validar campos obligatorios
-    if (!usuario || !password || !nombre || !apellido || !cedula || !telefono || !correo || !rol_id) {
-      return res.status(400).json({
-        ok: false,
-        message: 'Todos los campos obligatorios deben ser proporcionados (usuario, password, nombre, apellido, cedula, telefono, correo, rol_id).'
-      });
-    }
-
     const cleanUsername = String(usuario).trim().toLowerCase();
     const cleanEmail = String(correo).trim().toLowerCase();
-    const cleanCedula = String(cedula).trim();
+    const cleanCedula = String(cedula).replace(/\D/g, '');
+    const cleanTelefono = String(telefono).replace(/\D/g, '');
 
     // 2. Control de asignación de sucursal según rol del usuario autenticado
     let assignedBranchId = sucursal_id ? parseInt(sucursal_id, 10) : null;
     if (!req.isSuperAdmin && req.filterSucursalId) {
       assignedBranchId = req.filterSucursalId;
     }
-
-    const pool = getPool();
 
     // 3. Verificar duplicados (usuario, correo, cedula)
     const duplicateCheckQuery = `
@@ -193,7 +329,7 @@ const createWorker = async (req, res) => {
 
       return res.status(409).json({
         ok: false,
-        message: `Ya existe un trabajador registrado con este ${fieldConflict}.`
+        message: `Ya existe un usuario registrado con este ${fieldConflict}.`
       });
     }
 
@@ -237,22 +373,22 @@ const createWorker = async (req, res) => {
       nombre.trim(),
       apellido.trim(),
       cleanCedula,
-      telefono.trim(),
+      cleanTelefono,
       cleanEmail,
       hashedPassword,
-      foto_perfil_url || null
+      foto_perfil_url ? String(foto_perfil_url).trim() : null
     ]);
 
     return res.status(201).json({
       ok: true,
-      message: 'Trabajador registrado exitosamente.',
+      message: 'Usuario registrado exitosamente.',
       data: insertResult.rows[0]
     });
   } catch (error) {
     console.error('❌ Error en createWorker:', error);
     return res.status(500).json({
       ok: false,
-      message: 'Ocurrió un error al registrar el nuevo trabajador.',
+      message: 'Ocurrió un error al registrar el nuevo usuario.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -268,7 +404,41 @@ const updateWorker = async (req, res) => {
     if (isNaN(workerId)) {
       return res.status(400).json({
         ok: false,
-        message: 'El ID del trabajador es inválido.'
+        message: 'El ID del usuario proporcionado es inválido.'
+      });
+    }
+
+    const pool = getPool();
+
+    // 1. Verificar existencia del trabajador
+    const checkWorkerRes = await pool.query(
+      'SELECT id, sucursal_id, rol_id, password FROM datos_trabajadores WHERE id = $1',
+      [workerId]
+    );
+
+    if (checkWorkerRes.rows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        message: 'Usuario no encontrado.'
+      });
+    }
+
+    const currentWorker = checkWorkerRes.rows[0];
+
+    // Aislamiento por sucursal
+    if (!req.isSuperAdmin && req.filterSucursalId && currentWorker.sucursal_id !== req.filterSucursalId) {
+      return res.status(403).json({
+        ok: false,
+        message: 'No tiene permisos para modificar usuarios de otra sucursal.'
+      });
+    }
+
+    // 2. Validar reglas de negocio del payload
+    const validationError = await validateWorkerPayload(pool, req.body, true, currentWorker);
+    if (validationError) {
+      return res.status(400).json({
+        ok: false,
+        message: validationError
       });
     }
 
@@ -285,43 +455,24 @@ const updateWorker = async (req, res) => {
       foto_perfil_url
     } = req.body;
 
-    const pool = getPool();
+    const cleanUsername = usuario !== undefined ? String(usuario).trim().toLowerCase() : undefined;
+    const cleanEmail = correo !== undefined ? String(correo).trim().toLowerCase() : undefined;
+    const cleanCedula = cedula !== undefined ? String(cedula).replace(/\D/g, '') : undefined;
+    const cleanTelefono = telefono !== undefined ? String(telefono).replace(/\D/g, '') : undefined;
 
-    // 1. Verificar existencia del trabajador
-    const checkWorkerRes = await pool.query(
-      'SELECT id, sucursal_id, password FROM datos_trabajadores WHERE id = $1',
-      [workerId]
-    );
-
-    if (checkWorkerRes.rows.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        message: 'Trabajador no encontrado.'
-      });
-    }
-
-    const currentWorker = checkWorkerRes.rows[0];
-
-    // Aislamiento por sucursal
-    if (!req.isSuperAdmin && req.filterSucursalId && currentWorker.sucursal_id !== req.filterSucursalId) {
-      return res.status(403).json({
-        ok: false,
-        message: 'No tiene permisos para modificar trabajadores de otra sucursal.'
-      });
-    }
-
-    const cleanUsername = usuario ? String(usuario).trim().toLowerCase() : undefined;
-    const cleanEmail = correo ? String(correo).trim().toLowerCase() : undefined;
-    const cleanCedula = cedula ? String(cedula).trim() : undefined;
-
-    // 2. Validar duplicados en otros trabajadores
+    // 3. Validar duplicados en otros trabajadores
     const duplicateQuery = `
       SELECT id, usuario, correo, cedula
       FROM datos_trabajadores
       WHERE (LOWER(usuario) = $1 OR LOWER(correo) = $2 OR cedula = $3) AND id != $4
       LIMIT 1
     `;
-    const duplicateRes = await pool.query(duplicateQuery, [cleanUsername, cleanEmail, cleanCedula, workerId]);
+    const duplicateRes = await pool.query(duplicateQuery, [
+      cleanUsername || '',
+      cleanEmail || '',
+      cleanCedula || '',
+      workerId
+    ]);
 
     if (duplicateRes.rows.length > 0) {
       const existing = duplicateRes.rows[0];
@@ -332,23 +483,23 @@ const updateWorker = async (req, res) => {
 
       return res.status(409).json({
         ok: false,
-        message: `El ${fieldConflict} ya se encuentra asignado a otro trabajador.`
+        message: `El ${fieldConflict} ya se encuentra asignado a otro usuario.`
       });
     }
 
-    // 3. Evaluar actualización de contraseña
+    // 4. Evaluar actualización de contraseña
     let finalPassword = currentWorker.password;
     if (password && String(password).trim().length > 0) {
       finalPassword = await bcrypt.hash(String(password).trim(), 10);
     }
 
-    // 4. Determinar sucursal asignada
+    // 5. Determinar sucursal asignada
     let branchToAssign = sucursal_id !== undefined ? (sucursal_id ? parseInt(sucursal_id, 10) : null) : currentWorker.sucursal_id;
     if (!req.isSuperAdmin && req.filterSucursalId) {
       branchToAssign = req.filterSucursalId;
     }
 
-    // 5. Ejecutar actualización
+    // 6. Ejecutar actualización
     const updateQuery = `
       UPDATE datos_trabajadores
       SET 
@@ -380,29 +531,29 @@ const updateWorker = async (req, res) => {
     `;
 
     const updateRes = await pool.query(updateQuery, [
-      cleanUsername || null,
-      nombre ? nombre.trim() : null,
-      apellido ? apellido.trim() : null,
-      cleanCedula || null,
-      telefono ? telefono.trim() : null,
-      cleanEmail || null,
-      rol_id ? parseInt(rol_id, 10) : null,
+      cleanUsername !== undefined ? cleanUsername : null,
+      nombre !== undefined ? nombre.trim() : null,
+      apellido !== undefined ? apellido.trim() : null,
+      cleanCedula !== undefined ? cleanCedula : null,
+      cleanTelefono !== undefined ? cleanTelefono : null,
+      cleanEmail !== undefined ? cleanEmail : null,
+      rol_id !== undefined ? parseInt(rol_id, 10) : null,
       branchToAssign,
-      foto_perfil_url !== undefined ? foto_perfil_url : null,
+      foto_perfil_url !== undefined ? (foto_perfil_url ? String(foto_perfil_url).trim() : null) : null,
       finalPassword,
       workerId
     ]);
 
     return res.status(200).json({
       ok: true,
-      message: 'Trabajador actualizado exitosamente.',
+      message: 'Usuario actualizado exitosamente.',
       data: updateRes.rows[0]
     });
   } catch (error) {
     console.error('❌ Error en updateWorker:', error);
     return res.status(500).json({
       ok: false,
-      message: 'Ocurrió un error al actualizar los datos del trabajador.',
+      message: 'Ocurrió un error al actualizar los datos del usuario.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

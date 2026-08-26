@@ -183,9 +183,19 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ---
 
-### 3.3 Registrar Nuevo Trabajador
+### 3.3 Registrar Nuevo Trabajador / Usuario
 - **Ruta:** `POST /api/trabajadores`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Reglas de Validación Estrictas:**
+  - `nombre` y `apellido`: Obligatorios (string, min. 2 caracteres).
+  - `usuario`: Obligatorio (string, min. 6 caracteres, sin espacios en blanco).
+  - `cedula`: Obligatoria (solo dígitos numéricos, min. 11).
+  - `correo`: Obligatorio (formato email estándar válido, sin espacios en blanco).
+  - `telefono`: Obligatorio (solo dígitos numéricos, min. 10).
+  - `rol_id`: Obligatorio (ID válido y existente en `roles_equipo`).
+  - `sucursal_id`: Obligatorio para roles de sede (`Admin_Sucursal`, `Secretaria`, `Tecnico`). Para `SuperAdmin` se permite `null` (acceso global).
+  - `password`: Obligatoria (string, min. 8 caracteres, sin espacios en blanco).
+  - `foto_perfil_url`: Opcional (URL válida o `null`).
 - **Body (JSON):**
   ```json
   {
@@ -193,8 +203,8 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
     "password": "PasswordSegura123",
     "nombre": "Juan",
     "apellido": "López",
-    "cedula": "056-1234567-8",
-    "telefono": "809-555-8899",
+    "cedula": "05612345678",
+    "telefono": "8095558899",
     "correo": "juan.lopez@franyermobile.com",
     "rol_id": 4,
     "sucursal_id": 1,
@@ -205,47 +215,70 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
   ```json
   {
     "ok": true,
-    "message": "Trabajador registrado exitosamente.",
+    "message": "Usuario registrado exitosamente.",
     "data": {
       "id": 5,
+      "sucursal_id": 1,
+      "rol_id": 4,
       "usuario": "tecnico.juan",
       "nombre": "Juan",
       "apellido": "López",
+      "cedula": "05612345678",
+      "telefono": "8095558899",
       "correo": "juan.lopez@franyermobile.com",
-      "activo": true
+      "foto_perfil_url": null,
+      "activo": true,
+      "created_at": "2026-08-26T17:00:00.000Z"
     }
   }
   ```
-- **Errores:** `400 Bad Request` (campos faltantes), `409 Conflict` (usuario/correo/cédula duplicado).
+- **Errores:**
+  - `400 Bad Request`: Formato o longitud inválida en campos (`"El nombre de usuario no puede contener espacios en blanco."`, `"La contraseña debe tener al menos 8 caracteres."`, etc.).
+  - `409 Conflict`: Conflicto por duplicidad en `usuario`, `correo` o `cedula`.
 
 ---
 
-### 3.4 Actualizar Trabajador
+### 3.4 Actualizar Trabajador / Usuario
 - **Ruta:** `PUT /api/trabajadores/:id`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Reglas de Validación:**
+  - Aplica las mismas validaciones de formato, longitud mínima y bloqueo de espacios que en creación.
+  - `password` es opcional; si se incluye con texto, debe tener mínimo 8 caracteres sin espacios.
 - **Body (JSON):**
   ```json
   {
     "nombre": "Juan Carlos",
     "apellido": "López",
-    "telefono": "809-555-8800",
+    "telefono": "8095558800",
     "correo": "jc.lopez@franyermobile.com",
-    "password": ""
+    "password": "",
+    "rol_id": 4,
+    "sucursal_id": 1,
+    "foto_perfil_url": "https://example.com/avatar.jpg"
   }
   ```
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
     "ok": true,
-    "message": "Trabajador actualizado exitosamente.",
+    "message": "Usuario actualizado exitosamente.",
     "data": {
       "id": 5,
+      "sucursal_id": 1,
+      "rol_id": 4,
+      "usuario": "tecnico.juan",
       "nombre": "Juan Carlos",
       "apellido": "López",
-      "correo": "jc.lopez@franyermobile.com"
+      "cedula": "05612345678",
+      "telefono": "8095558800",
+      "correo": "jc.lopez@franyermobile.com",
+      "foto_perfil_url": "https://example.com/avatar.jpg",
+      "activo": true,
+      "updated_at": "2026-08-26T17:15:00.000Z"
     }
   }
   ```
+- **Errores:** `400 Bad Request` (datos inválidos), `404 Not Found`, `409 Conflict` (duplicados en otros usuarios).
 
 ---
 

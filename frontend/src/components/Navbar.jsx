@@ -44,16 +44,22 @@ const Navbar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
       {/* Extremo Derecho Desktop (>= 1024px): Perfil de Usuario + Logout */}
       <div className="hidden lg:flex items-center gap-3 sm:gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-zinc-800 text-zinc-100 dark:bg-zinc-700 font-bold text-xs flex items-center justify-center border border-zinc-700 shadow-sm overflow-hidden">
+          <div className="w-9 h-9 rounded-xl bg-zinc-800 text-zinc-100 dark:bg-zinc-700 font-bold text-xs flex items-center justify-center border border-zinc-700 shadow-sm overflow-hidden shrink-0 relative">
             {user?.foto_perfil_url ? (
               <img
                 src={user.foto_perfil_url}
                 alt={user.nombre}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                  if (fallback) fallback.classList.remove('hidden');
+                }}
               />
-            ) : (
-              <span>{getInitials(user?.nombre, user?.apellido)}</span>
-            )}
+            ) : null}
+            <span className={`avatar-fallback ${user?.foto_perfil_url ? 'hidden' : ''}`}>
+              {getInitials(user?.nombre, user?.apellido)}
+            </span>
           </div>
 
           <div className="hidden sm:block text-left">

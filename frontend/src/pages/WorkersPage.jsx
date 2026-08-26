@@ -414,9 +414,23 @@ const WorkersPage = () => {
                       {/* Columna 1: Trabajador / Usuario */}
                       <td className="py-3.5 px-4 sm:px-6">
                         <div className="flex items-center gap-3">
-                          {/* Avatar / Iniciales */}
-                          <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-sm shrink-0 border border-red-200/60 dark:border-red-900/40">
-                            {getInitials(worker.nombre, worker.apellido)}
+                          {/* Avatar / Foto de Perfil / Iniciales */}
+                          <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-sm shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden relative">
+                            {worker.foto_perfil_url ? (
+                              <img
+                                src={worker.foto_perfil_url}
+                                alt={`${worker.nombre} ${worker.apellido}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                                  if (fallback) fallback.classList.remove('hidden');
+                                }}
+                              />
+                            ) : null}
+                            <span className={`avatar-fallback ${worker.foto_perfil_url ? 'hidden' : ''}`}>
+                              {getInitials(worker.nombre, worker.apellido)}
+                            </span>
                           </div>
                           <div>
                             <p className="font-semibold text-neutral-900 dark:text-neutral-100">

@@ -53,11 +53,11 @@ const WorkerModal = ({
   roles = [],
   sucursales = []
 }) => {
-
   const sucursalesList = extractArray(sucursales);
   const rolesList = extractArray(roles);
 
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+  const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -65,15 +65,28 @@ const WorkerModal = ({
   const selectedRoleObj = rolesList.find((r) => String(r.id) === String(formData.rol_id));
   const isSuperAdminRole = selectedRoleObj?.nombre_rol === 'SuperAdmin';
 
+  const hasChanges = !isEdit || Boolean(
+    formData.nombre.trim() !== (worker?.nombre || '').trim() ||
+    formData.apellido.trim() !== (worker?.apellido || '').trim() ||
+    formData.usuario.trim().toLowerCase() !== (worker?.usuario || '').trim().toLowerCase() ||
+    formData.cedula.replace(/\D/g, '') !== String(worker?.cedula || '').replace(/\D/g, '') ||
+    formData.telefono.replace(/\D/g, '') !== String(worker?.telefono || '').replace(/\D/g, '') ||
+    formData.correo.trim().toLowerCase() !== (worker?.correo || '').trim().toLowerCase() ||
+    String(formData.rol_id || '') !== String(worker?.rol_id || '') ||
+    String(formData.sucursal_id || '') !== String(worker?.sucursal_id || '') ||
+    Boolean(formData.password && formData.password.trim().length > 0) ||
+    (formData.foto_perfil_url || '').trim() !== (worker?.foto_perfil_url || '').trim()
+  );
+
   useEffect(() => {
     if (worker && isEdit) {
       setFormData({
         nombre: worker.nombre || '',
         apellido: worker.apellido || '',
-        usuario: worker.usuario || '',
-        cedula: worker.cedula || '',
-        telefono: worker.telefono || '',
-        correo: worker.correo || '',
+        usuario: worker.usuario ? String(worker.usuario).replace(/\s/g, '') : '',
+        cedula: worker.cedula ? String(worker.cedula).replace(/\D/g, '') : '',
+        telefono: worker.telefono ? String(worker.telefono).replace(/\D/g, '') : '',
+        correo: worker.correo ? String(worker.correo).replace(/\s/g, '') : '',
         password: '',
         rol_id: worker.rol_id ? String(worker.rol_id) : '',
         sucursal_id: worker.sucursal_id ? String(worker.sucursal_id) : '',
@@ -86,40 +99,145 @@ const WorkerModal = ({
         sucursal_id: sucursalesList.length > 0 ? String(sucursalesList[0].id) : ''
       });
     }
+    setErrors({});
     setShowPassword(false);
   }, [worker, isEdit, isOpen, roles, sucursales]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+    if (name === 'cedula' || name === 'telefono') {
+      value = value.replace(/\D/g, '');
+    }
+    if (name === 'usuario' || name === 'correo' || name === 'password') {
+      value = value.replace(/\s/g, '');
+    }
+
+    if (name === 'rol_id') {
+      const selectedRole = rolesList.find((r) => String(r.id) === String(value));
+      if (selectedRole?.nombre_rol === 'SuperAdmin') {
+        setFormData((prev) => ({ ...prev, rol_id: value, sucursal_id: '' }));
+        setErrors((prev) => ({ ...prev, rol_id: '', sucursal_id: '' }));
+        return;
+      }
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleKeyDownNoSpace = (e) => {
+    if (e.key === ' ' || e.keyCode === 32) {
+      e.preventDefault();
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    // 1. Nombre
+    if (!formData.nombre.trim()) {
+      newErrors.nombre = 'El nombre es obligatorio.';
+    } else if (formData.nombre.trim().length < 2) {
+      newErrors.nombre = 'El nombre debe tener al menos 2 caracteres.';
+    }
+
+    // 2. Apellido
+    if (!formData.apellido.trim()) {
+      newErrors.apellido = 'El apellido es obligatorio.';
+    } else if (formData.apellido.trim().length < 2) {
+      newErrors.apellido = 'El apellido debe tener al menos 2 caracteres.';
+    }
+
+    // 3. Nombre de Usuario
+    if (!formData.usuario.trim()) {
+      newErrors.usuario = 'El nombre de usuario es obligatorio.';
+    } else if (/\s/.test(formData.usuario)) {
+      newErrors.usuario = 'El nombre de usuario no puede contener espacios.';
+    } else if (formData.usuario.trim().length < 6) {
+      newErrors.usuario = 'El usuario debe tener al menos 6 caracteres.';
+    }
+
+    // 4. Cédula de Identidad (solo dígitos, mínimo 11)
+    if (!formData.cedula.trim()) {
+      newErrors.cedula = 'La cédula de identidad es obligatoria.';
+    } else if (formData.cedula.trim().length < 11) {
+      newErrors.cedula = 'La cédula debe contener al menos 11 dígitos numéricos.';
+    }
+
+    // 5. Correo Electrónico
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.correo.trim()) {
+      newErrors.correo = 'El correo electrónico es obligatorio.';
+    } else if (/\s/.test(formData.correo)) {
+      newErrors.correo = 'El correo electrónico no puede contener espacios.';
+    } else if (!emailRegex.test(formData.correo.trim())) {
+      newErrors.correo = 'Ingrese un correo electrónico válido (ej. usuario@dominio.com).';
+    }
+
+    // 6. Teléfono / WhatsApp (solo dígitos, mínimo 10)
+    if (!formData.telefono.trim()) {
+      newErrors.telefono = 'El teléfono de contacto es obligatorio.';
+    } else if (formData.telefono.trim().length < 10) {
+      newErrors.telefono = 'El teléfono debe contener al menos 10 dígitos numéricos.';
+    }
+
+    // 7. Rol en el Equipo
+    if (!formData.rol_id) {
+      newErrors.rol_id = 'Debe seleccionar un rol en el equipo.';
+    }
+
+    // Sucursal Asignada (requerida si no es SuperAdmin)
+    if (!isSuperAdminRole && !formData.sucursal_id) {
+      newErrors.sucursal_id = 'Debe seleccionar una sucursal para este rol.';
+    }
+
+    // 8. Contraseña
+    if (!isEdit) {
+      if (!formData.password) {
+        newErrors.password = 'La contraseña de acceso es obligatoria.';
+      } else if (/\s/.test(formData.password)) {
+        newErrors.password = 'La contraseña no puede contener espacios.';
+      } else if (formData.password.length < 8) {
+        newErrors.password = 'La contraseña debe tener al menos 8 caracteres.';
+      }
+    } else if (formData.password) {
+      if (/\s/.test(formData.password)) {
+        newErrors.password = 'La nueva contraseña no puede contener espacios.';
+      } else if (formData.password.length < 8) {
+        newErrors.password = 'La nueva contraseña debe tener al menos 8 caracteres.';
+      }
+    }
+
+    return newErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.nombre.trim() || !formData.apellido.trim() || !formData.usuario.trim()) {
-      sileo.error({
-        title: 'Campos requeridos',
-        description: 'Por favor complete el nombre, apellido y nombre de usuario.'
+    if (isEdit && !hasChanges) {
+      sileo.info({
+        title: 'Sin cambios',
+        description: 'No se detectaron cambios para actualizar.'
       });
+      onClose();
       return;
     }
 
-    if (!isEdit && !formData.password.trim()) {
-      sileo.error({
-        title: 'Contraseña obligatoria',
-        description: 'Debe ingresar una contraseña para el nuevo usuario.'
-      });
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
       return;
     }
 
     const payload = {
       nombre: formData.nombre.trim(),
       apellido: formData.apellido.trim(),
-      usuario: formData.usuario.trim(),
+      usuario: formData.usuario.trim().toLowerCase(),
       cedula: formData.cedula.trim(),
       telefono: formData.telefono.trim(),
-      correo: formData.correo.trim(),
+      correo: formData.correo.trim().toLowerCase(),
       rol_id: parseInt(formData.rol_id, 10),
       sucursal_id: formData.sucursal_id ? parseInt(formData.sucursal_id, 10) : null,
       foto_perfil_url: formData.foto_perfil_url.trim() || null
@@ -173,7 +291,7 @@ const WorkerModal = ({
       }
       maxWidth="max-w-3xl"
     >
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} noValidate className="space-y-3">
         {/* Fila 1: Nombre y Apellido */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div>
@@ -183,12 +301,18 @@ const WorkerModal = ({
             <input
               type="text"
               name="nombre"
-              required
               value={formData.nombre}
               onChange={handleChange}
               placeholder="Ej. Franyer"
-              className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors"
+              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
+                errors.nombre
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+              }`}
             />
+            {errors.nombre && (
+              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.nombre}</p>
+            )}
           </div>
 
           <div>
@@ -198,12 +322,18 @@ const WorkerModal = ({
             <input
               type="text"
               name="apellido"
-              required
               value={formData.apellido}
               onChange={handleChange}
               placeholder="Ej. Fernández"
-              className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors"
+              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
+                errors.apellido
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+              }`}
             />
+            {errors.apellido && (
+              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.apellido}</p>
+            )}
           </div>
         </div>
 
@@ -220,13 +350,20 @@ const WorkerModal = ({
               <input
                 type="text"
                 name="usuario"
-                required
                 value={formData.usuario}
                 onChange={handleChange}
+                onKeyDown={handleKeyDownNoSpace}
                 placeholder="usuario.login"
-                className="w-full pl-8 pr-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors"
+                className={`w-full pl-8 pr-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
+                  errors.usuario
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                    : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+                }`}
               />
             </div>
+            {errors.usuario && (
+              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.usuario}</p>
+            )}
           </div>
 
           <div>
@@ -236,12 +373,18 @@ const WorkerModal = ({
             <input
               type="text"
               name="cedula"
-              required
               value={formData.cedula}
               onChange={handleChange}
-              placeholder="056-0000000-1"
-              className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors"
+              placeholder="05600000001 (solo números)"
+              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
+                errors.cedula
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+              }`}
             />
+            {errors.cedula && (
+              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.cedula}</p>
+            )}
           </div>
         </div>
 
@@ -254,12 +397,19 @@ const WorkerModal = ({
             <input
               type="email"
               name="correo"
-              required
               value={formData.correo}
               onChange={handleChange}
+              onKeyDown={handleKeyDownNoSpace}
               placeholder="correo@franyermobile.com"
-              className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors"
+              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
+                errors.correo
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+              }`}
             />
+            {errors.correo && (
+              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.correo}</p>
+            )}
           </div>
 
           <div>
@@ -269,12 +419,18 @@ const WorkerModal = ({
             <input
               type="tel"
               name="telefono"
-              required
               value={formData.telefono}
               onChange={handleChange}
-              placeholder="809-555-0101"
-              className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors"
+              placeholder="8095550101 (solo números)"
+              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
+                errors.telefono
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+              }`}
             />
+            {errors.telefono && (
+              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.telefono}</p>
+            )}
           </div>
         </div>
 
@@ -286,17 +442,24 @@ const WorkerModal = ({
             </label>
             <select
               name="rol_id"
-              required
               value={formData.rol_id}
               onChange={handleChange}
-              className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors cursor-pointer"
+              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 transition-colors cursor-pointer ${
+                errors.rol_id
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+              }`}
             >
+              <option value="" disabled>Seleccione un rol</option>
               {rolesList.map((r) => (
                 <option key={r.id} value={String(r.id)}>
                   {formatRoleName(r.nombre_rol || r.nombre)}
                 </option>
               ))}
             </select>
+            {errors.rol_id && (
+              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.rol_id}</p>
+            )}
           </div>
 
           <div>
@@ -305,10 +468,14 @@ const WorkerModal = ({
             </label>
             <select
               name="sucursal_id"
-              required={!isSuperAdminRole}
-              value={formData.sucursal_id}
+              disabled={isSuperAdminRole}
+              value={isSuperAdminRole ? '' : formData.sucursal_id}
               onChange={handleChange}
-              className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors cursor-pointer"
+              className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-neutral-100 dark:disabled:bg-neutral-800 ${
+                errors.sucursal_id
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+              }`}
             >
               {isSuperAdminRole ? (
                 <option value="">Global / Sin Asignar (SuperAdmin)</option>
@@ -321,6 +488,9 @@ const WorkerModal = ({
                 </option>
               ))}
             </select>
+            {errors.sucursal_id && (
+              <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.sucursal_id}</p>
+            )}
           </div>
         </div>
 
@@ -334,11 +504,15 @@ const WorkerModal = ({
             <input
               type={showPassword ? 'text' : 'password'}
               name="password"
-              required={!isEdit}
               value={formData.password}
               onChange={handleChange}
-              placeholder={isEdit ? 'Dejar en blanco para mantener la actual' : 'Contraseña inicial'}
-              className="w-full pl-3.5 pr-11 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors"
+              onKeyDown={handleKeyDownNoSpace}
+              placeholder={isEdit ? 'Dejar en blanco para mantener la actual' : 'Mínimo 8 caracteres'}
+              className={`w-full pl-3.5 pr-11 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${
+                errors.password
+                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+              }`}
             />
             <button
               type="button"
@@ -349,6 +523,9 @@ const WorkerModal = ({
               <MorphIcon icon={showPassword ? EyeOff : Eye} size={18} spring="smooth" />
             </button>
           </div>
+          {errors.password && (
+            <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.password}</p>
+          )}
         </div>
 
         {/* Botones de Acción */}
@@ -363,8 +540,8 @@ const WorkerModal = ({
           </button>
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="px-5 py-2 text-xs sm:text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+            disabled={isSubmitting || (isEdit && !hasChanges)}
+            className="px-5 py-2 text-xs sm:text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
           >
             {isSubmitting ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Crear Usuario'}
           </button>
