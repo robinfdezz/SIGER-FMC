@@ -20,11 +20,10 @@ import {
 
 const MENU_ITEMS = [
   { id: 'dashboard', name: 'Inicio / Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { id: 'opcion1', name: 'Opción 1', path: '/opcion-1', icon: Ticket },
-  { id: 'opcion2', name: 'Opción 2', path: '/opcion-2', icon: Wrench },
-  { id: 'opcion3', name: 'Opción 3', path: '/opcion-3', icon: ImageIcon },
-  { id: 'opcion4', name: 'Opción 4', path: '/opcion-4', icon: Users },
-  { id: 'opcion5', name: 'Opción 5', path: '/opcion-5', icon: Settings },
+  { id: 'tickets', name: 'Órdenes de Servicio', path: '/tickets', icon: Ticket },
+  { id: 'taller', name: 'Banco de Trabajo', path: '/taller', icon: Wrench },
+  { id: 'trabajadores', name: 'Usuarios', path: '/trabajadores', icon: Users },
+  { id: 'config', name: 'Configuración', path: '/configuracion', icon: Settings },
 ];
 
 const DashboardLayout = ({ children }) => {

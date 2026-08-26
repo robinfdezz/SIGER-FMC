@@ -14,6 +14,26 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - Integración con almacenamiento en la nube (Cloudinary) para evidencias fotográficas.
 - Portal público de seguimiento de tickets para clientes (`/tracking/:codigo_ticket`).
 
+### Added
+- Componente modular reutilizable `ConfirmModal.jsx` con variantes (`danger`, `warning`, `info`) y soporte de carga asíncrona.
+- Modal de confirmación interactivo antes de alternar el estado activo/inactivo de trabajadores.
+
+### Changed
+- Configuración global de `Toaster` (Sileo) reubicada a `top-center` y sincronizada dinámicamente con `ThemeContext` (Dark/Light).
+
+## [0.3.0] - 2026-08-26
+
+### Added
+- **Módulo Backend de Trabajadores (`datos_trabajadores`):**
+  - Endpoints CRUD (`/api/trabajadores`) protegidos con JWT y validación de roles (`SuperAdmin`, `Admin_Sucursal`).
+  - Validación de unicidad para usuario, cédula y correo[cite: 1].
+  - Encriptación segura de contraseñas con `bcryptjs` (10 rondas de salt)[cite: 1].
+  - Borrado lógico (`PATCH /api/trabajadores/:id/toggle-status`) con protección contra auto-desactivación de sesión[cite: 1].
+- **Módulo Frontend de Trabajadores:**
+  - Vista principal (`WorkersPage.jsx`) con filtros en tiempo real por texto, rol, sucursal y estado[cite: 1].
+  - Modal reutilizable (`WorkerModal.jsx`) de dos columnas para creación y edición de personal[cite: 1].
+  - Integración de notificaciones asíncronas con `sileo.promise` para los estados de carga, éxito y error.
+  - Servicios de consumo API (`workers.service.js` y `catalogs.service.js`).
 ---
 
 ## [0.2.0] - 2026-08-25

@@ -5,10 +5,20 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/Login/LoginPage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
+import WorkersPage from './pages/WorkersPage';
+import { useTheme } from './context/ThemeContext';
+import { Toaster } from 'sileo';
+import 'sileo/styles.css';
+
+const ThemedToaster = () => {
+  const { isDark } = useTheme();
+  return <Toaster position="top-center" theme={isDark ? 'dark' : 'light'} />;
+};
 
 function App() {
   return (
     <ThemeProvider>
+      <ThemedToaster />
       <AuthProvider>
         <BrowserRouter>
           <Routes>
@@ -21,6 +31,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/trabajadores"
+              element={
+                <ProtectedRoute>
+                  <WorkersPage />
                 </ProtectedRoute>
               }
             />

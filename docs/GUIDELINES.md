@@ -128,6 +128,20 @@ frontend/
 * **Acento Primario (Rojo Marca):** `#E11D48` / `#EF4444` (Rose/Red 600).
 * **Acento Hover/Focus:** `#BE123C` / `#DC2626` (Rose/Red 700).
 
+### Tipografía Oficial
+* **Fuente Corporativa:** **Sora** (Google Fonts) configurada como fuente predeterminada del sistema (`font-sans`).
+* **Familia CSS:** `'Sora', sans-serif`.
+* **Pesos Tipográficos:** Light (300), Regular (400), Medium (500), SemiBold (600), Bold (700), ExtraBold (800).
+* Se aplica de manera global y uniforme a todos los componentes de la interfaz (encabezados, párrafos, tablas, formularios, modales, badges y botones).
+
+### Estilo de Badges y Etiquetas
+* **Bordes y Radio:** Se utiliza **`rounded-lg`** o `rounded-md` con padding compacto (`px-2.5 py-1 text-xs font-medium border`), descartando la forma genérica de píldora (`rounded-full`).
+* **Etiquetas Limpias:** Se deben formatear siempre los nombres de roles a etiquetas de presentación legibles:
+  * `SuperAdmin` ➔ `Super Admin`
+  * `Admin_Sucursal` ➔ `Admin Sucursal`
+  * `Secretaria` ➔ `Secretaria`
+  * `Tecnico` ➔ `Técnico`
+
 ---
 
 ### Paleta Funcional para Estados (Badges & Tracking)
@@ -139,6 +153,13 @@ frontend/
 * **Listo para Entrega:** `#34D399`
 * **Entregado:** `#059669`
 * **Cancelado / No Reparado:** `#EF4444`
+
+---
+
+### Contenedores y Tarjetas de Gestión
+* **Cabecera y Filtros Integrados:** El título de la vista, la descripción, el botón de refrescar y el botón de acción principal (`+ Nuevo ...`) deben residir dentro de la misma tarjeta superior que contiene los buscadores y filtros.
+* **Filas Inactivas:** Las filas con registros deshabilitados o inactivos (`activo = false`) deben mostrarse con opacidad atenuada (`opacity-50`) para comunicar visualmente su estado sin alterar la alineación.
+* **Botones de Acción en Tablas:** Los botones de acción por fila (Editar, Activar/Desactivar) comparten dimensiones idénticas (`p-2 rounded-lg`), color base neutro (`text-neutral-500`) y estados hover sutiles.
 
 ---
 
@@ -165,9 +186,10 @@ frontend/
 ## 8. Patrones de Interfaz y UX (Modales vs. Páginas)
 
 ### Criterio de Selección: Modales vs. Vistas Dedicadas
-* **Modales (`Modal.jsx`):**
+* **Modales (`Modal.jsx` y `ConfirmModal.jsx`):**
   * Reservados exclusivamente para acciones atómicas, rápidas y formularios cortos que no deben perder el contexto de la vista principal.
-  * Casos de uso: Creación o edición rápida de clientes, cambio de estado de un ticket, registro puntual de una incidencia o subida de evidencia fotográfica.
+  * **Modal Estándar (`Modal.jsx`):** Creación o edición de entidades (trabajadores, clientes), formularios en dos columnas y selects dinámicos.
+  * **Modal de Confirmación (`ConfirmModal.jsx`):** Acciones críticas o destructivas (activar/desactivar cuentas, eliminar registros, cambiar estados sensibles) con variantes temáticas (`danger`, `warning`, `info`), iconos descriptivos y estados asíncronos (`isLoading`).
   * Características: Cierre con `Esc`, clic exterior opcional, backdrop con desenfoque suave (`backdrop-blur-xs`) y scroll interno si el contenido lo requiere.
 * **Vistas Dedicadas con Breadcrumbs y Stepper:**
   * Obligatorias para flujos largos, formularios complejos o vistas con alta densidad de datos.

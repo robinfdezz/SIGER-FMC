@@ -7,12 +7,12 @@
     color-scheme: light dark;
   }
   
-  html {
-    font-family: 'Inter', sans-serif;
+  html, body {
+    font-family: 'Sora', sans-serif;
   }
   
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Outfit', 'Inter', sans-serif;
+    font-family: 'Sora', sans-serif;
   }
 }
 

@@ -52,7 +52,8 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'Outfit', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Sora', 'system-ui', '-apple-system', 'sans-serif'],
+        sora: ['Sora', 'sans-serif'],
       },
       boxShadow: {
         'glow-brand': '0 0 20px -5px rgba(225, 29, 72, 0.35)',

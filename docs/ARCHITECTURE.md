@@ -66,7 +66,8 @@ frontend/
 │   │   ├── common/          # Componentes transversales y modulares
 │   │   │   ├── Breadcrumbs.jsx  # Cabecera contextual (Módulo / Subsección)
 │   │   │   ├── Stepper.jsx      # Asistente visual por etapas (Checklist/Presupuesto)
-│   │   │   └── Modal.jsx        # Ventana modal atómica (Clientes, estados rápidos)
+│   │   │   ├── Modal.jsx        # Ventana modal atómica (Clientes, edición)
+│   │   │   └── ConfirmModal.jsx # Modal de confirmación de acciones críticas
 │   │   ├── DashboardLayout.jsx  # Shell principal (Header + Sidebar + Menú móvil)
 │   │   ├── Navbar.jsx           # Header superior de 100% de ancho
 │   │   ├── Sidebar.jsx          # Barra lateral con 3 modos (expanded, hover, collapsed)
@@ -191,6 +192,6 @@ Para optimizar la experiencia de usuario y la confiabilidad operativa, el fronte
 1. **Rutas Dedicadas con Stepper (`/tickets/nuevo`):**
    - La recepción y apertura de tickets se estructura en una página independiente con asistente por pasos (`Stepper.jsx`) y migas de pan (`Breadcrumbs.jsx`).
    - Ventajas arquitectónicas: Garantiza compatibilidad nativa con el historial de navegación (botones atrás/adelante del navegador), previene pérdidas accidentales de datos extensos y permite validaciones modulares por etapa (Cliente/Equipo -> Diagnóstico/Checklist -> Presupuesto/Condiciones).
-2. **Modales Atómicos (`Modal.jsx`):**
-   - Acciones puntuales que no requieren salir de la tabla o vista actual (ej. creación rápida de un nuevo cliente desde un selector, cambio de estado del ticket, registro de un repuesto extra o carga de una fotografía de evidencia).
+2. **Modales Atómicos y de Confirmación (`Modal.jsx`, `ConfirmModal.jsx`):**
+   - Acciones puntuales que no requieren salir de la tabla o vista actual (ej. creación rápida de un nuevo cliente desde un selector, edición de datos de trabajadores, o confirmación modal obligatoria para activar/desactivar cuentas y registrar repuestos extras).
 

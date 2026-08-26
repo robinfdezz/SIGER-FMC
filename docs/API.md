@@ -124,7 +124,150 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ---
 
-## 3. Módulo de Servicios y Tickets (`/api/servicios`)
+## 3. Módulo de Trabajadores y Usuarios (`/api/trabajadores`)
+
+### 3.1 Listar Trabajadores
+- **Ruta:** `GET /api/trabajadores`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Query Params (Opcionales):** `sucursal_id` (solo SuperAdmin)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Listado de trabajadores obtenido con éxito.",
+    "data": [
+      {
+        "id": 1,
+        "sucursal_id": 1,
+        "rol_id": 1,
+        "usuario": "superadmin",
+        "nombre": "Franyer",
+        "apellido": "Administrador",
+        "cedula": "056-0000000-1",
+        "telefono": "809-555-0199",
+        "correo": "admin@franyermobile.com",
+        "foto_perfil_url": null,
+        "ultimo_login": "2026-08-25T18:45:00.000Z",
+        "activo": true,
+        "rol_nombre": "SuperAdmin",
+        "sucursal_nombre": "Franyer Mobile Center - SFM",
+        "sucursal_codigo": "MATRIZ"
+      }
+    ],
+    "total": 1
+  }
+  ```
+
+---
+
+### 3.2 Obtener Detalle de un Trabajador
+- **Ruta:** `GET /api/trabajadores/:id`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "data": {
+      "id": 1,
+      "usuario": "superadmin",
+      "nombre": "Franyer",
+      "apellido": "Administrador",
+      "cedula": "056-0000000-1",
+      "telefono": "809-555-0199",
+      "correo": "admin@franyermobile.com",
+      "rol_nombre": "SuperAdmin",
+      "sucursal_nombre": "Franyer Mobile Center - SFM"
+    }
+  }
+  ```
+
+---
+
+### 3.3 Registrar Nuevo Trabajador
+- **Ruta:** `POST /api/trabajadores`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Body (JSON):**
+  ```json
+  {
+    "usuario": "tecnico.juan",
+    "password": "PasswordSegura123",
+    "nombre": "Juan",
+    "apellido": "López",
+    "cedula": "056-1234567-8",
+    "telefono": "809-555-8899",
+    "correo": "juan.lopez@franyermobile.com",
+    "rol_id": 4,
+    "sucursal_id": 1,
+    "foto_perfil_url": null
+  }
+  ```
+- **Respuesta Exitosa (`201 Created`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Trabajador registrado exitosamente.",
+    "data": {
+      "id": 5,
+      "usuario": "tecnico.juan",
+      "nombre": "Juan",
+      "apellido": "López",
+      "correo": "juan.lopez@franyermobile.com",
+      "activo": true
+    }
+  }
+  ```
+- **Errores:** `400 Bad Request` (campos faltantes), `409 Conflict` (usuario/correo/cédula duplicado).
+
+---
+
+### 3.4 Actualizar Trabajador
+- **Ruta:** `PUT /api/trabajadores/:id`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Body (JSON):**
+  ```json
+  {
+    "nombre": "Juan Carlos",
+    "apellido": "López",
+    "telefono": "809-555-8800",
+    "correo": "jc.lopez@franyermobile.com",
+    "password": ""
+  }
+  ```
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Trabajador actualizado exitosamente.",
+    "data": {
+      "id": 5,
+      "nombre": "Juan Carlos",
+      "apellido": "López",
+      "correo": "jc.lopez@franyermobile.com"
+    }
+  }
+  ```
+
+---
+
+### 3.5 Alternar Estado (Activar / Desactivar)
+- **Ruta:** `PATCH /api/trabajadores/:id/toggle-status`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "El trabajador Juan Carlos López ha sido desactivado exitosamente.",
+    "data": {
+      "id": 5,
+      "usuario": "tecnico.juan",
+      "activo": false
+    }
+  }
+  ```
+
+---
+
+## 4. Módulo de Servicios y Tickets (`/api/servicios`)
 
 ### 3.1 Listar Órdenes de Servicio
 - **Ruta:** `GET /api/servicios`
