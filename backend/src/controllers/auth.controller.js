@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { getPool, sql } = require('../config/db');
+const { getPool } = require('../config/db');
 
 /**
  * Genera un token JWT para el trabajador autenticado.
@@ -31,7 +31,7 @@ const login = async (req, res) => {
     const cleanUsername = String(userIdentifier).trim().toLowerCase();
 
     // 2. Consultar usuario en la base de datos con JOIN a Roles y Sucursales
-    const pool = await getPool();
+    const pool = getPool();
     const query = `
       SELECT 
         t.id,
@@ -50,24 +50,22 @@ const login = async (req, res) => {
         r.nombre_rol AS rol_nombre,
         s.nombre_sucursal AS sucursal_nombre,
         s.codigo_sucursal AS sucursal_codigo
-      FROM Datos_Trabajadores t
-      INNER JOIN Roles_Equipo r ON t.rol_id = r.id
-      LEFT JOIN Datos_Sucursales s ON t.sucursal_id = s.id
-      WHERE LOWER(t.usuario) = @usuario
+      FROM datos_trabajadores t
+      INNER JOIN roles_equipo r ON t.rol_id = r.id
+      LEFT JOIN datos_sucursales s ON t.sucursal_id = s.id
+      WHERE LOWER(t.usuario) = $1
     `;
 
-    const result = await pool.request()
-      .input('usuario', sql.NVarChar(50), cleanUsername)
-      .query(query);
+    const result = await pool.query(query, [cleanUsername]);
 
-    if (result.recordset.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
         message: 'Credenciales inválidas. Verifique el usuario y la contraseña ingresados.'
       });
     }
 
-    const worker = result.recordset[0];
+    const worker = result.rows[0];
 
     // 3. Validar estado activo del trabajador
     if (!worker.activo) {
@@ -88,9 +86,10 @@ const login = async (req, res) => {
 
     // 5. Actualizar último acceso (ultimo_login)
     try {
-      await pool.request()
-        .input('workerId', sql.Int, worker.id)
-        .query('UPDATE Datos_Trabajadores SET ultimo_login = SYSDATETIME(), updated_at = SYSDATETIME() WHERE id = @workerId');
+      await pool.query(
+        'UPDATE datos_trabajadores SET ultimo_login = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+        [worker.id]
+      );
     } catch (updateErr) {
       console.error('Error al actualizar ultimo_login:', updateErr.message);
     }
@@ -158,7 +157,7 @@ const getMe = async (req, res) => {
       });
     }
 
-    const pool = await getPool();
+    const pool = getPool();
     const query = `
       SELECT 
         t.id,
@@ -176,24 +175,22 @@ const getMe = async (req, res) => {
         r.nombre_rol AS rol_nombre,
         s.nombre_sucursal AS sucursal_nombre,
         s.codigo_sucursal AS sucursal_codigo
-      FROM Datos_Trabajadores t
-      INNER JOIN Roles_Equipo r ON t.rol_id = r.id
-      LEFT JOIN Datos_Sucursales s ON t.sucursal_id = s.id
-      WHERE t.id = @userId
+      FROM datos_trabajadores t
+      INNER JOIN roles_equipo r ON t.rol_id = r.id
+      LEFT JOIN datos_sucursales s ON t.sucursal_id = s.id
+      WHERE t.id = $1
     `;
 
-    const result = await pool.request()
-      .input('userId', sql.Int, userId)
-      .query(query);
+    const result = await pool.query(query, [userId]);
 
-    if (result.recordset.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'El usuario asociado a esta sesión no fue encontrado.'
       });
     }
 
-    const worker = result.recordset[0];
+    const worker = result.rows[0];
 
     if (!worker.activo) {
       return res.status(403).json({

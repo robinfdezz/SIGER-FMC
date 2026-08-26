@@ -1,291 +1,253 @@
 -- ============================================================================
--- SCRIPT DE INICIALIZACIÓN DE BASE DE DATOS: SIGER_FMC_DB
--- Motor: Microsoft SQL Server (T-SQL)
+-- SCRIPT DE INICIALIZACIÓN DE BASE DE DATOS: siger_fmc_db
+-- Motor: PostgreSQL 15+ / 18.x
+-- Codificación: UTF-8
 -- ============================================================================
-
-IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'SIGER_FMC_DB')
-BEGIN
-    CREATE DATABASE SIGER_FMC_DB COLLATE Latin1_General_100_CI_AS_SC_UTF8;
-END
-GO
-
-USE SIGER_FMC_DB;
-GO
 
 -- 1. Tabla de Compañía Matriz
-IF OBJECT_ID('Datos_Companhia', 'U') IS NULL
-BEGIN
-    CREATE TABLE Datos_Companhia (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        nombre_empresa NVARCHAR(100) NOT NULL,
-        rnc NVARCHAR(20) NOT NULL,
-        telefono_principal NVARCHAR(20) NOT NULL,
-        correo_contacto NVARCHAR(100) NOT NULL,
-        direccion_fiscal NVARCHAR(MAX) NOT NULL,
-        logo_url NVARCHAR(255) NULL,
-        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME()
-    );
-END
-GO
+CREATE TABLE IF NOT EXISTS datos_companhia (
+    id SERIAL PRIMARY KEY,
+    nombre_empresa VARCHAR(100) NOT NULL,
+    rnc VARCHAR(20) NOT NULL,
+    telefono_principal VARCHAR(20) NOT NULL,
+    correo_contacto VARCHAR(100) NOT NULL,
+    direccion_fiscal TEXT NOT NULL,
+    logo_url VARCHAR(255) NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
 -- 2. Tabla de Sucursales
-IF OBJECT_ID('Datos_Sucursales', 'U') IS NULL
-BEGIN
-    CREATE TABLE Datos_Sucursales (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        companhia_id INT NOT NULL,
-        codigo_sucursal NVARCHAR(10) NOT NULL UNIQUE,
-        nombre_sucursal NVARCHAR(100) NOT NULL,
-        telefono NVARCHAR(20) NOT NULL,
-        direccion NVARCHAR(MAX) NOT NULL,
-        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        activo BIT NOT NULL DEFAULT 1,
-        CONSTRAINT FK_Sucursal_Companhia FOREIGN KEY (companhia_id) 
-            REFERENCES Datos_Companhia(id) ON UPDATE CASCADE
-    );
-END
-GO
+CREATE TABLE IF NOT EXISTS datos_sucursales (
+    id SERIAL PRIMARY KEY,
+    companhia_id INT NOT NULL,
+    codigo_sucursal VARCHAR(10) NOT NULL UNIQUE,
+    nombre_sucursal VARCHAR(100) NOT NULL,
+    telefono VARCHAR(20) NOT NULL,
+    direccion TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT fk_sucursal_companhia FOREIGN KEY (companhia_id) 
+        REFERENCES datos_companhia(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
 
 -- 3. Tabla de Roles de Equipo
-IF OBJECT_ID('Roles_Equipo', 'U') IS NULL
-BEGIN
-    CREATE TABLE Roles_Equipo (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        nombre_rol NVARCHAR(50) NOT NULL UNIQUE,
-        descripcion NVARCHAR(255) NULL,
-        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        activo BIT NOT NULL DEFAULT 1
-    );
-END
-GO
+CREATE TABLE IF NOT EXISTS roles_equipo (
+    id SERIAL PRIMARY KEY,
+    nombre_rol VARCHAR(50) NOT NULL UNIQUE,
+    descripcion VARCHAR(255) NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    activo BOOLEAN NOT NULL DEFAULT TRUE
+);
 
--- 4. Tabla de Trabajadores / Usuarios
-IF OBJECT_ID('Datos_Trabajadores', 'U') IS NULL
-BEGIN
-    CREATE TABLE Datos_Trabajadores (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        sucursal_id INT NULL,
-        rol_id INT NOT NULL,
-        usuario NVARCHAR(50) NOT NULL UNIQUE,
-        nombre NVARCHAR(50) NOT NULL,
-        apellido NVARCHAR(50) NOT NULL,
-        cedula NVARCHAR(20) NOT NULL,
-        telefono NVARCHAR(20) NOT NULL,
-        correo NVARCHAR(100) NOT NULL UNIQUE,
-        password NVARCHAR(255) NOT NULL,
-        foto_perfil_url NVARCHAR(255) NULL,
-        ultimo_login DATETIME2 NULL,
-        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        activo BIT NOT NULL DEFAULT 1,
-        CONSTRAINT FK_Trabajador_Sucursal FOREIGN KEY (sucursal_id) 
-            REFERENCES Datos_Sucursales(id),
-        CONSTRAINT FK_Trabajador_Rol FOREIGN KEY (rol_id) 
-            REFERENCES Roles_Equipo(id)
-    );
-END
-GO
+-- 4. Tabla de Trabajadores (Usuarios del Sistema)
+CREATE TABLE IF NOT EXISTS datos_trabajadores (
+    id SERIAL PRIMARY KEY,
+    sucursal_id INT NULL,
+    rol_id INT NOT NULL,
+    usuario VARCHAR(50) NOT NULL UNIQUE,
+    nombre VARCHAR(50) NOT NULL,
+    apellido VARCHAR(50) NOT NULL,
+    cedula VARCHAR(20) NOT NULL,
+    telefono VARCHAR(20) NOT NULL,
+    correo VARCHAR(100) NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    foto_perfil_url VARCHAR(255) NULL,
+    ultimo_login TIMESTAMPTZ NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT fk_trabajador_sucursal FOREIGN KEY (sucursal_id) 
+        REFERENCES datos_sucursales(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT fk_trabajador_rol FOREIGN KEY (rol_id) 
+        REFERENCES roles_equipo(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
 
 -- 5. Tabla de Categorías de Dispositivos
-IF OBJECT_ID('Categorias_Dispositivos', 'U') IS NULL
-BEGIN
-    CREATE TABLE Categorias_Dispositivos (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        nombre_categoria NVARCHAR(50) NOT NULL UNIQUE,
-        descripcion NVARCHAR(150) NULL,
-        activo BIT NOT NULL DEFAULT 1
-    );
-END
-GO
+CREATE TABLE IF NOT EXISTS categorias_dispositivos (
+    id SERIAL PRIMARY KEY,
+    nombre_categoria VARCHAR(50) NOT NULL UNIQUE,
+    descripcion VARCHAR(150) NULL,
+    activo BOOLEAN NOT NULL DEFAULT TRUE
+);
 
--- 6. Tabla de Estados de Servicio
-IF OBJECT_ID('Estados_Servicio', 'U') IS NULL
-BEGIN
-    CREATE TABLE Estados_Servicio (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        codigo_estado NVARCHAR(30) NOT NULL UNIQUE,
-        nombre_estado NVARCHAR(50) NOT NULL,
-        color_badge NVARCHAR(20) NOT NULL,
-        orden_flujo INT NOT NULL
-    );
-END
-GO
+-- 6. Tabla de Estados de Servicio Técnico
+CREATE TABLE IF NOT EXISTS estados_servicio (
+    id SERIAL PRIMARY KEY,
+    codigo_estado VARCHAR(30) NOT NULL UNIQUE,
+    nombre_estado VARCHAR(50) NOT NULL,
+    color_badge VARCHAR(20) NOT NULL,
+    orden_flujo INT NOT NULL
+);
 
--- 7. Tabla de Servicios / Recepción (Órdenes de Trabajo)
-IF OBJECT_ID('Servicios_Recepcion', 'U') IS NULL
-BEGIN
-    CREATE TABLE Servicios_Recepcion (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        codigo_ticket NVARCHAR(20) NOT NULL UNIQUE,
-        sucursal_id INT NOT NULL,
-        categoria_id INT NOT NULL,
-        usuario_recepcion_id INT NOT NULL,
-        estado_actual_id INT NOT NULL,
-        nombre_cliente NVARCHAR(100) NOT NULL,
-        telefono_cliente NVARCHAR(20) NOT NULL,
-        cedula_cliente NVARCHAR(20) NULL,
-        correo_cliente NVARCHAR(100) NULL,
-        marca_equipo NVARCHAR(50) NOT NULL,
-        modelo_equipo NVARCHAR(50) NOT NULL,
-        num_serie_imei NVARCHAR(50) NULL,
-        datos_acceso_equipo NVARCHAR(MAX) NULL,
-        falla_reportada NVARCHAR(MAX) NOT NULL,
-        observaciones_recepcion NVARCHAR(MAX) NULL,
-        checklist_entrada NVARCHAR(MAX) NULL,
-        costo_previsto DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-        monto_descuento DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-        costo_final_confirmado DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-        tiempo_garantia NVARCHAR(50) NULL DEFAULT '30 días',
-        condiciones_garantia NVARCHAR(MAX) NULL,
-        fecha_entrega_estimada DATE NULL,
-        fecha_entrega_real DATETIME2 NULL,
-        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        updated_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        activo BIT NOT NULL DEFAULT 1,
-        CONSTRAINT FK_Servicio_Sucursal FOREIGN KEY (sucursal_id) REFERENCES Datos_Sucursales(id),
-        CONSTRAINT FK_Servicio_Categoria FOREIGN KEY (categoria_id) REFERENCES Categorias_Dispositivos(id),
-        CONSTRAINT FK_Servicio_UsuarioRecepcion FOREIGN KEY (usuario_recepcion_id) REFERENCES Datos_Trabajadores(id),
-        CONSTRAINT FK_Servicio_EstadoActual FOREIGN KEY (estado_actual_id) REFERENCES Estados_Servicio(id)
-    );
-END
-GO
+-- 7. Tabla de Servicios de Recepción (Tickets / Órdenes de Trabajo)
+CREATE TABLE IF NOT EXISTS servicios_recepcion (
+    id SERIAL PRIMARY KEY,
+    codigo_ticket VARCHAR(20) NOT NULL UNIQUE,
+    sucursal_id INT NOT NULL,
+    categoria_id INT NOT NULL,
+    usuario_recepcion_id INT NOT NULL,
+    estado_actual_id INT NOT NULL,
+    nombre_cliente VARCHAR(100) NOT NULL,
+    telefono_cliente VARCHAR(20) NOT NULL,
+    cedula_cliente VARCHAR(20) NULL,
+    correo_cliente VARCHAR(100) NULL,
+    marca_equipo VARCHAR(50) NOT NULL,
+    modelo_equipo VARCHAR(50) NOT NULL,
+    num_serie_imei VARCHAR(50) NULL,
+    datos_acceso_equipo TEXT NULL,
+    falla_reportada TEXT NOT NULL,
+    observaciones_recepcion TEXT NULL,
+    checklist_entrada TEXT NULL,
+    costo_previsto NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    monto_descuento NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    costo_final_confirmado NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    tiempo_garantia VARCHAR(50) NULL DEFAULT '30 días',
+    condiciones_garantia TEXT NULL,
+    fecha_entrega_estimada DATE NULL,
+    fecha_entrega_real TIMESTAMPTZ NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT fk_servicio_sucursal FOREIGN KEY (sucursal_id) 
+        REFERENCES datos_sucursales(id),
+    CONSTRAINT fk_servicio_categoria FOREIGN KEY (categoria_id) 
+        REFERENCES categorias_dispositivos(id),
+    CONSTRAINT fk_servicio_recepcionista FOREIGN KEY (usuario_recepcion_id) 
+        REFERENCES datos_trabajadores(id),
+    CONSTRAINT fk_servicio_estado FOREIGN KEY (estado_actual_id) 
+        REFERENCES estados_servicio(id)
+);
 
--- 8. Técnicos Asignados
-IF OBJECT_ID('Tecnicos_Asignados', 'U') IS NULL
-BEGIN
-    CREATE TABLE Tecnicos_Asignados (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        servicio_id INT NOT NULL,
-        tecnico_id INT NOT NULL,
-        fecha_asignacion DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        es_principal BIT NOT NULL DEFAULT 1,
-        CONSTRAINT FK_TecnicoAsignado_Servicio FOREIGN KEY (servicio_id) 
-            REFERENCES Servicios_Recepcion(id) ON DELETE CASCADE,
-        CONSTRAINT FK_TecnicoAsignado_Tecnico FOREIGN KEY (tecnico_id) 
-            REFERENCES Datos_Trabajadores(id)
-    );
-END
-GO
+-- 8. Tabla de Técnicos Asignados
+CREATE TABLE IF NOT EXISTS tecnicos_asignados (
+    id SERIAL PRIMARY KEY,
+    servicio_id INT NOT NULL,
+    tecnico_id INT NOT NULL,
+    fecha_asignacion TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    es_principal BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT fk_asignacion_servicio FOREIGN KEY (servicio_id) 
+        REFERENCES servicios_recepcion(id) ON DELETE CASCADE,
+    CONSTRAINT fk_asignacion_tecnico FOREIGN KEY (tecnico_id) 
+        REFERENCES datos_trabajadores(id)
+);
 
--- 9. Historial de Estados (Auditoría / Línea de Tiempo)
-IF OBJECT_ID('Historial_Estados', 'U') IS NULL
-BEGIN
-    CREATE TABLE Historial_Estados (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        servicio_id INT NOT NULL,
-        estado_id INT NOT NULL,
-        usuario_id INT NOT NULL,
-        nota_cambio NVARCHAR(MAX) NULL,
-        fecha_registro DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        CONSTRAINT FK_Historial_Servicio FOREIGN KEY (servicio_id) 
-            REFERENCES Servicios_Recepcion(id) ON DELETE CASCADE,
-        CONSTRAINT FK_Historial_Estado FOREIGN KEY (estado_id) 
-            REFERENCES Estados_Servicio(id),
-        CONSTRAINT FK_Historial_Usuario FOREIGN KEY (usuario_id) 
-            REFERENCES Datos_Trabajadores(id)
-    );
-END
-GO
+-- 9. Tabla de Historial de Estados (Auditoría / Línea de Tiempo)
+CREATE TABLE IF NOT EXISTS historial_estados (
+    id SERIAL PRIMARY KEY,
+    servicio_id INT NOT NULL,
+    estado_id INT NOT NULL,
+    usuario_id INT NOT NULL,
+    nota_cambio TEXT NULL,
+    fecha_registro TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_historial_servicio FOREIGN KEY (servicio_id) 
+        REFERENCES servicios_recepcion(id) ON DELETE CASCADE,
+    CONSTRAINT fk_historial_estado FOREIGN KEY (estado_id) 
+        REFERENCES estados_servicio(id),
+    CONSTRAINT fk_historial_usuario FOREIGN KEY (usuario_id) 
+        REFERENCES datos_trabajadores(id)
+);
 
--- 10. Incidencias de Servicio (Repuestos y Novedades)
-IF OBJECT_ID('Incidencias_Servicio', 'U') IS NULL
-BEGIN
-    CREATE TABLE Incidencias_Servicio (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        servicio_id INT NOT NULL,
-        tipo_incidencia NVARCHAR(50) NOT NULL,
-        descripcion NVARCHAR(MAX) NOT NULL,
-        repuesto_requerido NVARCHAR(150) NULL,
-        costo_adicional_repuesto DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-        aprobado_por_cliente BIT NOT NULL DEFAULT 0,
-        fecha_registro DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        activo BIT NOT NULL DEFAULT 1,
-        CONSTRAINT FK_Incidencia_Servicio FOREIGN KEY (servicio_id) 
-            REFERENCES Servicios_Recepcion(id) ON DELETE CASCADE
-    );
-END
-GO
+-- 10. Tabla de Incidencias de Servicio (Repuestos y Novedades)
+CREATE TABLE IF NOT EXISTS incidencias_servicio (
+    id SERIAL PRIMARY KEY,
+    servicio_id INT NOT NULL,
+    tipo_incidencia VARCHAR(50) NOT NULL,
+    descripcion TEXT NOT NULL,
+    repuesto_requerido VARCHAR(150) NULL,
+    costo_adicional_repuesto NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    aprobado_por_cliente BOOLEAN NOT NULL DEFAULT FALSE,
+    fecha_registro TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT fk_incidencia_servicio FOREIGN KEY (servicio_id) 
+        REFERENCES servicios_recepcion(id) ON DELETE CASCADE,
+    CONSTRAINT chk_tipo_incidencia CHECK (tipo_incidencia IN ('Imprevisto', 'Aviso al Cliente', 'Pieza Extra', 'Hallazgo Tecnico'))
+);
 
--- 11. Evidencias Fotográficas
-IF OBJECT_ID('Evidencias_Fotograficas', 'U') IS NULL
-BEGIN
-    CREATE TABLE Evidencias_Fotograficas (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        servicio_id INT NOT NULL,
-        incidencia_id INT NULL,
-        url_foto NVARCHAR(255) NOT NULL,
-        tipo_evidencia NVARCHAR(50) NOT NULL,
-        descripcion NVARCHAR(150) NULL,
-        fecha_subida DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        activo BIT NOT NULL DEFAULT 1,
-        CONSTRAINT FK_Evidencia_Servicio FOREIGN KEY (servicio_id) 
-            REFERENCES Servicios_Recepcion(id) ON DELETE CASCADE,
-        CONSTRAINT FK_Evidencia_Incidencia FOREIGN KEY (incidencia_id) 
-            REFERENCES Incidencias_Servicio(id)
-    );
-END
-GO
+-- 11. Tabla de Evidencias Fotográficas (Galería Multimedia)
+CREATE TABLE IF NOT EXISTS evidencias_fotograficas (
+    id SERIAL PRIMARY KEY,
+    servicio_id INT NOT NULL,
+    incidencia_id INT NULL,
+    url_foto VARCHAR(500) NOT NULL,
+    tipo_evidencia VARCHAR(150) NOT NULL,
+    descripcion VARCHAR(150) NULL,
+    fecha_subida TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT fk_evidencia_servicio FOREIGN KEY (servicio_id) 
+        REFERENCES servicios_recepcion(id) ON DELETE CASCADE,
+    CONSTRAINT fk_evidencia_incidencia FOREIGN KEY (incidencia_id) 
+        REFERENCES incidencias_servicio(id) ON DELETE SET NULL
+);
 
 -- ============================================================================
--- INSERCIÓN DE DATOS SEMILLA (ROLES, ESTADOS Y COMPAÑÍA)
+-- ÍNDICES SECUNDARIOS
+-- ============================================================================
+CREATE INDEX IF NOT EXISTS idx_trabajadores_usuario ON datos_trabajadores(usuario);
+CREATE INDEX IF NOT EXISTS idx_servicios_sucursal ON servicios_recepcion(sucursal_id);
+CREATE INDEX IF NOT EXISTS idx_servicios_estado ON servicios_recepcion(estado_actual_id);
+CREATE INDEX IF NOT EXISTS idx_servicios_ticket ON servicios_recepcion(codigo_ticket);
+CREATE INDEX IF NOT EXISTS idx_tecnicos_servicio ON tecnicos_asignados(servicio_id);
+CREATE INDEX IF NOT EXISTS idx_historial_servicio ON historial_estados(servicio_id);
+CREATE INDEX IF NOT EXISTS idx_incidencias_servicio ON incidencias_servicio(servicio_id);
+CREATE INDEX IF NOT EXISTS idx_evidencias_servicio ON evidencias_fotograficas(servicio_id);
+
+-- ============================================================================
+-- DATOS SEMILLA (SEEDS)
 -- ============================================================================
 
--- Roles
-IF NOT EXISTS (SELECT 1 FROM Roles_Equipo WHERE nombre_rol = 'SuperAdmin')
-    INSERT INTO Roles_Equipo (nombre_rol, descripcion) VALUES 
-    ('SuperAdmin', 'Control total del sistema y todas las sucursales'),
-    ('Admin_Sucursal', 'Control administrativo de una sucursal específica'),
-    ('Secretaria', 'Recepción de equipos, apertura de tickets y entrega'),
-    ('Tecnico', 'Diagnóstico, reparación, reporte de incidencias y carga de evidencias');
-GO
+-- 1. Compañía Matriz
+INSERT INTO datos_companhia (nombre_empresa, rnc, telefono_principal, correo_contacto, direccion_fiscal)
+SELECT 'Franyer Mobile Center, S.R.L.', '131-99999-1', '809-588-0000', 'contacto@franyermobile.com', 'Calle Principal #45, San Francisco de Macorís, Rep. Dom.'
+WHERE NOT EXISTS (SELECT 1 FROM datos_companhia WHERE rnc = '131-99999-1');
 
--- Estados de Servicio
-IF NOT EXISTS (SELECT 1 FROM Estados_Servicio WHERE codigo_estado = 'RECIBIDO')
-    INSERT INTO Estados_Servicio (codigo_estado, nombre_estado, color_badge, orden_flujo) VALUES 
-    ('RECIBIDO', 'Recibido en Taller', '#6B7280', 1),
-    ('EN_DIAGNOSTICO', 'En Diagnóstico', '#3B82F6', 2),
-    ('ESPERA_REPUESTO', 'En Espera de Repuesto', '#F59E0B', 3),
-    ('EN_REPARACION', 'En Proceso de Reparación', '#8B5CF6', 4),
-    ('CONTROL_CALIDAD', 'Control de Calidad / Pruebas', '#EC4899', 5),
-    ('LISTO_ENTREGA', 'Listo para Entrega', '#10B981', 6),
-    ('ENTREGADO', 'Entregado al Cliente', '#059669', 7),
-    ('CANCELADO_DEVUELTO', 'Cancelado / No Reparado', '#EF4444', 8);
-GO
+-- 2. Sucursal Principal
+INSERT INTO datos_sucursales (companhia_id, codigo_sucursal, nombre_sucursal, telefono, direccion)
+SELECT 1, 'MATRIZ', 'Franyer Mobile Center - SFM', '809-588-0001', 'Av. Presidente Antonio Guzmán Fernández #12, SFM'
+WHERE NOT EXISTS (SELECT 1 FROM datos_sucursales WHERE codigo_sucursal = 'MATRIZ');
 
--- Empresa Matriz
-IF NOT EXISTS (SELECT 1 FROM Datos_Companhia WHERE rnc = '132-00000-1')
-    INSERT INTO Datos_Companhia (nombre_empresa, rnc, telefono_principal, correo_contacto, direccion_fiscal)
-    VALUES ('Franyer Mobile Center, S.R.L.', '132-00000-1', '809-555-0199', 'contacto@franyermobile.com', 'Av. Principal #100, Santo Domingo, R.D.');
-GO
+-- 3. Roles del Sistema
+INSERT INTO roles_equipo (nombre_rol, descripcion) VALUES
+('SuperAdmin', 'Control total del sistema, todas las sucursales y finanzas'),
+('Admin_Sucursal', 'Administración y control operativo de sucursal asignada'),
+('Secretaria', 'Recepción de dispositivos, apertura de tickets y entrega a clientes'),
+('Tecnico', 'Diagnóstico, banco de trabajo, registro de incidencias y evidencias')
+ON CONFLICT (nombre_rol) DO NOTHING;
 
--- Sucursal Principal
-IF NOT EXISTS (SELECT 1 FROM Datos_Sucursales WHERE codigo_sucursal = 'SUC-01')
-    INSERT INTO Datos_Sucursales (companhia_id, codigo_sucursal, nombre_sucursal, telefono, direccion)
-    VALUES (1, 'SUC-01', 'Sede Central - Principal', '809-555-0101', 'Av. Principal #100, Santo Domingo');
-GO
+-- 4. Usuario Inicial SuperAdmin (Contraseña: admin123)
+-- Hash bcrypt para 'admin123': $2a$10$f3G5cn.uw42Q1Vafn545oug50jRK5z7LeKKHJYI5MPKboBQ99BYb6
+INSERT INTO datos_trabajadores (sucursal_id, rol_id, usuario, nombre, apellido, cedula, telefono, correo, password)
+SELECT 
+    1, 
+    (SELECT id FROM roles_equipo WHERE nombre_rol = 'SuperAdmin'), 
+    'superadmin', 
+    'Franyer', 
+    'Administrador', 
+    '056-0000000-1', 
+    '809-555-0199', 
+    'admin@franyermobile.com', 
+    '$2a$10$f3G5cn.uw42Q1Vafn545oug50jRK5z7LeKKHJYI5MPKboBQ99BYb6'
+WHERE NOT EXISTS (SELECT 1 FROM datos_trabajadores WHERE usuario = 'superadmin');
 
--- Categorías de Dispositivos
-IF NOT EXISTS (SELECT 1 FROM Categorias_Dispositivos WHERE nombre_categoria = 'Smartphone')
-    INSERT INTO Categorias_Dispositivos (nombre_categoria, descripcion) VALUES
-    ('Smartphone', 'Teléfonos móviles inteligentes (iPhone, Samsung, Xiaomi, etc.)'),
-    ('Tablet', 'Tablets y iPads'),
-    ('Laptop', 'Computadoras portátiles'),
-    ('Smartwatch', 'Relojes inteligentes');
-GO
+-- 5. Categorías de Dispositivos
+INSERT INTO categorias_dispositivos (nombre_categoria, descripcion) VALUES
+('Smartphone', 'Teléfonos inteligentes Android y iPhone'),
+('Tablet / iPad', 'Tabletas táctiles y iPads'),
+('Laptop', 'Computadoras portátiles y notebooks'),
+('Consola de Videojuegos', 'PlayStation, Xbox, Nintendo Switch y portátiles'),
+('Smartwatch', 'Relojes inteligentes y pulseras deportivas'),
+('Otros', 'Accesorios, tarjetas lógicas y dispositivos varios')
+ON CONFLICT (nombre_categoria) DO NOTHING;
 
--- Usuario SuperAdmin por defecto (Contraseña: Admin1234!)
--- Hash Bcrypt generado con 10 rondas para 'Admin1234!' = $2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1q92kYQx5bTzN4e1k8wO1P9.k7bQy2 (ejemplo)
--- Se recomienda cambiar la contraseña inmediatamente tras el primer inicio de sesión.
-IF NOT EXISTS (SELECT 1 FROM Datos_Trabajadores WHERE correo = 'admin@sigerfmc.com')
-BEGIN
-    INSERT INTO Datos_Trabajadores (
-        sucursal_id, rol_id, usuario, nombre, apellido, cedula, telefono, correo, password, activo
-    ) VALUES (
-        1, 1, 'admin', 'Franyer', 'Administrador', '001-0000000-0', '809-555-0100', 'admin@sigerfmc.com', 
-        '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- Contraseña: password (o hash personalizado)
-        1
-    );
-END
-GO
+-- 6. Estados de Servicio Técnico
+INSERT INTO estados_servicio (codigo_estado, nombre_estado, color_badge, orden_flujo) VALUES
+('RECIBIDO', 'Recibido en Taller', '#6B7280', 1),
+('EN_DIAGNOSTICO', 'En Diagnóstico', '#3B82F6', 2),
+('ESPERA_REPUESTO', 'En Espera de Repuesto', '#F59E0B', 3),
+('EN_REPARACION', 'En Proceso de Reparación', '#8B5CF6', 4),
+('CONTROL_CALIDAD', 'Control de Calidad / Pruebas', '#EC4899', 5),
+('LISTO_ENTREGA', 'Listo para Entrega', '#10B981', 6),
+('ENTREGADO', 'Entregado al Cliente', '#059669', 7),
+('CANCELADO_DEVUELTO', 'Cancelado / No Reparado', '#EF4444', 8)
+ON CONFLICT (codigo_estado) DO NOTHING;

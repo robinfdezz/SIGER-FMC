@@ -6,9 +6,9 @@ Sistema web especializado para el taller de servicio técnico **Franyer Mobile C
 
 ## 🛠️ Stack Tecnológico
 
-- **Backend:** Node.js, Express, Microsoft SQL Server (`mssql` Connection Pool), JWT, BcryptJS.
+- **Backend:** Node.js, Express, PostgreSQL (`pg` Connection Pool), JWT, BcryptJS.
 - **Frontend:** React (Vite), React Router v6, Tailwind CSS (Estilo Supabase Dark/Light), Lucide React, Morphicons (Iconos animados), Axios.
-- **Base de Datos:** Microsoft SQL Server (`SIGER_FMC_DB`).
+- **Base de Datos:** PostgreSQL (`siger_fmc_db`).
 - **Flujo de Ramas Git:**
   - `main`: Rama principal / producción estable.
   - `develop`: Rama de integración activa para desarrollo.
@@ -19,13 +19,13 @@ Sistema web especializado para el taller de servicio técnico **Franyer Mobile C
 
 ```
 SIGER-FMC/
-├── backend/                  # Servidor API Express + SQL Server
+├── backend/                  # Servidor API Express + PostgreSQL
 │   ├── src/
-│   │   ├── config/           # db.js (SQL Server connection pool)
+│   │   ├── config/           # db.js (PostgreSQL connection pool)
 │   │   ├── controllers/      # auth.controller.js
 │   │   ├── middlewares/      # authMiddleware.js (JWT)
 │   │   ├── routes/           # auth.routes.js
-│   │   ├── db/               # init.sql (DDL + Seeds para SQL Server)
+│   │   ├── db/               # init.sql (DDL + Seeds para PostgreSQL)
 │   │   └── app.js            # Configuración Express, CORS y middlewares
 │   ├── server.js             # Entrada del servidor backend
 │   ├── package.json
@@ -33,7 +33,7 @@ SIGER-FMC/
 │
 ├── frontend/                 # Aplicación Cliente React + Vite
 │   ├── src/
-│   │   ├── components/       # ProtectedRoute, ThemeToggle
+│   │   ├── components/       # ProtectedRoute, ThemeToggle, Navbar, Sidebar
 │   │   ├── context/          # AuthContext (Sesión), ThemeContext (Dark/Light)
 │   │   ├── pages/
 │   │   │   ├── Login/        # LoginPage (Diseño Supabase, alertas, recordar)
@@ -48,7 +48,7 @@ SIGER-FMC/
 │   └── .env                  # Variables de entorno frontend
 │
 └── docs/
-    ├── DATABASE.md           # Estructura y diccionario de base de datos
+    ├── DATABASE.md           # Estructura y diccionario de base de datos PostgreSQL
     └── GUIDELINES.md         # Guía de arquitectura y diseño UI/UX
 ```
 
@@ -56,8 +56,8 @@ SIGER-FMC/
 
 ## ⚙️ Pasos de Instalación y Ejecución
 
-### 1. Inicialización de la Base de Datos (SQL Server)
-Ejecuta el script [backend/src/db/init.sql](file:///c:/Users/pc/Desktop/SIGER-FMC/backend/src/db/init.sql) en SQL Server Management Studio (SSMS) o Azure Data Studio para crear la base de datos `SIGER_FMC_DB`, tablas, roles y usuario inicial.
+### 1. Inicialización de la Base de Datos (PostgreSQL)
+Ejecuta el script [backend/src/db/init.sql](file:///c:/Users/pc/Desktop/SIGER-FMC/backend/src/db/init.sql) en pgAdmin, DBeaver o `psql` para crear las tablas, roles, usuario inicial y estados en la base de datos `siger_fmc_db`.
 
 ### 2. Ejecución del Backend
 ```bash

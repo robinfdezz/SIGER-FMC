@@ -10,7 +10,7 @@
 
 * **Frontend:** React.js (Vite), React Router v6, Tailwind CSS, Lucide React (Íconos), Morphicons (Iconos animados interactivos), Axios.
 * **Backend:** Node.js, Express.js.
-* **Base de Datos:** Microsoft SQL Server (driver `mssql` con Connection Pool).
+* **Base de Datos:** PostgreSQL (driver `pg` con Connection Pool, base de datos `siger_fmc_db`).
 * **Autenticación:** JSON Web Tokens (JWT) + Hashing de contraseñas con `bcryptjs` (salt rounds = 10).
 * **Multimedia:** Cloudinary con compresión previa en el cliente (`browser-image-compression`).
 * **Control de Versiones (Git):**
@@ -27,7 +27,7 @@
 
 backend/
 ├── src/
-│   ├── config/          # db.js (SQL Server pool), cloudinary.js
+│   ├── config/          # db.js (PostgreSQL pool), cloudinary.js
 │   ├── controllers/     # Controladores por entidad (auth, tickets, incidencias, etc.)
 │   ├── middlewares/     # authMiddleware.js (JWT), roleMiddleware.js, upload.js (Multer)
 │   ├── routes/          # auth.routes.js, tickets.routes.js, catalogos.routes.js, public.routes.js
@@ -162,9 +162,40 @@ frontend/
 
 ---
 
-## 8. Reglas de Backend y Seguridad
+## 8. Patrones de Interfaz y UX (Modales vs. Páginas)
 
-* **Autenticación:** Login exclusivo mediante el campo **`usuario`** (columna `usuario` en `Datos_Trabajadores`) y hash `bcryptjs`.
+### Criterio de Selección: Modales vs. Vistas Dedicadas
+* **Modales (`Modal.jsx`):**
+  * Reservados exclusivamente para acciones atómicas, rápidas y formularios cortos que no deben perder el contexto de la vista principal.
+  * Casos de uso: Creación o edición rápida de clientes, cambio de estado de un ticket, registro puntual de una incidencia o subida de evidencia fotográfica.
+  * Características: Cierre con `Esc`, clic exterior opcional, backdrop con desenfoque suave (`backdrop-blur-xs`) y scroll interno si el contenido lo requiere.
+* **Vistas Dedicadas con Breadcrumbs y Stepper:**
+  * Obligatorias para flujos largos, formularios complejos o vistas con alta densidad de datos.
+  * Casos de uso: Recepción y apertura de órdenes de servicio, detalle completo de diagnóstico y banco de trabajo técnico.
+  * Características: Rutas propias (`/tickets/nuevo`, `/tickets/:id`), persistencia en navegación e historial del navegador.
+
+### Especificación de Componentes de Navegación
+
+#### Breadcrumbs (`Breadcrumbs.jsx`)
+* Cabecera de navegación superior interactiva con enlaces contextuales.
+* Formato: `Módulo / Subsección` (ej. `Órdenes de Servicio / Recibir Dispositivo`).
+* Separador sutil (`/` o `ChevronRight`), texto atenuado en niveles previos y texto resaltado en el nivel actual.
+
+#### Stepper / Asistente por Pasos (`Stepper.jsx`)
+* Indicador visual superior para procesos secuenciales.
+* Elementos:
+  * Badges circulares numerados (completado con `Check`, activo con color de acento `#E11D48`, pendiente en gris neutro).
+  * Línea conectora horizontal entre pasos.
+  * Título y descripción corta por fase:
+    * **Paso 1:** Cliente y Dispositivo (Datos del cliente, marca, modelo e IMEI).
+    * **Paso 2:** Diagnóstico y Checklist (Falla reportada, condiciones estéticas y pruebas iniciales).
+    * **Paso 3:** Presupuesto y Confirmación (Costos previstos, garantía y emisión de orden).
+
+---
+
+## 9. Reglas de Backend y Seguridad
+
+* **Autenticación:** Login exclusivo mediante el campo **`usuario`** (columna `usuario` en `datos_trabajadores`) y hash `bcryptjs`.
 * **Middlewares de Acceso:**
   * `authMiddleware`: Validación de token JWT en header `Authorization: Bearer <token>`.
   * `checkRole(['SuperAdmin', ...])`: Restricción de endpoints según el rol del usuario.
