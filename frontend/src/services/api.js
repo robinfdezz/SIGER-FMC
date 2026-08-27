@@ -27,8 +27,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Si la sesión expiró y no estamos ya en la ruta de login, limpiar tokens
-      if (!window.location.pathname.includes('/login')) {
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      // Si la petición no proviene de /auth/login y la sesión expiró, limpiar storage y redirigir
+      if (!isLoginRequest && !window.location.pathname.includes('/login')) {
         localStorage.removeItem('siger_token');
         sessionStorage.removeItem('siger_token');
         localStorage.removeItem('siger_user');

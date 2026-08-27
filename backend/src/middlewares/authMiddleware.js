@@ -24,7 +24,15 @@ const authMiddleware = (req, res, next) => {
       });
     }
 
-    const secret = process.env.JWT_SECRET || 'siger_fmc_default_secret_jwt';
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error('❌ Error de seguridad: JWT_SECRET no está definida en las variables de entorno.');
+      return res.status(500).json({
+        success: false,
+        message: 'Error interno en la configuración de autenticación del servidor.'
+      });
+    }
+
     const decoded = jwt.verify(token, secret);
 
     // Adjuntar los datos del usuario decodificados al objeto Request
@@ -34,12 +42,14 @@ const authMiddleware = (req, res, next) => {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
+        code: 'TOKEN_EXPIRED',
         message: 'La sesión ha expirado. Por favor, inicie sesión nuevamente.'
       });
     }
 
     return res.status(401).json({
       success: false,
+      code: 'INVALID_TOKEN',
       message: 'Token inválido o manipulado.'
     });
   }

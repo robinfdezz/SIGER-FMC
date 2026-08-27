@@ -21,6 +21,21 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 ### Changed
 - Configuración global de `Toaster` (Sileo) reubicada a `top-center` y sincronizada dinámicamente con `ThemeContext` (Dark/Light).
 
+## [0.5.0] - 2026-08-27
+
+### Security
+- **Ajuste de Expiración Estricta de JWT (8 Horas):**
+  - Configuración del tiempo de expiración a 8 horas (`expiresIn: '8h'`) en el controlador de login y variables de entorno (`.env` y `.env.example`).
+  - Validación obligatoria de `JWT_SECRET` en el backend para evitar arranques con secretos nulos o fallback inseguro.
+- **Manejo Robusto de Expiración de Sesión:**
+  - `authMiddleware.js`: Captura explícita de `TokenExpiredError` retornando `401 Unauthorized` con código `TOKEN_EXPIRED`.
+  - `api.js`: Interceptor de Axios mejorado para limpiar storage (`localStorage` y `sessionStorage`) y redirigir inmediatamente a `/login?expired=true` sin bucles de redirección.
+  - `AuthContext.jsx`: Validación de expiración local previa (`isTokenExpired`) al inicializar la aplicación antes de enviar peticiones con tokens caducados.
+- **Auditoría de Payload de Tokens:**
+  - Verificación de contenido seguro en el token JWT, transportando únicamente identificadores y roles (`id`, `usuario`, `correo`, `rol_id`, `rol_nombre`, `sucursal_id`, `sucursal_nombre`) y omitiendo contraseñas, hashes o cédulas.
+
+---
+
 ## [0.4.0] - 2026-08-26
 
 ### Added

@@ -6,8 +6,11 @@ const { getPool } = require('../config/db');
  * Genera un token JWT para el trabajador autenticado.
  */
 const generateToken = (payload) => {
-  const secret = process.env.JWT_SECRET || 'siger_fmc_default_secret_jwt';
-  const expiresIn = process.env.JWT_EXPIRES_IN || '24h';
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET no está configurada en las variables de entorno.');
+  }
+  const expiresIn = process.env.JWT_EXPIRES_IN || '8h';
   return jwt.sign(payload, secret, { expiresIn });
 };
 

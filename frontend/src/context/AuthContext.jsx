@@ -3,6 +3,27 @@ import api from '../services/api';
 
 const AuthContext = createContext();
 
+const isTokenExpired = (tokenString) => {
+  if (!tokenString || typeof tokenString !== 'string') return true;
+  try {
+    const base64Url = tokenString.split('.')[1];
+    if (!base64Url) return true;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const { exp } = JSON.parse(jsonPayload);
+    if (!exp) return false;
+    // Comprobar si el timestamp exp en segundos ya pasó
+    return Date.now() >= exp * 1000;
+  } catch (e) {
+    return true;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -16,6 +37,19 @@ export const AuthProvider = ({ children }) => {
       const storedUser = localStorage.getItem('siger_user') || sessionStorage.getItem('siger_user');
 
       if (storedToken) {
+        // 1. Validar vigencia local del token
+        if (isTokenExpired(storedToken)) {
+          console.warn('El token almacenado ha expirado.');
+          localStorage.removeItem('siger_token');
+          localStorage.removeItem('siger_user');
+          sessionStorage.removeItem('siger_token');
+          sessionStorage.removeItem('siger_user');
+          setUser(null);
+          setToken(null);
+          setLoading(false);
+          return;
+        }
+
         setToken(storedToken);
         if (storedUser) {
           try {
@@ -25,7 +59,7 @@ export const AuthProvider = ({ children }) => {
           }
         }
 
-        // Validar token contra el backend mediante /api/auth/me
+        // 2. Validar token y sesión activa contra el backend mediante /api/auth/me
         try {
           const response = await api.get('/auth/me');
           if (response.data?.success && response.data?.user) {
@@ -39,7 +73,12 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (apiErr) {
           console.warn('Sesión no válida o expirada en el backend:', apiErr.response?.data?.message || apiErr.message);
-          logout();
+          localStorage.removeItem('siger_token');
+          localStorage.removeItem('siger_user');
+          sessionStorage.removeItem('siger_token');
+          sessionStorage.removeItem('siger_user');
+          setUser(null);
+          setToken(null);
         }
       }
     } catch (err) {
