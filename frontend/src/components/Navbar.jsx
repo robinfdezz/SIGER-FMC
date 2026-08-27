@@ -2,12 +2,44 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import logoFmcBlack from '../assets/logo-FMC Black.png';
 import logoFmcWhite from '../assets/logo-FMC White.png';
-import { LogOut } from 'lucide-react';
+import { LogOut, ShieldCheck, Shield, ClipboardList, Wrench, User } from 'lucide-react';
 import { MorphIcon } from 'morphicons/react';
 import { Menu, X } from 'lucide';
 
+const getRoleConfig = (rolNombre) => {
+  switch (rolNombre) {
+    case 'SuperAdmin':
+      return {
+        label: 'Super Admin',
+        icon: ShieldCheck
+      };
+    case 'Admin_Sucursal':
+      return {
+        label: 'Admin',
+        icon: Shield
+      };
+    case 'Secretaria':
+      return {
+        label: 'Secretaria',
+        icon: ClipboardList
+      };
+    case 'Tecnico':
+      return {
+        label: 'Técnico',
+        icon: Wrench
+      };
+    default:
+      return {
+        label: rolNombre || 'Usuario',
+        icon: User
+      };
+  }
+};
+
 const Navbar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
   const { user, logout } = useAuth();
+  const roleConfig = getRoleConfig(user?.rol_nombre);
+  const RoleIcon = roleConfig.icon;
 
   const getInitials = (firstName, lastName) => {
     const f = firstName ? firstName.charAt(0).toUpperCase() : '';
@@ -44,32 +76,39 @@ const Navbar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
       {/* Extremo Derecho Desktop (>= 1024px): Perfil de Usuario + Logout */}
       <div className="hidden lg:flex items-center gap-3 sm:gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-zinc-800 text-zinc-100 dark:bg-zinc-700 font-bold text-xs flex items-center justify-center border border-zinc-700 shadow-sm overflow-hidden shrink-0 relative">
-            {user?.foto_perfil_url ? (
-              <img
-                src={user.foto_perfil_url}
-                alt={user.nombre}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
-                  if (fallback) fallback.classList.remove('hidden');
-                }}
-              />
-            ) : null}
-            <span className={`avatar-fallback ${user?.foto_perfil_url ? 'hidden' : ''}`}>
-              {getInitials(user?.nombre, user?.apellido)}
-            </span>
+          {/* Avatar con Badge de Estado Parpadeante en Esquina Inferior Derecha */}
+          <div className="relative shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-zinc-800 text-zinc-100 dark:bg-zinc-700 font-bold text-xs flex items-center justify-center border border-zinc-700 shadow-xs overflow-hidden relative">
+              {user?.foto_perfil_url ? (
+                <img
+                  src={user.foto_perfil_url}
+                  alt={user.nombre}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                    if (fallback) fallback.classList.remove('hidden');
+                  }}
+                />
+              ) : null}
+              <span className={`avatar-fallback ${user?.foto_perfil_url ? 'hidden' : ''}`}>
+                {getInitials(user?.nombre, user?.apellido)}
+              </span>
+            </div>
+
+            {/* Punto Verde de Estado Activo (Fijo y nítido) */}
+            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white dark:border-dark-surface shadow-2xs" />
           </div>
 
+          {/* Nombre y Rol con Ícono Sobrio */}
           <div className="hidden sm:block text-left">
             <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
               {user?.nombre} {user?.apellido}
             </p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[11px] font-medium text-brand-600 dark:text-brand-400">
-                {user?.rol_nombre || 'Usuario'}
+            <div className="flex items-center gap-1.5 mt-0.5 text-neutral-500 dark:text-neutral-400 font-inter">
+              <RoleIcon className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500 flex-shrink-0" />
+              <span className="text-[11px] font-medium leading-none">
+                {roleConfig.label}
               </span>
             </div>
           </div>

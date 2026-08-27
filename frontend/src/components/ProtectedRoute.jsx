@@ -3,8 +3,8 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Loader2 } from 'lucide-react';
 
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+const ProtectedRoute = ({ children, allowedRoles }) => {
+  const { isAuthenticated, user, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -14,7 +14,7 @@ const ProtectedRoute = ({ children }) => {
           <div className="w-12 h-12 rounded-2xl bg-brand-500/10 flex items-center justify-center border border-brand-500/20">
             <Loader2 className="w-6 h-6 text-brand-500 animate-spin" />
           </div>
-          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 animate-pulse">
+          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 animate-pulse font-inter">
             Verificando sesión segura...
           </p>
         </div>
@@ -25,6 +25,14 @@ const ProtectedRoute = ({ children }) => {
   if (!isAuthenticated) {
     // Redirigir a login preservando la ruta previa
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Validación RBAC de roles permitidos para la ruta
+  if (allowedRoles && allowedRoles.length > 0) {
+    const userRole = user?.rol_nombre;
+    if (!allowedRoles.includes(userRole)) {
+      return <Navigate to="/dashboard" replace />;
+    }
   }
 
   return children;

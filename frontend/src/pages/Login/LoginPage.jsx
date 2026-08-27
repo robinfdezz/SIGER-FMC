@@ -50,8 +50,19 @@ const LoginPage = () => {
     setClientError('');
     clearError();
 
-    if (!formData.usuario.trim()) {
+    const cleanUser = formData.usuario.trim();
+    if (!cleanUser) {
       setClientError('Por favor, ingrese su nombre de usuario.');
+      return;
+    }
+
+    if (cleanUser.length < 6) {
+      setClientError('El nombre de usuario debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    if (cleanUser.length > 50) {
+      setClientError('El nombre de usuario no puede exceder los 50 caracteres.');
       return;
     }
 
@@ -60,9 +71,19 @@ const LoginPage = () => {
       return;
     }
 
+    if (formData.password.length < 8) {
+      setClientError('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+
+    if (formData.password.length > 20) {
+      setClientError('La contraseña no puede exceder los 20 caracteres.');
+      return;
+    }
+
     setIsSubmitting(true);
     const result = await login({
-      usuario: formData.usuario.trim(),
+      usuario: cleanUser,
       password: formData.password,
       rememberMe: formData.rememberMe
     });
@@ -129,6 +150,7 @@ const LoginPage = () => {
                   id="usuario"
                   name="usuario"
                   type="text"
+                  maxLength={50}
                   autoComplete="username"
                   value={formData.usuario}
                   onChange={handleChange}
@@ -156,6 +178,7 @@ const LoginPage = () => {
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
+                  maxLength={20}
                   autoComplete="current-password"
                   value={formData.password}
                   onChange={handleChange}

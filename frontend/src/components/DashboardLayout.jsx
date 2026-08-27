@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
@@ -15,14 +15,33 @@ import {
   Settings,
   Store,
   LogOut,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck,
+  Shield,
+  ClipboardList,
+  User
 } from 'lucide-react';
+
+const getRoleConfig = (rolNombre) => {
+  switch (rolNombre) {
+    case 'SuperAdmin':
+      return { label: 'Super Admin', icon: ShieldCheck };
+    case 'Admin_Sucursal':
+      return { label: 'Admin', icon: Shield };
+    case 'Secretaria':
+      return { label: 'Secretaria', icon: ClipboardList };
+    case 'Tecnico':
+      return { label: 'Técnico', icon: Wrench };
+    default:
+      return { label: rolNombre || 'Usuario', icon: User };
+  }
+};
 
 const MENU_ITEMS = [
   { id: 'dashboard', name: 'Inicio / Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { id: 'tickets', name: 'Órdenes de Servicio', path: '/tickets', icon: Ticket },
   { id: 'taller', name: 'Banco de Trabajo', path: '/taller', icon: Wrench },
-  { id: 'trabajadores', name: 'Usuarios', path: '/trabajadores', icon: Users },
+  { id: 'trabajadores', name: 'Usuarios', path: '/trabajadores', icon: Users, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
   { id: 'config', name: 'Configuración', path: '/configuracion', icon: Settings },
 ];
 
@@ -31,6 +50,13 @@ const DashboardLayout = ({ children }) => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+
+  const filteredMenuItems = useMemo(() => {
+    return MENU_ITEMS.filter((item) => {
+      if (!item.allowedRoles) return true;
+      return item.allowedRoles.includes(user?.rol_nombre);
+    });
+  }, [user]);
 
   // Cerrar menú móvil al cambiar de ruta
   useEffect(() => {
@@ -87,7 +113,7 @@ const DashboardLayout = ({ children }) => {
 
           {/* Lista de Navegación Móvil */}
           <nav className="space-y-1.5">
-            {MENU_ITEMS.map((item) => {
+            {filteredMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
 
@@ -126,33 +152,44 @@ const DashboardLayout = ({ children }) => {
 
             {/* Usuario */}
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-10 h-10 rounded-xl bg-zinc-800 text-zinc-100 font-bold text-xs flex items-center justify-center border border-zinc-700 overflow-hidden flex-shrink-0 relative">
-                {user?.foto_perfil_url ? (
-                  <img
-                    src={user.foto_perfil_url}
-                    alt={user.nombre}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                      const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
-                      if (fallback) fallback.classList.remove('hidden');
-                    }}
-                  />
-                ) : null}
-                <span className={`avatar-fallback ${user?.foto_perfil_url ? 'hidden' : ''}`}>
-                  {getInitials(user?.nombre, user?.apellido)}
-                </span>
+              <div className="relative shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-zinc-800 text-zinc-100 font-bold text-xs flex items-center justify-center border border-zinc-700 overflow-hidden relative">
+                  {user?.foto_perfil_url ? (
+                    <img
+                      src={user.foto_perfil_url}
+                      alt={user.nombre}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                        if (fallback) fallback.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <span className={`avatar-fallback ${user?.foto_perfil_url ? 'hidden' : ''}`}>
+                    {getInitials(user?.nombre, user?.apellido)}
+                  </span>
+                </div>
+                {/* Badge de Estado Activo (Fijo y nítido) */}
+                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white dark:border-dark-surface shadow-2xs" />
               </div>
+
               <div className="min-w-0">
                 <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
                   {user?.nombre} {user?.apellido}
                 </p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-xs font-medium text-brand-600 dark:text-brand-400 truncate">
-                    {user?.rol_nombre || 'Usuario'}
-                  </span>
-                </div>
+                {(() => {
+                  const roleConfig = getRoleConfig(user?.rol_nombre);
+                  const RoleIcon = roleConfig.icon;
+                  return (
+                    <div className="flex items-center gap-1.5 mt-0.5 text-neutral-500 dark:text-neutral-400 font-inter">
+                      <RoleIcon className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500 flex-shrink-0" />
+                      <span className="text-xs font-medium truncate">
+                        {roleConfig.label}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

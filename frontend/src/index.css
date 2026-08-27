@@ -56,3 +56,10 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
+
+/* Toast Viewport highest z-index layer (above all portals, backdrops and modals) */
+[data-sileo-viewport],
+[data-sileo-toast],
+.sileo-viewport {
+  z-index: 99999 !important;
+}

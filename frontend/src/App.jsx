@@ -38,7 +38,7 @@ function App() {
             <Route
               path="/trabajadores"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['SuperAdmin', 'Admin_Sucursal']}>
                   <WorkersPage />
                 </ProtectedRoute>
               }

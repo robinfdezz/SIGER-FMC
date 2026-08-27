@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { MorphIcon } from 'morphicons/react';
 import { Sun, Moon } from 'lucide';
 import {
@@ -20,13 +21,21 @@ const MENU_ITEMS = [
   { id: 'dashboard', name: 'Inicio / Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { id: 'tickets', name: 'Órdenes de Servicio', path: '/tickets', icon: Ticket },
   { id: 'taller', name: 'Banco de Trabajo', path: '/taller', icon: Wrench },
-  { id: 'trabajadores', name: 'Usuarios', path: '/trabajadores', icon: Users },
+  { id: 'trabajadores', name: 'Usuarios', path: '/trabajadores', icon: Users, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
   { id: 'config', name: 'Configuración', path: '/configuracion', icon: Settings },
 ];
 
 const Sidebar = () => {
   const location = useLocation();
   const { isDark, toggleTheme } = useTheme();
+  const { user } = useAuth();
+
+  const filteredMenuItems = useMemo(() => {
+    return MENU_ITEMS.filter((item) => {
+      if (!item.allowedRoles) return true;
+      return item.allowedRoles.includes(user?.rol_nombre);
+    });
+  }, [user]);
 
   const [sidebarMode, setSidebarMode] = useState(() => {
     const saved = localStorage.getItem('siger_sidebar_mode');
@@ -77,7 +86,7 @@ const Sidebar = () => {
     >
       {/* Navegación Principal */}
       <nav className="flex-1 py-4 px-2 space-y-1.5 overflow-y-auto overflow-x-hidden">
-        {MENU_ITEMS.map((item) => {
+        {filteredMenuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
 

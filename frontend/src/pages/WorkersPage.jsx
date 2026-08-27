@@ -63,6 +63,8 @@ const extractArray = (res) => {
 
 const WorkersPage = () => {
   const { user: currentUser } = useAuth();
+  const isBranchAdmin = currentUser?.rol_nombre === 'Admin_Sucursal';
+  const isSuperAdmin = currentUser?.rol_nombre === 'SuperAdmin';
 
   const [workers, setWorkers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -85,6 +87,26 @@ const WorkersPage = () => {
   const [workerToToggle, setWorkerToToggle] = useState(null);
   const [isToggling, setIsToggling] = useState(false);
 
+  // RBAC: Roles visibles en los filtros para Admin de Sucursal (solo Técnico y Secretaria)
+  const filterRoles = useMemo(() => {
+    if (isBranchAdmin) {
+      return roles.filter((r) => ['Tecnico', 'Secretaria'].includes(r.nombre_rol || r.nombre));
+    }
+    return roles;
+  }, [roles, isBranchAdmin]);
+
+  // RBAC: Comprobar si el usuario en sesión tiene permisos para gestionar a un trabajador específico
+  const canManageWorker = (targetWorker) => {
+    if (!targetWorker) return false;
+    if (isSuperAdmin) return true;
+    if (isBranchAdmin) {
+      // El Administrador de Sucursal solo puede editar o desactivar Técnicos y Secretarias
+      const targetRole = targetWorker.rol_nombre || '';
+      return ['Tecnico', 'Secretaria'].includes(targetRole);
+    }
+    return false;
+  };
+
   const fetchInitialData = async () => {
     setIsLoading(true);
     try {
@@ -98,10 +120,6 @@ const WorkersPage = () => {
       setSucursales(extractArray(branchesRes));
     } catch (error) {
       console.error('Error al cargar datos de usuarios:', error);
-      sileo.error({
-        title: 'Error de carga',
-        description: 'No se pudieron consultar los usuarios desde el servidor.'
-      });
     } finally {
       setIsLoading(false);
     }
@@ -117,6 +135,13 @@ const WorkersPage = () => {
   };
 
   const handleOpenEditModal = (worker) => {
+    if (!canManageWorker(worker)) {
+      sileo.error({
+        title: 'Acceso denegado',
+        description: 'No tienes permisos para editar a este usuario.'
+      });
+      return;
+    }
     setEditingWorker(worker);
     setIsModalOpen(true);
   };
@@ -127,6 +152,14 @@ const WorkersPage = () => {
       sileo.warning({
         title: 'Acción no permitida',
         description: 'No puedes desactivar tu propia cuenta mientras tienes una sesión activa.'
+      });
+      return;
+    }
+
+    if (!canManageWorker(worker)) {
+      sileo.error({
+        title: 'Acceso denegado',
+        description: 'No tienes permisos para modificar el estado de este usuario.'
       });
       return;
     }
@@ -289,7 +322,7 @@ const WorkersPage = () => {
 
               {/* Selectores Dinámicos y Botón Limpiar */}
               <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto flex-1 lg:flex-initial">
-                {/* Selector Rol */}
+                {/* Selector Rol (Filtrado según RBAC) */}
                 <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[150px]">
                   <select
                     value={selectedRole}
@@ -297,30 +330,32 @@ const WorkersPage = () => {
                     className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors cursor-pointer"
                   >
                     <option value="">Todos los Roles</option>
-                    {roles.map((r) => (
+                    {filterRoles.map((r) => (
                       <option key={r.id} value={r.id}>
-                        {formatRoleName(r.nombre_rol)}
+                        {formatRoleName(r.nombre_rol || r.nombre)}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Selector Sucursal */}
-                <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[160px]">
-                  <select
-                    value={selectedBranch}
-                    onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors cursor-pointer"
-                  >
-                    <option value="all">Todas las Sucursales</option>
-                    <option value="global">Global / Sin Asignar</option>
-                    {sucursales.map((s) => (
-                      <option key={s.id} value={String(s.id)}>
-                        {s.nombre_sucursal}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* Selector Sucursal (Visible únicamente para SuperAdmin) */}
+                {isSuperAdmin && (
+                  <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[160px]">
+                    <select
+                      value={selectedBranch}
+                      onChange={(e) => setSelectedBranch(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors cursor-pointer"
+                    >
+                      <option value="all">Todas las Sucursales</option>
+                      <option value="global">Global / Sin Asignar</option>
+                      {sucursales.map((s) => (
+                        <option key={s.id} value={String(s.id)}>
+                          {s.nombre_sucursal || s.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* Selector Estado */}
                 <div className="flex-1 sm:flex-initial min-w-[130px] sm:min-w-[140px]">
@@ -495,26 +530,34 @@ const WorkersPage = () => {
                         </span>
                       </td>
 
-                      {/* Columna 5: Acciones */}
+                      {/* Columna 5: Acciones (Protegidas por RBAC) */}
                       <td className="py-3.5 px-4 sm:px-6 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Botón Editar */}
-                          <button
-                            onClick={() => handleOpenEditModal(worker)}
-                            title="Editar usuario"
-                            className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                          >
-                            <Edit2 size={16} />
-                          </button>
+                          {canManageWorker(worker) ? (
+                            <>
+                              {/* Botón Editar */}
+                              <button
+                                onClick={() => handleOpenEditModal(worker)}
+                                title="Editar usuario"
+                                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                              >
+                                <Edit2 size={16} />
+                              </button>
 
-                          {/* Botón Activar / Desactivar */}
-                          <button
-                            onClick={() => handleRequestToggleStatus(worker)}
-                            title={worker.activo ? 'Desactivar cuenta' : 'Activar cuenta'}
-                            className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                          >
-                            <Power size={16} />
-                          </button>
+                              {/* Botón Activar / Desactivar */}
+                              <button
+                                onClick={() => handleRequestToggleStatus(worker)}
+                                title={worker.activo ? 'Desactivar cuenta' : 'Activar cuenta'}
+                                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                              >
+                                <Power size={16} />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-neutral-400 dark:text-neutral-600 font-inter italic px-2">
+                              Solo lectura
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>

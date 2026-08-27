@@ -77,7 +77,13 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
     }
   }
   ```
-- **Errores Posibles:** `400 Bad Request`, `401 Unauthorized` (Credenciales inválidas), `403 Forbidden` (Cuenta inactiva).
+- **Reglas de Validación de Credenciales:**
+  - `usuario`: Obligatorio (mínimo 6 caracteres, máximo 50 caracteres).
+  - `password`: Obligatorio (mínimo 8 caracteres, máximo 20 caracteres).
+- **Errores Posibles:** 
+  - `400 Bad Request`: Formato o longitud de credenciales inválida.
+  - `401 Unauthorized`: Credenciales incorrectas (usuario o contraseña no coinciden).
+  - `403 Forbidden`: Cuenta de usuario desactivada.
 
 ---
 
@@ -187,14 +193,14 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 - **Ruta:** `POST /api/trabajadores`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
 - **Reglas de Validación Estrictas:**
-  - `nombre` y `apellido`: Obligatorios (string, min. 2 caracteres).
-  - `usuario`: Obligatorio (string, min. 6 caracteres, sin espacios en blanco).
-  - `cedula`: Obligatoria (solo dígitos numéricos, min. 11).
-  - `correo`: Obligatorio (formato email estándar válido, sin espacios en blanco).
-  - `telefono`: Obligatorio (solo dígitos numéricos, min. 10).
+  - `nombre` y `apellido`: Obligatorios (string, min. 2, máx. 50 caracteres).
+  - `usuario`: Obligatorio (string, min. 6, máx. 50 caracteres, sin espacios en blanco).
+  - `cedula`: Obligatoria (solo dígitos numéricos, min. 11, máx. 20 dígitos).
+  - `correo`: Obligatorio (formato email estándar válido, máx. 100 caracteres, sin espacios en blanco).
+  - `telefono`: Obligatorio (solo dígitos numéricos, min. 10, máx. 20 dígitos).
   - `rol_id`: Obligatorio (ID válido y existente en `roles_equipo`).
   - `sucursal_id`: Obligatorio para roles de sede (`Admin_Sucursal`, `Secretaria`, `Tecnico`). Para `SuperAdmin` se permite `null` (acceso global).
-  - `password`: Obligatoria (string, min. 8 caracteres, sin espacios en blanco).
+  - `password`: Obligatoria (string, min. 8, máx. 20 caracteres, sin espacios en blanco).
   - `foto_perfil_url`: Opcional (URL válida o `null`).
 - **Body (JSON):**
   ```json
@@ -234,6 +240,8 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
   ```
 - **Errores:**
   - `400 Bad Request`: Formato o longitud inválida en campos (`"El nombre de usuario no puede contener espacios en blanco."`, `"La contraseña debe tener al menos 8 caracteres."`, etc.).
+  - `403 Forbidden`: 
+    - Intento de un `Admin_Sucursal` de asignar roles administrativos (`SuperAdmin` o `Admin_Sucursal`): *"No tienes permisos para asignar este rol. Un Administrador de Sucursal solo puede registrar Técnicos o Secretarias."*
   - `409 Conflict`: Conflicto por duplicidad en `usuario`, `correo` o `cedula`.
 
 ---
@@ -241,9 +249,11 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 ### 3.4 Actualizar Trabajador / Usuario
 - **Ruta:** `PUT /api/trabajadores/:id`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
-- **Reglas de Validación:**
+- **Reglas de Validación y RBAC:**
   - Aplica las mismas validaciones de formato, longitud mínima y bloqueo de espacios que en creación.
   - `password` es opcional; si se incluye con texto, debe tener mínimo 8 caracteres sin espacios.
+  - **Aislamiento por Sede:** Un `Admin_Sucursal` solo puede modificar usuarios pertenecientes a su misma sucursal física.
+  - **Restricción de Roles:** Un `Admin_Sucursal` no puede cambiar el rol de un usuario a `SuperAdmin` ni `Admin_Sucursal`.
 - **Body (JSON):**
   ```json
   {
@@ -278,13 +288,22 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
     }
   }
   ```
-- **Errores:** `400 Bad Request` (datos inválidos), `404 Not Found`, `409 Conflict` (duplicados en otros usuarios).
+- **Errores:**
+  - `400 Bad Request`: Datos inválidos o parámetros incompletos.
+  - `403 Forbidden`: 
+    - Intento de un `Admin_Sucursal` de modificar un usuario de otra sucursal (*"No tiene permisos para modificar usuarios de otra sucursal."*).
+    - Intento de escalar el rol a `SuperAdmin` o `Admin_Sucursal` (*"No tienes permisos para asignar este rol."*).
+  - `404 Not Found`: Usuario no encontrado.
+  - `409 Conflict`: Duplicidad en `usuario`, `correo` o `cedula` asignados a otro registro.
 
 ---
 
 ### 3.5 Alternar Estado (Activar / Desactivar)
 - **Ruta:** `PATCH /api/trabajadores/:id/toggle-status`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Reglas RBAC:**
+  - Un usuario no puede desactivar su propia cuenta de sesión activa (`400 Bad Request`).
+  - Un `Admin_Sucursal` no puede alternar el estado de trabajadores de otra sucursal (`403 Forbidden`).
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {

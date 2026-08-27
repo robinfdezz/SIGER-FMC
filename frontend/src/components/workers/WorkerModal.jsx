@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../common/Modal';
 import { createWorker, updateWorker } from '../../services/workers.service';
+import { useAuth } from '../../context/AuthContext';
 import { sileo } from 'sileo';
 import { MorphIcon } from 'morphicons/react';
 import { Eye, EyeOff } from 'lucide';
@@ -53,8 +54,19 @@ const WorkerModal = ({
   roles = [],
   sucursales = []
 }) => {
+  const { user: currentUser } = useAuth();
+  const isBranchAdmin = currentUser?.rol_nombre === 'Admin_Sucursal';
+
   const sucursalesList = extractArray(sucursales);
   const rolesList = extractArray(roles);
+
+  // RBAC: Administradores de sucursal solo pueden ver roles Técnico y Secretaria
+  const availableRoles = useMemo(() => {
+    if (isBranchAdmin) {
+      return rolesList.filter((r) => ['Tecnico', 'Secretaria'].includes(r.nombre_rol || r.nombre));
+    }
+    return rolesList;
+  }, [rolesList, isBranchAdmin]);
 
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
   const [errors, setErrors] = useState({});
@@ -62,7 +74,7 @@ const WorkerModal = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEdit = Boolean(worker && worker.id);
-  const selectedRoleObj = rolesList.find((r) => String(r.id) === String(formData.rol_id));
+  const selectedRoleObj = availableRoles.find((r) => String(r.id) === String(formData.rol_id)) || rolesList.find((r) => String(r.id) === String(formData.rol_id));
   const isSuperAdminRole = selectedRoleObj?.nombre_rol === 'SuperAdmin';
 
   const hasChanges = !isEdit || Boolean(
@@ -89,19 +101,23 @@ const WorkerModal = ({
         correo: worker.correo ? String(worker.correo).replace(/\s/g, '') : '',
         password: '',
         rol_id: worker.rol_id ? String(worker.rol_id) : '',
-        sucursal_id: worker.sucursal_id ? String(worker.sucursal_id) : '',
+        sucursal_id: isBranchAdmin
+          ? String(currentUser?.sucursal_id || worker.sucursal_id || '')
+          : (worker.sucursal_id ? String(worker.sucursal_id) : ''),
         foto_perfil_url: worker.foto_perfil_url || ''
       });
     } else {
       setFormData({
         ...INITIAL_FORM_STATE,
-        rol_id: rolesList.length > 0 ? String(rolesList[0].id) : '',
-        sucursal_id: sucursalesList.length > 0 ? String(sucursalesList[0].id) : ''
+        rol_id: availableRoles.length > 0 ? String(availableRoles[0].id) : '',
+        sucursal_id: isBranchAdmin
+          ? String(currentUser?.sucursal_id || '')
+          : (sucursalesList.length > 0 ? String(sucursalesList[0].id) : '')
       });
     }
     setErrors({});
     setShowPassword(false);
-  }, [worker, isEdit, isOpen, roles, sucursales]);
+  }, [worker, isEdit, isOpen, roles, sucursales, isBranchAdmin, currentUser]);
 
   const handleChange = (e) => {
     let { name, value } = e.target;
@@ -136,51 +152,63 @@ const WorkerModal = ({
   const validateForm = () => {
     const newErrors = {};
 
-    // 1. Nombre
+    // 1. Nombre (min 2, max 50)
     if (!formData.nombre.trim()) {
       newErrors.nombre = 'El nombre es obligatorio.';
     } else if (formData.nombre.trim().length < 2) {
       newErrors.nombre = 'El nombre debe tener al menos 2 caracteres.';
+    } else if (formData.nombre.trim().length > 50) {
+      newErrors.nombre = 'El nombre no puede exceder los 50 caracteres.';
     }
 
-    // 2. Apellido
+    // 2. Apellido (min 2, max 50)
     if (!formData.apellido.trim()) {
       newErrors.apellido = 'El apellido es obligatorio.';
     } else if (formData.apellido.trim().length < 2) {
       newErrors.apellido = 'El apellido debe tener al menos 2 caracteres.';
+    } else if (formData.apellido.trim().length > 50) {
+      newErrors.apellido = 'El apellido no puede exceder los 50 caracteres.';
     }
 
-    // 3. Nombre de Usuario
+    // 3. Nombre de Usuario (sin espacios, min 6, max 50)
     if (!formData.usuario.trim()) {
       newErrors.usuario = 'El nombre de usuario es obligatorio.';
     } else if (/\s/.test(formData.usuario)) {
       newErrors.usuario = 'El nombre de usuario no puede contener espacios.';
     } else if (formData.usuario.trim().length < 6) {
       newErrors.usuario = 'El usuario debe tener al menos 6 caracteres.';
+    } else if (formData.usuario.trim().length > 50) {
+      newErrors.usuario = 'El nombre de usuario no puede exceder los 50 caracteres.';
     }
 
-    // 4. Cédula de Identidad (solo dígitos, mínimo 11)
+    // 4. Cédula de Identidad (solo dígitos, min 11, max 20)
     if (!formData.cedula.trim()) {
       newErrors.cedula = 'La cédula de identidad es obligatoria.';
     } else if (formData.cedula.trim().length < 11) {
       newErrors.cedula = 'La cédula debe contener al menos 11 dígitos numéricos.';
+    } else if (formData.cedula.trim().length > 20) {
+      newErrors.cedula = 'La cédula no puede exceder los 20 dígitos numéricos.';
     }
 
-    // 5. Correo Electrónico
+    // 5. Correo Electrónico (sin espacios, formato válido, max 100)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!formData.correo.trim()) {
       newErrors.correo = 'El correo electrónico es obligatorio.';
     } else if (/\s/.test(formData.correo)) {
       newErrors.correo = 'El correo electrónico no puede contener espacios.';
+    } else if (formData.correo.trim().length > 100) {
+      newErrors.correo = 'El correo electrónico no puede exceder los 100 caracteres.';
     } else if (!emailRegex.test(formData.correo.trim())) {
       newErrors.correo = 'Ingrese un correo electrónico válido (ej. usuario@dominio.com).';
     }
 
-    // 6. Teléfono / WhatsApp (solo dígitos, mínimo 10)
+    // 6. Teléfono / WhatsApp (solo dígitos, min 10, max 20)
     if (!formData.telefono.trim()) {
       newErrors.telefono = 'El teléfono de contacto es obligatorio.';
     } else if (formData.telefono.trim().length < 10) {
       newErrors.telefono = 'El teléfono debe contener al menos 10 dígitos numéricos.';
+    } else if (formData.telefono.trim().length > 20) {
+      newErrors.telefono = 'El teléfono no puede exceder los 20 dígitos numéricos.';
     }
 
     // 7. Rol en el Equipo
@@ -193,7 +221,7 @@ const WorkerModal = ({
       newErrors.sucursal_id = 'Debe seleccionar una sucursal para este rol.';
     }
 
-    // 8. Contraseña
+    // 8. Contraseña (sin espacios, min 8, max 20)
     if (!isEdit) {
       if (!formData.password) {
         newErrors.password = 'La contraseña de acceso es obligatoria.';
@@ -201,12 +229,16 @@ const WorkerModal = ({
         newErrors.password = 'La contraseña no puede contener espacios.';
       } else if (formData.password.length < 8) {
         newErrors.password = 'La contraseña debe tener al menos 8 caracteres.';
+      } else if (formData.password.length > 20) {
+        newErrors.password = 'La contraseña no puede exceder los 20 caracteres.';
       }
     } else if (formData.password) {
       if (/\s/.test(formData.password)) {
         newErrors.password = 'La nueva contraseña no puede contener espacios.';
       } else if (formData.password.length < 8) {
         newErrors.password = 'La nueva contraseña debe tener al menos 8 caracteres.';
+      } else if (formData.password.length > 20) {
+        newErrors.password = 'La nueva contraseña no puede exceder los 20 caracteres.';
       }
     }
 
@@ -303,6 +335,7 @@ const WorkerModal = ({
               <input
                 type="text"
                 name="nombre"
+                maxLength={50}
                 value={formData.nombre}
                 onChange={handleChange}
                 placeholder="Ej. Franyer"
@@ -323,6 +356,7 @@ const WorkerModal = ({
               <input
                 type="text"
                 name="apellido"
+                maxLength={50}
                 value={formData.apellido}
                 onChange={handleChange}
                 placeholder="Ej. Fernández"
@@ -350,6 +384,7 @@ const WorkerModal = ({
                 <input
                   type="text"
                   name="usuario"
+                  maxLength={50}
                   value={formData.usuario}
                   onChange={handleChange}
                   onKeyDown={handleKeyDownNoSpace}
@@ -372,6 +407,7 @@ const WorkerModal = ({
               <input
                 type="text"
                 name="cedula"
+                maxLength={20}
                 value={formData.cedula}
                 onChange={handleChange}
                 placeholder="05600000001 (solo números)"
@@ -395,6 +431,7 @@ const WorkerModal = ({
               <input
                 type="email"
                 name="correo"
+                maxLength={100}
                 value={formData.correo}
                 onChange={handleChange}
                 onKeyDown={handleKeyDownNoSpace}
@@ -416,6 +453,7 @@ const WorkerModal = ({
               <input
                 type="tel"
                 name="telefono"
+                maxLength={20}
                 value={formData.telefono}
                 onChange={handleChange}
                 placeholder="8095550101 (solo números)"
@@ -446,7 +484,7 @@ const WorkerModal = ({
                   }`}
               >
                 <option value="" disabled>Seleccione un rol</option>
-                {rolesList.map((r) => (
+                {availableRoles.map((r) => (
                   <option key={r.id} value={String(r.id)}>
                     {formatRoleName(r.nombre_rol || r.nombre)}
                   </option>
@@ -460,11 +498,12 @@ const WorkerModal = ({
             <div>
               <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
                 Sucursal Asignada {!isSuperAdminRole && <span className="text-red-500">*</span>}
+                {isBranchAdmin && <span className="text-[11px] text-neutral-400 font-normal ml-1">(Fijada a tu sede)</span>}
               </label>
               <select
                 name="sucursal_id"
-                disabled={isSuperAdminRole}
-                value={isSuperAdminRole ? '' : formData.sucursal_id}
+                disabled={isSuperAdminRole || isBranchAdmin}
+                value={isBranchAdmin ? String(currentUser?.sucursal_id || '') : (isSuperAdminRole ? '' : formData.sucursal_id)}
                 onChange={handleChange}
                 className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-neutral-100 dark:disabled:bg-neutral-800 ${errors.sucursal_id
                   ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
@@ -498,10 +537,11 @@ const WorkerModal = ({
               <input
                 type={showPassword ? 'text' : 'password'}
                 name="password"
+                maxLength={20}
                 value={formData.password}
                 onChange={handleChange}
                 onKeyDown={handleKeyDownNoSpace}
-                placeholder={isEdit ? 'Dejar en blanco para mantener la actual' : 'Mínimo 8 caracteres'}
+                placeholder={isEdit ? 'Dejar en blanco para mantener la actual (máx. 20 car.)' : 'Entre 8 y 20 caracteres'}
                 className={`w-full pl-3.5 pr-11 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors ${errors.password
                   ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
                   : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'

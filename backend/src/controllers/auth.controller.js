@@ -23,7 +23,7 @@ const login = async (req, res) => {
     const { usuario, password, correo } = req.body;
     const userIdentifier = usuario || correo;
 
-    // 1. Validar campos requeridos
+    // 1. Validar campos requeridos y formato de longitudes
     if (!userIdentifier || !password) {
       return res.status(400).json({
         success: false,
@@ -32,6 +32,14 @@ const login = async (req, res) => {
     }
 
     const cleanUsername = String(userIdentifier).trim().toLowerCase();
+    const strPassword = String(password);
+
+    if (cleanUsername.length < 6 || cleanUsername.length > 50 || strPassword.length < 8 || strPassword.length > 20) {
+      return res.status(400).json({
+        success: false,
+        message: 'Formato o longitud de credenciales inválida.'
+      });
+    }
 
     // 2. Consultar usuario en la base de datos con JOIN a Roles y Sucursales
     const pool = getPool();

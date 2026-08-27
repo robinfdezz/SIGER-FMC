@@ -33,6 +33,37 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   - `AuthContext.jsx`: Validación de expiración local previa (`isTokenExpired`) al inicializar la aplicación antes de enviar peticiones con tokens caducados.
 - **Auditoría de Payload de Tokens:**
   - Verificación de contenido seguro en el token JWT, transportando únicamente identificadores y roles (`id`, `usuario`, `correo`, `rol_id`, `rol_nombre`, `sucursal_id`, `sucursal_nombre`) y omitiendo contraseñas, hashes o cédulas.
+- **Prevención de Escalamiento de Privilegios y Control de Acceso (RBAC en Backend):**
+  - `createWorker` y `updateWorker`: Rechazo inmediato con `403 Forbidden` ante cualquier intento de un Administrador de Sucursal de crear o asignar roles `SuperAdmin` o `Admin_Sucursal`, limitándolo exclusivamente a roles operativos (`Tecnico` y `Secretaria`).
+  - Aislamiento estricto de sucursal: Forzado automático del `sucursal_id` de la sesión del administrador autenticado e impedimento de modificar usuarios o estados de otras sedes (`403 Forbidden`).
+
+### Added
+- **Protección y Guardia de Rutas en Frontend (`ProtectedRoute.jsx` y `App.jsx`):**
+  - Implementación de la prop `allowedRoles` en `ProtectedRoute` para validación de permisos en el cliente.
+  - Protección de la ruta `/trabajadores` exclusiva para `['SuperAdmin', 'Admin_Sucursal']`, redirigiendo automáticamente al `/dashboard` si un `Técnico` o `Secretaria` intenta ingresar manualmente.
+- **Navegación Condicional por Roles (`Sidebar.jsx` y `DashboardLayout.jsx`):**
+  - Ocultamiento reactivo del enlace/icono del módulo de Usuarios (`/trabajadores`) en el menú lateral de escritorio y en el menú móvil para usuarios con rol `Técnico` o `Secretaria`.
+
+### Changed
+- **Adaptación Dinámica de Gestión de Usuarios (`WorkersPage.jsx` y `WorkerModal.jsx`):**
+  - `WorkersPage.jsx`: El selector de roles se adapta para mostrar únicamente `Todos los Roles`, `Técnico` y `Secretaria` si el usuario en sesión es Admin de Sucursal.
+  - `WorkersPage.jsx`: El filtro de sucursales se oculta para el Admin de Sucursal y queda visible exclusivamente para `SuperAdmin`.
+  - `WorkersPage.jsx`: Las acciones de fila (Editar y Alternar Estado) se restringen para que el Admin de Sucursal solo pueda operar sobre personal técnico/secretaría, mostrando *"Solo lectura"* en cuentas administrativas.
+  - `WorkerModal.jsx`: El selector de rol filtra dinámicamente opciones administrativas y el selector de sucursal se bloquea/fija automáticamente a la sede del administrador en sesión.
+- **Validación Estricta de Límites Máximos de Caracteres (`WorkerModal.jsx` y `workers.controller.js`):**
+  - Aplicación de `maxLength` y validaciones visuales en frontend y rechazo con `400 Bad Request` en backend:
+    - `nombre`: max 50 caracteres
+    - `apellido`: max 50 caracteres
+    - `usuario`: max 50 caracteres (min 6)
+    - `correo`: max 100 caracteres
+    - `cedula`: max 20 caracteres (min 11)
+    - `telefono`: max 20 caracteres (min 10)
+    - `password`: max 20 caracteres (min 8)
+- **Validación y Sincronización en Login (`LoginPage.jsx` y `auth.controller.js`):**
+  - Frontend: Inclusión de `maxLength={50}` en `usuario` (mín. 6) y `maxLength={20}` en `password` (mín. 8) con avisos de error personalizados en el formulario.
+  - Backend: Validación previa de longitud de credenciales en `POST /api/auth/login`, respondiendo inmediatamente con `400 Bad Request` ante entradas fuera del rango permitido.
+- **Capa Visual de Notificaciones Toast:**
+  - `index.css`: Definición de regla `z-index: 99999 !important` para `[data-sileo-viewport]` y `[data-sileo-toast]` asegurando visibilidad frontal por encima de cualquier modal y backdrop.
 
 ---
 

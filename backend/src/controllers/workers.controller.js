@@ -19,21 +19,27 @@ const validateWorkerPayload = async (pool, data, isEdit = false, currentWorker =
     password
   } = data;
 
-  // 1. Nombre
+  // 1. Nombre (min 2, max 50)
   if (!isEdit || nombre !== undefined) {
     if (!nombre || typeof nombre !== 'string' || nombre.trim().length < 2) {
       return 'El nombre es obligatorio y debe tener al menos 2 caracteres.';
     }
+    if (nombre.trim().length > 50) {
+      return 'El nombre no puede exceder los 50 caracteres.';
+    }
   }
 
-  // 2. Apellido
+  // 2. Apellido (min 2, max 50)
   if (!isEdit || apellido !== undefined) {
     if (!apellido || typeof apellido !== 'string' || apellido.trim().length < 2) {
       return 'El apellido es obligatorio y debe tener al menos 2 caracteres.';
     }
+    if (apellido.trim().length > 50) {
+      return 'El apellido no puede exceder los 50 caracteres.';
+    }
   }
 
-  // 3. Nombre de Usuario (sin espacios, mínimo 6 caracteres)
+  // 3. Nombre de Usuario (sin espacios, min 6, max 50)
   if (!isEdit || usuario !== undefined) {
     if (!usuario || typeof usuario !== 'string') {
       return 'El nombre de usuario es obligatorio.';
@@ -45,9 +51,12 @@ const validateWorkerPayload = async (pool, data, isEdit = false, currentWorker =
     if (cleanUser.length < 6) {
       return 'El nombre de usuario debe tener al menos 6 caracteres.';
     }
+    if (cleanUser.length > 50) {
+      return 'El nombre de usuario no puede exceder los 50 caracteres.';
+    }
   }
 
-  // 4. Cédula (solo dígitos numéricos, mínimo 11)
+  // 4. Cédula (solo dígitos numéricos, min 11, max 20)
   if (!isEdit || cedula !== undefined) {
     if (!cedula) {
       return 'La cédula de identidad es obligatoria.';
@@ -56,9 +65,12 @@ const validateWorkerPayload = async (pool, data, isEdit = false, currentWorker =
     if (cleanCed.length < 11) {
       return 'La cédula debe contener al menos 11 dígitos numéricos.';
     }
+    if (cleanCed.length > 20) {
+      return 'La cédula no puede exceder los 20 dígitos numéricos.';
+    }
   }
 
-  // 5. Correo Electrónico (sin espacios, formato válido)
+  // 5. Correo Electrónico (sin espacios, formato válido, max 100)
   if (!isEdit || correo !== undefined) {
     if (!correo || typeof correo !== 'string') {
       return 'El correo electrónico es obligatorio.';
@@ -67,12 +79,15 @@ const validateWorkerPayload = async (pool, data, isEdit = false, currentWorker =
       return 'El correo electrónico no puede contener espacios en blanco.';
     }
     const cleanMail = correo.trim();
+    if (cleanMail.length > 100) {
+      return 'El correo electrónico no puede exceder los 100 caracteres.';
+    }
     if (!EMAIL_REGEX.test(cleanMail)) {
       return 'Ingrese un correo electrónico con formato válido (ej. usuario@dominio.com).';
     }
   }
 
-  // 6. Teléfono (solo dígitos numéricos, mínimo 10)
+  // 6. Teléfono (solo dígitos numéricos, min 10, max 20)
   if (!isEdit || telefono !== undefined) {
     if (!telefono) {
       return 'El teléfono de contacto es obligatorio.';
@@ -80,6 +95,9 @@ const validateWorkerPayload = async (pool, data, isEdit = false, currentWorker =
     const cleanTel = String(telefono).replace(/\D/g, '');
     if (cleanTel.length < 10) {
       return 'El teléfono debe contener al menos 10 dígitos numéricos.';
+    }
+    if (cleanTel.length > 20) {
+      return 'El teléfono no puede exceder los 20 dígitos numéricos.';
     }
   }
 
@@ -112,7 +130,7 @@ const validateWorkerPayload = async (pool, data, isEdit = false, currentWorker =
     }
   }
 
-  // 8. Contraseña (sin espacios, mínimo 8 caracteres)
+  // 8. Contraseña (sin espacios, min 8, max 20)
   if (!isEdit) {
     if (!password || typeof password !== 'string') {
       return 'La contraseña es obligatoria.';
@@ -123,12 +141,18 @@ const validateWorkerPayload = async (pool, data, isEdit = false, currentWorker =
     if (password.length < 8) {
       return 'La contraseña debe tener al menos 8 caracteres.';
     }
+    if (password.length > 20) {
+      return 'La contraseña no puede exceder los 20 caracteres.';
+    }
   } else if (password !== undefined && password !== null && String(password).length > 0) {
     if (/\s/.test(password)) {
       return 'La nueva contraseña no puede contener espacios en blanco.';
     }
     if (String(password).length < 8) {
       return 'La nueva contraseña debe tener al menos 8 caracteres.';
+    }
+    if (String(password).length > 20) {
+      return 'La nueva contraseña no puede exceder los 20 caracteres.';
     }
   }
 
@@ -305,10 +329,24 @@ const createWorker = async (req, res) => {
     const cleanCedula = String(cedula).replace(/\D/g, '');
     const cleanTelefono = String(telefono).replace(/\D/g, '');
 
-    // 2. Control de asignación de sucursal según rol del usuario autenticado
+    // 2. Control de asignación de sucursal y rol según rol del usuario autenticado (RBAC)
     let assignedBranchId = sucursal_id ? parseInt(sucursal_id, 10) : null;
-    if (!req.isSuperAdmin && req.filterSucursalId) {
-      assignedBranchId = req.filterSucursalId;
+    if (!req.isSuperAdmin) {
+      // Validar que el rol_id solicitado pertenezca a Técnico o Secretaria
+      const targetRoleRes = await pool.query('SELECT id, nombre_rol FROM roles_equipo WHERE id = $1', [parseInt(rol_id, 10)]);
+      if (targetRoleRes.rows.length === 0) {
+        return res.status(400).json({ ok: false, message: 'El rol seleccionado no existe.' });
+      }
+      const targetRoleName = targetRoleRes.rows[0].nombre_rol;
+      if (!['Tecnico', 'Secretaria'].includes(targetRoleName)) {
+        return res.status(403).json({
+          ok: false,
+          message: 'No tienes permisos para asignar este rol. Un Administrador de Sucursal solo puede registrar Técnicos o Secretarias.'
+        });
+      }
+
+      // Forzar la sucursal del admin autenticado
+      assignedBranchId = req.filterSucursalId || req.user.sucursal_id;
     }
 
     // 3. Verificar duplicados (usuario, correo, cedula)
@@ -493,10 +531,26 @@ const updateWorker = async (req, res) => {
       finalPassword = await bcrypt.hash(String(password).trim(), 10);
     }
 
-    // 5. Determinar sucursal asignada
+    // 5. Determinar sucursal y rol asignado según rol del usuario autenticado (RBAC)
     let branchToAssign = sucursal_id !== undefined ? (sucursal_id ? parseInt(sucursal_id, 10) : null) : currentWorker.sucursal_id;
-    if (!req.isSuperAdmin && req.filterSucursalId) {
-      branchToAssign = req.filterSucursalId;
+    if (!req.isSuperAdmin) {
+      // Si se intenta modificar el rol, validar que solo pueda ser Técnico o Secretaria
+      if (rol_id !== undefined && rol_id !== null && String(rol_id).trim() !== '') {
+        const targetRoleRes = await pool.query('SELECT id, nombre_rol FROM roles_equipo WHERE id = $1', [parseInt(rol_id, 10)]);
+        if (targetRoleRes.rows.length === 0) {
+          return res.status(400).json({ ok: false, message: 'El rol seleccionado no existe.' });
+        }
+        const targetRoleName = targetRoleRes.rows[0].nombre_rol;
+        if (!['Tecnico', 'Secretaria'].includes(targetRoleName)) {
+          return res.status(403).json({
+            ok: false,
+            message: 'No tienes permisos para asignar este rol. Un Administrador de Sucursal solo puede asignar roles de Técnico o Secretaria.'
+          });
+        }
+      }
+
+      // Forzar la sucursal del admin autenticado
+      branchToAssign = req.filterSucursalId || req.user.sucursal_id;
     }
 
     // 6. Ejecutar actualización
