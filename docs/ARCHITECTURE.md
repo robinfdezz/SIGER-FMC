@@ -194,4 +194,3 @@ Para optimizar la experiencia de usuario y la confiabilidad operativa, el fronte
    - Ventajas arquitectónicas: Garantiza compatibilidad nativa con el historial de navegación (botones atrás/adelante del navegador), previene pérdidas accidentales de datos extensos y permite validaciones modulares por etapa (Cliente/Equipo -> Diagnóstico/Checklist -> Presupuesto/Condiciones).
 2. **Modales Atómicos y de Confirmación (`Modal.jsx`, `ConfirmModal.jsx`):**
    - Acciones puntuales que no requieren salir de la tabla o vista actual (ej. creación rápida de un nuevo cliente desde un selector, edición de datos de trabajadores, o confirmación modal obligatoria para activar/desactivar cuentas y registrar repuestos extras).
-
