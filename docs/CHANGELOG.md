@@ -21,7 +21,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 ### Changed
 - Configuración global de `Toaster` (Sileo) reubicada a `top-center` y sincronizada dinámicamente con `ThemeContext` (Dark/Light).
 
-## [0.5.0] - 2026-08-27
+## [0.4.0] - 2026-08-27
 
 ### Security
 - **Ajuste de Expiración Estricta de JWT (8 Horas):**
@@ -31,8 +31,10 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   - `authMiddleware.js`: Captura explícita de `TokenExpiredError` retornando `401 Unauthorized` con código `TOKEN_EXPIRED`.
   - `api.js`: Interceptor de Axios mejorado para limpiar storage (`localStorage` y `sessionStorage`) y redirigir inmediatamente a `/login?expired=true` sin bucles de redirección.
   - `AuthContext.jsx`: Validación de expiración local previa (`isTokenExpired`) al inicializar la aplicación antes de enviar peticiones con tokens caducados.
-- **Auditoría de Payload de Tokens:**
+- **Auditoría de Payload de Tokens y Flujo de Login Anti-Enumeración:**
   - Verificación de contenido seguro en el token JWT, transportando únicamente identificadores y roles (`id`, `usuario`, `correo`, `rol_id`, `rol_nombre`, `sucursal_id`, `sucursal_nombre`) y omitiendo contraseñas, hashes o cédulas.
+  - Validación de contraseña mediante `bcrypt.compare()` previa a la comprobación del estado `activo` para prevenir enumeración de cuentas o revelación de estados a atacantes.
+  - Mensaje unificado `401 Unauthorized`: *"Usuario o contraseña incorrectos."* tanto para usuarios inexistentes como para contraseñas incorrectas.
 - **Prevención de Escalamiento de Privilegios y Control de Acceso (RBAC en Backend):**
   - `createWorker` y `updateWorker`: Rechazo inmediato con `403 Forbidden` ante cualquier intento de un Administrador de Sucursal de crear o asignar roles `SuperAdmin` o `Admin_Sucursal`, limitándolo exclusivamente a roles operativos (`Tecnico` y `Secretaria`).
   - Aislamiento estricto de sucursal: Forzado automático del `sucursal_id` de la sesión del administrador autenticado e impedimento de modificar usuarios o estados de otras sedes (`403 Forbidden`).
@@ -67,7 +69,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [0.4.0] - 2026-08-26
+## [0.3.0] - 2026-08-26
 
 ### Added
 - **Diseño y Tipografía Global:**
@@ -94,7 +96,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [0.3.0] - 2026-08-26
+## [0.2.0] - 2026-08-26
 
 ### Added
 - **Módulo Backend de Trabajadores (`datos_trabajadores`):**
@@ -109,7 +111,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   - Servicios de consumo API (`workers.service.js` y `catalogs.service.js`).
 ---
 
-## [0.2.0] - 2026-08-25
+## [0.1.1] - 2026-08-25
 
 ### Added
 - Creación de la tabla `clientes` y normalización relacional con `servicios_recepcion`.

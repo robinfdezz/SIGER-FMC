@@ -72,26 +72,26 @@ const login = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
-        message: 'Credenciales inválidas. Verifique el usuario y la contraseña ingresados.'
+        message: 'Usuario o contraseña incorrectos.'
       });
     }
 
     const worker = result.rows[0];
 
-    // 3. Validar estado activo del trabajador
-    if (!worker.activo) {
-      return res.status(403).json({
-        success: false,
-        message: 'Su cuenta se encuentra desactivada. Comuníquese con el administrador del sistema.'
-      });
-    }
-
-    // 4. Comparar hash de contraseña
+    // 3. Comparar hash de contraseña primero (evita enumeración de cuentas o estados)
     const isMatch = await bcrypt.compare(password, worker.password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Credenciales inválidas. Verifique el usuario y la contraseña ingresados.'
+        message: 'Usuario o contraseña incorrectos.'
+      });
+    }
+
+    // 4. Validar estado activo del trabajador únicamente después de autenticar credenciales legítimas
+    if (!worker.activo) {
+      return res.status(403).json({
+        success: false,
+        message: 'Su cuenta se encuentra desactivada. Comuníquese con el administrador del sistema.'
       });
     }
 
