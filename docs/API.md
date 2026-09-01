@@ -319,7 +319,193 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ---
 
-## 4. Módulo de Servicios y Tickets (`/api/servicios`)
+## 4. Módulo de Gestión de Clientes (`/api/clientes`)
+
+### 4.1 Listar Clientes
+- **Ruta:** `GET /api/clientes`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Query Params (Opcionales):**
+  - `page` (INT, default: 1): Número de página.
+  - `limit` (INT, default: 20): Cantidad de registros por página.
+  - `search` (STRING): Término de búsqueda con `ILIKE` en `nombre`, `apellido`, `cedula_rnc`, `telefono`, `telefono_adicional` y `correo`.
+  - `estado` (STRING, default: `'all'`): Filtrar por `'active'`, `'inactive'` o `'all'`.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "id": 1,
+        "nombre": "Pedro",
+        "apellido": "Almonte",
+        "cedula_rnc": "05600123456",
+        "telefono": "8095551122",
+        "telefono_adicional": "8295553344",
+        "correo": "pedro.almonte@ejemplo.com",
+        "direccion": "Calle Principal #45, SFM",
+        "activo": true,
+        "created_at": "2026-09-01T12:00:00.000Z",
+        "updated_at": "2026-09-01T12:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "total": 1,
+      "page": 1,
+      "limit": 20,
+      "totalPages": 1
+    }
+  }
+  ```
+
+---
+
+### 4.2 Obtener Cliente por ID
+- **Ruta:** `GET /api/clientes/:id`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 1,
+      "nombre": "Pedro",
+      "apellido": "Almonte",
+      "cedula_rnc": "05600123456",
+      "telefono": "8095551122",
+      "telefono_adicional": "8295553344",
+      "correo": "pedro.almonte@ejemplo.com",
+      "direccion": "Calle Principal #45, SFM",
+      "activo": true,
+      "created_at": "2026-09-01T12:00:00.000Z",
+      "updated_at": "2026-09-01T12:00:00.000Z"
+    }
+  }
+  ```
+- **Errores:**
+  - `400 Bad Request`: ID no válido.
+  - `404 Not Found`: Cliente no encontrado.
+
+---
+
+### 4.3 Registrar Cliente
+- **Ruta:** `POST /api/clientes`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`)
+- **Campos Obligatorios:** `nombre`, `apellido`, `cedula_rnc`, `telefono`.
+- **Validaciones:**
+  - `nombre`: min 2, max 100 caracteres.
+  - `apellido`: min 2, max 100 caracteres.
+  - `cedula_rnc`: min 9, max 20 caracteres (único en la base de datos).
+  - `telefono`: min 10, max 20 dígitos numéricos.
+  - `correo`: max 100 caracteres con formato email válido.
+  - `direccion`: max 500 caracteres.
+- **Body (JSON):**
+  ```json
+  {
+    "nombre": "Pedro",
+    "apellido": "Almonte",
+    "cedula_rnc": "05600123456",
+    "telefono": "8095551122",
+    "telefono_adicional": "8295553344",
+    "correo": "pedro.almonte@ejemplo.com",
+    "direccion": "Calle Principal #45, SFM"
+  }
+  ```
+- **Respuesta Exitosa (`201 Created`):**
+  ```json
+  {
+    "success": true,
+    "message": "Cliente registrado exitosamente.",
+    "data": {
+      "id": 1,
+      "nombre": "Pedro",
+      "apellido": "Almonte",
+      "cedula_rnc": "05600123456",
+      "telefono": "8095551122",
+      "telefono_adicional": "8295553344",
+      "correo": "pedro.almonte@ejemplo.com",
+      "direccion": "Calle Principal #45, SFM",
+      "activo": true,
+      "created_at": "2026-09-01T12:00:00.000Z",
+      "updated_at": "2026-09-01T12:00:00.000Z"
+    }
+  }
+  ```
+- **Errores:**
+  - `400 Bad Request`: Validación de longitud o campos obligatorios no superada.
+  - `403 Forbidden`: Intento de creación por parte de un usuario con rol `Tecnico`.
+  - `409 Conflict`: Ya existe un cliente con la misma `cedula_rnc`.
+
+---
+
+### 4.4 Actualizar Cliente
+- **Ruta:** `PUT /api/clientes/:id`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`)
+- **Body (JSON):**
+  ```json
+  {
+    "nombre": "Pedro Manuel",
+    "apellido": "Almonte Díaz",
+    "cedula_rnc": "05600123456",
+    "telefono": "8095551199",
+    "telefono_adicional": null,
+    "correo": "p.almonte@ejemplo.com",
+    "direccion": "Av. Libertad #12, SFM"
+  }
+  ```
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "success": true,
+    "message": "Cliente actualizado exitosamente.",
+    "data": {
+      "id": 1,
+      "nombre": "Pedro Manuel",
+      "apellido": "Almonte Díaz",
+      "cedula_rnc": "05600123456",
+      "telefono": "8095551199",
+      "telefono_adicional": null,
+      "correo": "p.almonte@ejemplo.com",
+      "direccion": "Av. Libertad #12, SFM",
+      "activo": true,
+      "created_at": "2026-09-01T12:00:00.000Z",
+      "updated_at": "2026-09-01T12:30:00.000Z"
+    }
+  }
+  ```
+- **Errores:**
+  - `400 Bad Request`: Formato de datos inválido.
+  - `403 Forbidden`: Intento de edición por parte de un usuario con rol `Tecnico`.
+  - `404 Not Found`: Cliente no existe.
+  - `409 Conflict`: La cédula o RNC ya está registrada para otro cliente.
+
+---
+
+### 4.5 Alternar Estado (Activar / Desactivar)
+- **Ruta:** `PATCH /api/clientes/:id/toggle-status`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "success": true,
+    "message": "El cliente \"Pedro Almonte\" ha sido desactivado del sistema.",
+    "data": {
+      "id": 1,
+      "nombre": "Pedro",
+      "apellido": "Almonte",
+      "cedula_rnc": "05600123456",
+      "activo": false,
+      "updated_at": "2026-09-01T12:35:00.000Z"
+    }
+  }
+  ```
+- **Errores:**
+  - `400 Bad Request`: ID inválido.
+  - `403 Forbidden`: Intento de alternar estado por parte de roles no administrativos (`Secretaria` o `Tecnico`).
+  - `404 Not Found`: Cliente no encontrado.
+
+---
+
+## 5. Módulo de Servicios y Tickets (`/api/servicios`)
 
 ### 3.1 Listar Órdenes de Servicio
 - **Ruta:** `GET /api/servicios`

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../common/Modal';
+import Select from '../common/Select';
 import { createWorker, updateWorker } from '../../services/workers.service';
 import { useAuth } from '../../context/AuthContext';
 import { sileo } from 'sileo';
@@ -76,6 +77,23 @@ const WorkerModal = ({
   const isEdit = Boolean(worker && worker.id);
   const selectedRoleObj = availableRoles.find((r) => String(r.id) === String(formData.rol_id)) || rolesList.find((r) => String(r.id) === String(formData.rol_id));
   const isSuperAdminRole = selectedRoleObj?.nombre_rol === 'SuperAdmin';
+
+  const roleSelectItems = useMemo(() => {
+    return availableRoles.map((r) => ({
+      id: String(r.id),
+      label: formatRoleName(r.nombre_rol || r.nombre)
+    }));
+  }, [availableRoles]);
+
+  const sucursalSelectItems = useMemo(() => {
+    if (isSuperAdminRole) {
+      return [{ id: '', label: 'Global / Sin Asignar (SuperAdmin)' }];
+    }
+    return sucursalesList.map((s) => ({
+      id: String(s.id),
+      label: s.nombre_sucursal || s.nombre
+    }));
+  }, [isSuperAdminRole, sucursalesList]);
 
   const hasChanges = !isEdit || Boolean(
     formData.nombre.trim() !== (worker?.nombre || '').trim() ||
@@ -471,59 +489,47 @@ const WorkerModal = ({
           {/* Fila 4: Rol y Sucursal */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
-                Rol en el Equipo <span className="text-red-500">*</span>
-              </label>
-              <select
+              <Select
+                label="Rol en el Equipo"
+                isRequired
                 name="rol_id"
                 value={formData.rol_id}
-                onChange={handleChange}
-                className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 transition-colors cursor-pointer ${errors.rol_id
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
-                  }`}
-              >
-                <option value="" disabled>Seleccione un rol</option>
-                {availableRoles.map((r) => (
-                  <option key={r.id} value={String(r.id)}>
-                    {formatRoleName(r.nombre_rol || r.nombre)}
-                  </option>
-                ))}
-              </select>
-              {errors.rol_id && (
-                <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.rol_id}</p>
-              )}
+                onChange={(val) => {
+                  const selectedRole = rolesList.find((r) => String(r.id) === String(val));
+                  if (selectedRole?.nombre_rol === 'SuperAdmin') {
+                    setFormData((prev) => ({ ...prev, rol_id: val, sucursal_id: '' }));
+                    setErrors((prev) => ({ ...prev, rol_id: '', sucursal_id: '' }));
+                  } else {
+                    setFormData((prev) => ({ ...prev, rol_id: val }));
+                    if (errors.rol_id) setErrors((prev) => ({ ...prev, rol_id: '' }));
+                  }
+                }}
+                items={roleSelectItems}
+                placeholder="Seleccione un rol"
+                error={errors.rol_id}
+              />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 font-inter">
-                Sucursal Asignada {!isSuperAdminRole && <span className="text-red-500">*</span>}
-                {isBranchAdmin && <span className="text-[11px] text-neutral-400 font-normal ml-1">(Fijada a tu sede)</span>}
-              </label>
-              <select
-                name="sucursal_id"
+              <Select
+                label="Sucursal Asignada"
+                isRequired={!isSuperAdminRole}
+                hint={isBranchAdmin ? 'Fijada a tu sede asignada' : undefined}
                 disabled={isSuperAdminRole || isBranchAdmin}
-                value={isBranchAdmin ? String(currentUser?.sucursal_id || '') : (isSuperAdminRole ? '' : formData.sucursal_id)}
-                onChange={handleChange}
-                className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-neutral-100 dark:disabled:bg-neutral-800 ${errors.sucursal_id
-                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                  : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
-                  }`}
-              >
-                {isSuperAdminRole ? (
-                  <option value="">Global / Sin Asignar (SuperAdmin)</option>
-                ) : (
-                  <option value="" disabled>Seleccione una sucursal</option>
-                )}
-                {sucursalesList.map((s) => (
-                  <option key={s.id} value={String(s.id)}>
-                    {s.nombre_sucursal || s.nombre}
-                  </option>
-                ))}
-              </select>
-              {errors.sucursal_id && (
-                <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.sucursal_id}</p>
-              )}
+                name="sucursal_id"
+                value={
+                  isBranchAdmin
+                    ? String(currentUser?.sucursal_id || '')
+                    : (isSuperAdminRole ? '' : formData.sucursal_id)
+                }
+                onChange={(val) => {
+                  setFormData((prev) => ({ ...prev, sucursal_id: val }));
+                  if (errors.sucursal_id) setErrors((prev) => ({ ...prev, sucursal_id: '' }));
+                }}
+                items={sucursalSelectItems}
+                placeholder={isSuperAdminRole ? 'Global / Sin Asignar (SuperAdmin)' : 'Seleccione una sucursal'}
+                error={errors.sucursal_id}
+              />
             </div>
           </div>
 

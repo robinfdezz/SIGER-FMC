@@ -85,7 +85,7 @@
 | :--- | :--- | :--- | :--- |
 | `id` | SERIAL / INT | NO | Llave Primaria (PK) |
 | `nombre` | VARCHAR(100) | NO | Nombres del cliente |
-| `apellido` | VARCHAR(100) | SÍ | Apellidos del cliente |
+| `apellido` | VARCHAR(100) | NO | Apellidos del cliente |
 | `cedula_rnc` | VARCHAR(20) | NO | Cédula o RNC del cliente (Único) |
 | `telefono` | VARCHAR(20) | NO | Teléfono de contacto |
 | `telefono_adicional`| VARCHAR(20) | SÍ | Teléfono secundario |

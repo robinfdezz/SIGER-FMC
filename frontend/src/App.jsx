@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/Login/LoginPage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
 import WorkersPage from './pages/WorkersPage';
+import ClientsPage from './pages/ClientsPage';
 import { useTheme } from './context/ThemeContext';
 import { Toaster } from 'sileo';
 import 'sileo/styles.css';
@@ -31,6 +32,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/clientes"
+              element={
+                <ProtectedRoute>
+                  <ClientsPage />
                 </ProtectedRoute>
               }
             />

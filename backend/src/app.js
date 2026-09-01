@@ -6,6 +6,7 @@ require('dotenv').config();
 // Rutas
 const authRoutes = require('./routes/auth.routes');
 const workersRoutes = require('./routes/workers.routes');
+const clientsRoutes = require('./routes/clients.routes');
 const catalogsRoutes = require('./routes/catalogs.routes');
 
 const app = express();
@@ -67,6 +68,7 @@ app.get('/api/health', (req, res) => {
 // Montaje de rutas de la API
 app.use('/api/auth', authRoutes);
 app.use('/api/trabajadores', workersRoutes);
+app.use('/api/clientes', clientsRoutes);
 app.use('/api/catalogos', catalogsRoutes);
 app.use('/api/sucursales', catalogsRoutes);
 app.use('/api/roles', catalogsRoutes);

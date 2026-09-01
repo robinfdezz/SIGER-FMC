@@ -10,6 +10,7 @@ import {
   Wrench,
   Image as ImageIcon,
   Users,
+  Contact,
   Settings,
   PanelLeft,
   PanelLeftClose,
@@ -20,6 +21,7 @@ import {
 const MENU_ITEMS = [
   { id: 'dashboard', name: 'Inicio / Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { id: 'tickets', name: 'Órdenes de Servicio', path: '/tickets', icon: Ticket },
+  { id: 'clientes', name: 'Clientes', path: '/clientes', icon: Contact },
   { id: 'taller', name: 'Banco de Trabajo', path: '/taller', icon: Wrench },
   { id: 'trabajadores', name: 'Usuarios', path: '/trabajadores', icon: Users, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
   { id: 'config', name: 'Configuración', path: '/configuracion', icon: Settings },
@@ -45,10 +47,20 @@ const Sidebar = () => {
   const [isHovered, setIsHovered] = useState(false);
   const [showConfigMenu, setShowConfigMenu] = useState(false);
   const configMenuRef = useRef(null);
+  const enterTimeoutRef = useRef(null);
+  const leaveTimeoutRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem('siger_sidebar_mode', sidebarMode);
   }, [sidebarMode]);
+
+  // Limpieza de temporizadores al desmontar el componente
+  useEffect(() => {
+    return () => {
+      if (enterTimeoutRef.current) clearTimeout(enterTimeoutRef.current);
+      if (leaveTimeoutRef.current) clearTimeout(leaveTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -62,20 +74,41 @@ const Sidebar = () => {
 
   const isExpanded = sidebarMode === 'expanded' || (sidebarMode === 'hover' && isHovered);
 
+  const handleMouseEnter = () => {
+    if (sidebarMode !== 'hover') return;
+    if (leaveTimeoutRef.current) {
+      clearTimeout(leaveTimeoutRef.current);
+      leaveTimeoutRef.current = null;
+    }
+    enterTimeoutRef.current = setTimeout(() => {
+      setIsHovered(true);
+    }, 110);
+  };
+
+  const handleMouseLeave = () => {
+    if (sidebarMode !== 'hover') return;
+    if (enterTimeoutRef.current) {
+      clearTimeout(enterTimeoutRef.current);
+      enterTimeoutRef.current = null;
+    }
+    leaveTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+      setShowConfigMenu(false);
+    }, 220);
+  };
+
   const handleModeChange = (mode) => {
+    if (enterTimeoutRef.current) clearTimeout(enterTimeoutRef.current);
+    if (leaveTimeoutRef.current) clearTimeout(leaveTimeoutRef.current);
+    setIsHovered(false);
     setSidebarMode(mode);
     setShowConfigMenu(false);
   };
 
   return (
     <aside
-      onMouseEnter={() => sidebarMode === 'hover' && setIsHovered(true)}
-      onMouseLeave={() => {
-        if (sidebarMode === 'hover') {
-          setIsHovered(false);
-          setShowConfigMenu(false);
-        }
-      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       className={`relative z-20 h-full hidden lg:flex flex-col border-r border-zinc-200 dark:border-dark-border bg-white dark:bg-dark-surface transition-all duration-300 ease-in-out select-none flex-shrink-0 ${
         sidebarMode === 'hover' && isHovered
           ? 'w-64 shadow-2xl absolute md:relative left-0 top-0 bottom-0'

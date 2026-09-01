@@ -6,19 +6,25 @@
   :root {
     color-scheme: light dark;
   }
-  
-  html, body {
+
+  html,
+  body {
     font-family: 'Sora', sans-serif;
   }
-  
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Sora', sans-serif;
   }
 }
 
 /* Custom modern scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 10px;
   height: 6px;
 }
 

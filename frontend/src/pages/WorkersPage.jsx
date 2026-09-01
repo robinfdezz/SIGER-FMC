@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import WorkerModal from '../components/workers/WorkerModal';
 import ConfirmModal from '../components/common/ConfirmModal';
+import Select from '../components/common/Select';
 import { getWorkers, toggleWorkerStatus } from '../services/workers.service';
 import { getRoles, getSucursales } from '../services/catalogs.service';
 import { useAuth } from '../context/AuthContext';
@@ -262,6 +263,30 @@ const WorkersPage = () => {
     });
   }, [workers, searchTerm, selectedRole, selectedBranch, selectedStatus]);
 
+  // Opciones formateadas para los componentes Select
+  const roleOptions = useMemo(() => [
+    { id: '', label: 'Todos los Roles' },
+    ...filterRoles.map((r) => ({
+      id: String(r.id),
+      label: formatRoleName(r.nombre_rol || r.nombre)
+    }))
+  ], [filterRoles]);
+
+  const branchOptions = useMemo(() => [
+    { id: 'all', label: 'Todas las Sucursales' },
+    { id: 'global', label: 'Global / Sin Asignar' },
+    ...sucursales.map((s) => ({
+      id: String(s.id),
+      label: s.nombre_sucursal || s.nombre
+    }))
+  ], [sucursales]);
+
+  const statusOptions = useMemo(() => [
+    { id: 'all', label: 'Todos los Estados' },
+    { id: 'active', label: 'Solo Activos' },
+    { id: 'inactive', label: 'Solo Inactivos' }
+  ], []);
+
   const getInitials = (nombre, apellido) => {
     const n = nombre ? nombre.charAt(0).toUpperCase() : '';
     const a = apellido ? apellido.charAt(0).toUpperCase() : '';
@@ -323,51 +348,35 @@ const WorkersPage = () => {
               {/* Selectores Dinámicos y Botón Limpiar */}
               <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto flex-1 lg:flex-initial">
                 {/* Selector Rol (Filtrado según RBAC) */}
-                <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[150px]">
-                  <select
+                <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[160px]">
+                  <Select
                     value={selectedRole}
-                    onChange={(e) => setSelectedRole(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors cursor-pointer"
-                  >
-                    <option value="">Todos los Roles</option>
-                    {filterRoles.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {formatRoleName(r.nombre_rol || r.nombre)}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setSelectedRole(val)}
+                    items={roleOptions}
+                    placeholder="Todos los Roles"
+                  />
                 </div>
 
                 {/* Selector Sucursal (Visible únicamente para SuperAdmin) */}
                 {isSuperAdmin && (
-                  <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[160px]">
-                    <select
+                  <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[180px]">
+                    <Select
                       value={selectedBranch}
-                      onChange={(e) => setSelectedBranch(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors cursor-pointer"
-                    >
-                      <option value="all">Todas las Sucursales</option>
-                      <option value="global">Global / Sin Asignar</option>
-                      {sucursales.map((s) => (
-                        <option key={s.id} value={String(s.id)}>
-                          {s.nombre_sucursal || s.nombre}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(val) => setSelectedBranch(val)}
+                      items={branchOptions}
+                      placeholder="Todas las Sucursales"
+                    />
                   </div>
                 )}
 
                 {/* Selector Estado */}
-                <div className="flex-1 sm:flex-initial min-w-[130px] sm:min-w-[140px]">
-                  <select
+                <div className="flex-1 sm:flex-initial min-w-[130px] sm:min-w-[150px]">
+                  <Select
                     value={selectedStatus}
-                    onChange={(e) => setSelectedStatus(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors cursor-pointer"
-                  >
-                    <option value="all">Todos los Estados</option>
-                    <option value="active">Solo Activos</option>
-                    <option value="inactive">Solo Inactivos</option>
-                  </select>
+                    onChange={(val) => setSelectedStatus(val)}
+                    items={statusOptions}
+                    placeholder="Todos los Estados"
+                  />
                 </div>
 
                 {/* Botón Acción Limpiar Filtros con MorphIcon */}

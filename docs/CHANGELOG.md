@@ -15,13 +15,24 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - Portal público de seguimiento de tickets para clientes (`/tracking/:codigo_ticket`).
 
 ### Added
+- **Módulo de Gestión de Clientes y Control RBAC Granular (Fase 2):**
+  - **Backend (`clients.controller.js` y `clients.routes.js`):** Endpoints REST protegidos con middleware `checkRole`: listado y detalle con acceso de solo lectura para técnicos (`GET /api/clientes` y `GET /:id`), creación y edición autorizadas para roles administrativos y secretaría (`POST` y `PUT` exclusivo para `SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `403` para `Tecnico`), validación estricta de campos obligatorios (`nombre`, `apellido` NOT NULL, `cedula_rnc` única y `telefono`), y borrado lógico restringido a administradores (`PATCH /:id/toggle-status` exclusivo para `SuperAdmin` y `Admin_Sucursal`).
+  - **Frontend (`ClientsPage.jsx` y `ClientModal.jsx`):** Homologación visual idéntica al estándar de `WorkersPage.jsx`: resumen de conteo inferior (*"Mostrando X de Y clientes registrados"*), avatares redondeados `rounded-xl` (`w-10 h-10`), badges de estado en cápsula suave con punto indicador, opacidad para registros inactivos, y modal estilizado con los mismos patrones de botones y cabeceras de `WorkerModal.jsx`.
+  - **Navegación y Rutas (`App.jsx`, `Sidebar.jsx`, `DashboardLayout.jsx`):** Ruta protegida `/clientes` y acceso en menú lateral de escritorio y móvil con icono `Contact`.
+- **Componente Modular `Select.jsx` (Diseño Untitled UI):**
+  - Implementación del componente reutilizable `Select.jsx` con soporte de `label`, `hint`, `tooltip`, `isRequired`, `placeholder`, `items` (con `id`, `label`, `supportingText`, `avatarUrl`, `icon`, `disabled`), `value`, `onChange` y `disabled`.
+  - Estilizado con Tailwind CSS (Dark/Light), flecha chevron rotativa animada, checkmark de selección activa y cierre automático ante clic exterior (`mousedown`/`touchstart`).
 - Componente modular reutilizable `ConfirmModal.jsx` con variantes (`danger`, `warning`, `info`) y soporte de carga asíncrona.
 - Modal de confirmación interactivo antes de alternar el estado activo/inactivo de trabajadores.
 
 ### Changed
+- **Interacción Suave en Menú Lateral (`Sidebar.jsx`):**
+  - Implementación de temporizadores debounce controlados por `useRef` para eventos del mouse en modo hover: retardo de entrada de 110ms (previene aperturas accidentales) y retardo de salida de 220ms (evita cierres bruscos al navegar o hacer clic).
+  - Limpieza rigurosa de timers en desmontaje y cambio de modo de visualización.
+- Reemplazo de todos los elementos `<select>` nativos en `WorkersPage.jsx` (filtros de Rol, Sucursal y Estado) y `WorkerModal.jsx` (selectores de Rol y Sucursal) por el nuevo componente `Select.jsx`.
 - Configuración global de `Toaster` (Sileo) reubicada a `top-center` y sincronizada dinámicamente con `ThemeContext` (Dark/Light).
 
-## [0.4.0] - 2026-08-27
+## [1.4.0] - 2026-08-27
 
 ### Security
 - **Ajuste de Expiración Estricta de JWT (8 Horas):**
@@ -69,7 +80,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [0.3.0] - 2026-08-26
+## [1.3.0] - 2026-08-26
 
 ### Added
 - **Diseño y Tipografía Global:**
@@ -96,22 +107,23 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [0.2.0] - 2026-08-26
+## [1.2.0] - 2026-08-26
 
 ### Added
 - **Módulo Backend de Trabajadores (`datos_trabajadores`):**
   - Endpoints CRUD (`/api/trabajadores`) protegidos con JWT y validación de roles (`SuperAdmin`, `Admin_Sucursal`).
-  - Validación de unicidad para usuario, cédula y correo[cite: 1].
-  - Encriptación segura de contraseñas con `bcryptjs` (10 rondas de salt)[cite: 1].
-  - Borrado lógico (`PATCH /api/trabajadores/:id/toggle-status`) con protección contra auto-desactivación de sesión[cite: 1].
+  - Validación de unicidad para usuario, cédula y correo.
+  - Encriptación segura de contraseñas con `bcryptjs` (10 rondas de salt).
+  - Borrado lógico (`PATCH /api/trabajadores/:id/toggle-status`) con protección contra auto-desactivación de sesión.
 - **Módulo Frontend de Trabajadores:**
-  - Vista principal (`WorkersPage.jsx`) con filtros en tiempo real por texto, rol, sucursal y estado[cite: 1].
-  - Modal reutilizable (`WorkerModal.jsx`) de dos columnas para creación y edición de personal[cite: 1].
+  - Vista principal (`WorkersPage.jsx`) con filtros en tiempo real por texto, rol, sucursal y estado.
+  - Modal reutilizable (`WorkerModal.jsx`) de dos columnas para creación y edición de personal.
   - Integración de notificaciones asíncronas con `sileo.promise` para los estados de carga, éxito y error.
   - Servicios de consumo API (`workers.service.js` y `catalogs.service.js`).
+
 ---
 
-## [0.1.1] - 2026-08-25
+## [1.1.0] - 2026-08-25
 
 ### Added
 - Creación de la tabla `clientes` y normalización relacional con `servicios_recepcion`.
@@ -140,7 +152,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [0.1.0] - 2026-08-16
+## [1.0.0] - 2026-08-16
 
 ### Added
 - Configuración inicial de la arquitectura en 3 capas: Frontend (React 18 + Vite + Tailwind CSS) y Backend (Node.js + Express).
