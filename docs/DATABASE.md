@@ -118,6 +118,7 @@
 | `observaciones_recepcion`| TEXT | SÍ | Detalles estéticos y condición inicial |
 | `checklist_entrada`| TEXT | SÍ | Inspección inicial en formato JSON |
 | `costo_previsto` | NUMERIC(10,2)| NO | Presupuesto inicial (Default: 0.00) |
+| `monto_anticipo` | NUMERIC(10,2)| NO | Abono o pago inicial dejado por el cliente (Default: 0.00) |
 | `monto_descuento`| NUMERIC(10,2)| NO | Descuento aplicado (Default: 0.00) |
 | `costo_final_confirmado`| NUMERIC(10,2)| NO | Monto final a facturar (Default: 0.00) |
 | `tiempo_garantia`| VARCHAR(50) | SÍ | Periodo de garantía (Default: '30 días') |
@@ -155,24 +156,30 @@
 | :--- | :--- | :--- | :--- |
 | `id` | SERIAL / INT | NO | Llave Primaria (PK) |
 | `servicio_id` | INT | NO | FK -> `servicios_recepcion(id)` ON DELETE CASCADE |
+| `usuario_id` | INT | NO | FK -> `datos_trabajadores(id)` ON UPDATE CASCADE ON DELETE RESTRICT |
 | `tipo_incidencia`| VARCHAR(50) | NO | 'Imprevisto', 'Aviso al Cliente', 'Pieza Extra', 'Hallazgo Tecnico' |
 | `descripcion` | TEXT | NO | Detalle del problema o novedad |
 | `repuesto_requerido`| VARCHAR(150)| SÍ | Repuesto o componente necesario |
 | `costo_adicional_repuesto`| NUMERIC(10,2)| NO | Costo extra del repuesto (Default: 0.00) |
 | `aprobado_por_cliente`| BOOLEAN | NO | Aprobación del cliente (Default: FALSE) |
+| `fecha_aprobacion`| TIMESTAMPTZ | SÍ | Timestamp en que el cliente aprueba el costo extra |
+| `metodo_aprobacion`| VARCHAR(30) | SÍ | Medio de confirmación ('Presencial', 'Llamada', 'WhatsApp', 'Correo', 'Otro') |
 | `fecha_registro`| TIMESTAMPTZ | SÍ | Timestamp de registro (CURRENT_TIMESTAMP) |
 | `activo` | BOOLEAN | NO | Estado lógico (Default: TRUE) |
 
 > **Restricciones Check (`incidencias_servicio`):**
 > - `chk_tipo_incidencia`: `tipo_incidencia IN ('Imprevisto', 'Aviso al Cliente', 'Pieza Extra', 'Hallazgo Tecnico')`
+> - `chk_metodo_aprobacion`: `metodo_aprobacion IS NULL OR metodo_aprobacion IN ('Presencial', 'Llamada', 'WhatsApp', 'Correo', 'Otro')`
 
 ### `evidencias_fotograficas` (Galería Multimedia)
 | Campo | Tipo | Nulo | Descripción |
 | :--- | :--- | :--- | :--- |
 | `id` | SERIAL / INT | NO | Llave Primaria (PK) |
 | `servicio_id` | INT | NO | FK -> `servicios_recepcion(id)` ON DELETE CASCADE |
-| `incidencia_id`| INT | SÍ | FK -> `incidencias_servicio(id)` ON DELETE SET NULL |
-| `url_foto` | VARCHAR(500) | NO | URL de la imagen en almacenamiento Cloudinary |
+| `incidencia_id`| INT | SÍ | FK -> `incidencias_servicio(id, servicio_id)` ON UPDATE CASCADE ON DELETE SET NULL |
+| `usuario_id` | INT | NO | FK -> `datos_trabajadores(id)` ON UPDATE CASCADE ON DELETE RESTRICT |
+| `url_foto` | TEXT | NO | URL de la imagen en almacenamiento Cloudinary |
+| `public_id` | VARCHAR(150) | SÍ | ID único del archivo en Cloudinary para gestión y borrado |
 | `tipo_evidencia`| VARCHAR(150) | NO | Clasificación ('Estado Inicial', 'Falla Detectada', 'Incidencia', 'Finalizado') |
 | `descripcion` | VARCHAR(150) | SÍ | Descripción o nota visual |
 | `fecha_subida` | TIMESTAMPTZ | SÍ | Timestamp de subida (CURRENT_TIMESTAMP) |
@@ -189,7 +196,9 @@
 - `idx_tecnicos_servicio` -> `tecnicos_asignados(servicio_id)`
 - `idx_historial_servicio` -> `historial_estados(servicio_id)`
 - `idx_incidencias_servicio` -> `incidencias_servicio(servicio_id)`
+- `idx_incidencias_usuario` -> `incidencias_servicio(usuario_id)`
 - `idx_evidencias_servicio` -> `evidencias_fotograficas(servicio_id)`
+- `idx_evidencias_usuario` -> `evidencias_fotograficas(usuario_id)`
 
 ---
 

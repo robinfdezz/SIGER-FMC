@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import Tooltip from './common/Tooltip';
 import { MorphIcon } from 'morphicons/react';
 import { Sun, Moon } from 'lucide';
 import {
@@ -117,36 +118,41 @@ const Sidebar = () => {
         }`}
     >
       {/* Navegación Principal */}
-      <nav className="flex-1 py-4 px-2 space-y-1.5 overflow-y-auto overflow-x-hidden">
+      <nav className="flex-1 py-4 px-2 space-y-1.5 overflow-visible">
         {filteredMenuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
 
           return (
-            <NavLink
+            <Tooltip
               key={item.id}
-              to={item.path}
-              title={!isExpanded ? item.name : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group relative ${isActive
-                  ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold shadow-xs'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
-                } ${!isExpanded ? 'justify-center px-0' : ''}`}
+              content={item.name}
+              position="right"
+              enabled={!isExpanded}
             >
-              <Icon
-                className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive
-                    ? 'text-brand-600 dark:text-brand-400'
-                    : 'text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200'
-                  }`}
-              />
+              <NavLink
+                to={item.path}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group relative w-full ${isActive
+                    ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold shadow-xs'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                  } ${!isExpanded ? 'justify-center px-0' : ''}`}
+              >
+                <Icon
+                  className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive
+                      ? 'text-brand-600 dark:text-brand-400'
+                      : 'text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200'
+                    }`}
+                />
 
-              {isExpanded && (
-                <span className="truncate whitespace-nowrap">{item.name}</span>
-              )}
+                {isExpanded && (
+                  <span className="truncate whitespace-nowrap">{item.name}</span>
+                )}
 
-              {isActive && isExpanded && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-500" />
-              )}
-            </NavLink>
+                {isActive && isExpanded && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-500" />
+                )}
+              </NavLink>
+            </Tooltip>
           );
         })}
       </nav>
@@ -154,35 +160,47 @@ const Sidebar = () => {
       {/* Sección Inferior / Controles */}
       <div className="p-2 border-t border-zinc-100 dark:border-dark-border space-y-1 relative" ref={configMenuRef}>
 
-        {/* 1. Botón de Tema (Icono animado MorphIcon) */}
-        <button
-          onClick={toggleTheme}
-          type="button"
-          title={isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
-          className="w-full flex items-center justify-center p-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
+        {/* 1. Botón de Tema (Icono animado MorphIcon con Tooltip) */}
+        <Tooltip
+          content={isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
+          position="right"
+          enabled={!isExpanded}
         >
-          <MorphIcon
-            icon={isDark ? Moon : Sun}
-            size={20}
-            className={isDark ? "text-red-500" : "text-zinc-600 dark:text-zinc-400"}
-          />
-        </button>
-
-        {/* 2. Botón de Modo del Sidebar (Icono central) */}
-        <div className="relative">
           <button
-            onClick={() => setShowConfigMenu((prev) => !prev)}
+            onClick={toggleTheme}
             type="button"
-            title="Modo de barra lateral"
-            className={`w-full flex items-center justify-center p-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${showConfigMenu
-                ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
-                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
-              }`}
+            aria-label={isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
+            className="w-full flex items-center justify-center p-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
           >
-            {sidebarMode === 'expanded' && <PanelLeftClose className="w-5 h-5" />}
-            {sidebarMode === 'hover' && <MousePointer className="w-5 h-5" />}
-            {sidebarMode === 'collapsed' && <PanelLeft className="w-5 h-5" />}
+            <MorphIcon
+              icon={isDark ? Moon : Sun}
+              size={20}
+              className={isDark ? "text-red-500" : "text-zinc-600 dark:text-zinc-400"}
+            />
           </button>
+        </Tooltip>
+
+        {/* 2. Botón de Modo del Sidebar (Icono central con Tooltip) */}
+        <div className="relative">
+          <Tooltip
+            content="Modo de barra lateral"
+            position="right"
+            enabled={!isExpanded && !showConfigMenu}
+          >
+            <button
+              onClick={() => setShowConfigMenu((prev) => !prev)}
+              type="button"
+              aria-label="Modo de barra lateral"
+              className={`w-full flex items-center justify-center p-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${showConfigMenu
+                  ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                }`}
+            >
+              {sidebarMode === 'expanded' && <PanelLeftClose className="w-5 h-5" />}
+              {sidebarMode === 'hover' && <MousePointer className="w-5 h-5" />}
+              {sidebarMode === 'collapsed' && <PanelLeft className="w-5 h-5" />}
+            </button>
+          </Tooltip>
 
           {/* Menú Popover de Selección de Modos (Solo Texto Limpio) */}
           {showConfigMenu && (
