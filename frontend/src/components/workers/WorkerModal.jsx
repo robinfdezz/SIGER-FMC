@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../common/Modal';
 import Select from '../common/Select';
+import SingleImageDropzone from '../common/SingleImageDropzone';
 import { createWorker, updateWorker, uploadAvatar } from '../../services/workers.service';
 import { useAuth } from '../../context/AuthContext';
 import { sileo } from 'sileo';
 import { MorphIcon } from 'morphicons/react';
 import { Eye, EyeOff } from 'lucide';
-import { Camera, Trash2, RefreshCw, UploadCloud } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 const INITIAL_FORM_STATE = {
   nombre: '',
@@ -80,8 +81,6 @@ const WorkerModal = ({
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [avatarRemoved, setAvatarRemoved] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef(null);
 
   const isEdit = Boolean(worker && worker.id);
   const selectedRoleObj = availableRoles.find((r) => String(r.id) === String(formData.rol_id)) || rolesList.find((r) => String(r.id) === String(formData.rol_id));
@@ -153,66 +152,17 @@ const WorkerModal = ({
     setAvatarFile(null);
     setAvatarPreview(null);
     setAvatarRemoved(false);
-    setIsDragging(false);
     setErrors({});
     setShowPassword(false);
   }, [worker, isEdit, isOpen, roles, sucursales, isBranchAdmin, currentUser]);
 
-  const processFile = (file) => {
-    if (!file) return;
-
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    if (!validTypes.includes(file.type)) {
-      sileo.error({
-        title: 'Formato no permitido',
-        description: 'Solo se permiten imágenes en formato JPG, PNG o WEBP.'
-      });
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      sileo.error({
-        title: 'Archivo muy pesado',
-        description: 'La imagen no puede exceder los 5MB de tamaño.'
-      });
-      return;
-    }
-
+  const handleFileChange = (file) => {
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
     setAvatarRemoved(false);
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    processFile(file);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isDragging) setIsDragging(true);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    processFile(file);
-  };
-
-  const handleRemoveAvatar = (e) => {
-    e.stopPropagation();
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  const handleRemovePhoto = () => {
     setAvatarFile(null);
     setAvatarPreview(null);
     setAvatarRemoved(true);
@@ -454,78 +404,14 @@ const WorkerModal = ({
         {/* Cuerpo Scroleable */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-3.5">
           {/* Dropzone de Foto de Perfil / Avatar */}
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={handleDragOver}
-            onDragEnter={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`group relative flex items-center gap-3.5 sm:gap-4 p-3 sm:p-3.5 rounded-2xl border border-dashed transition-all duration-200 cursor-pointer ${
-              isDragging
-                ? 'border-red-500 bg-red-50/70 dark:bg-red-950/30 dark:border-red-500/80 ring-2 ring-red-500/20'
-                : 'border-neutral-200 hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600 bg-neutral-50/50 hover:bg-neutral-50 dark:bg-neutral-900/40 dark:hover:bg-neutral-900/70'
-            }`}
-          >
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="image/png,image/jpeg,image/webp,image/jpg"
-              className="hidden"
-            />
-
-            {/* Avatar con Overlay al Hover */}
-            <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 font-bold text-base sm:text-lg flex items-center justify-center shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden font-outfit shadow-2xs">
-              {avatarPreview ? (
-                <img
-                  src={avatarPreview}
-                  alt="Preview avatar"
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
-              ) : formData.foto_perfil_url ? (
-                <img
-                  src={formData.foto_perfil_url}
-                  alt="Avatar actual"
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
-              ) : (
-                <span>{getInitials(formData.nombre, formData.apellido)}</span>
-              )}
-
-              {/* Overlay al pasar el mouse */}
-              <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white">
-                <UploadCloud size={20} className="transition-transform group-hover:scale-110" />
-              </div>
-            </div>
-
-            {/* Contenido Descriptivo e Interactivo */}
-            <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-neutral-800 dark:text-neutral-200 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
-                {avatarPreview || formData.foto_perfil_url
-                  ? 'Arrastra o haz clic para cambiar foto'
-                  : 'Arrastra una foto aquí o haz clic para subir'}
-              </p>
-              <p className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5 font-inter">
-                JPG, PNG o WEBP · Máx. 5MB
-              </p>
-            </div>
-
-            {/* Botón Eliminar Foto en Extremo Derecho */}
-            {(avatarPreview || formData.foto_perfil_url) && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemoveAvatar(e);
-                }}
-                title="Eliminar foto de perfil"
-                aria-label="Eliminar foto de perfil"
-                className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 rounded-xl bg-red-50 text-red-500 hover:bg-red-600 hover:text-white dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-600 dark:hover:text-white transition-all duration-200 active:scale-95 cursor-pointer z-10"
-              >
-                <Trash2 size={18} />
-              </button>
-            )}
-          </div>
+          <SingleImageDropzone
+            value={formData.foto_perfil_url}
+            preview={avatarPreview}
+            onChange={handleFileChange}
+            onRemove={handleRemovePhoto}
+            disabled={isSubmitting}
+            initials={getInitials(formData.nombre, formData.apellido)}
+          />
           {/* Fila 1: Nombre y Apellido */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>

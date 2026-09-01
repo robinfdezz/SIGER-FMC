@@ -15,6 +15,15 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - Portal público de seguimiento de tickets para clientes (`/tracking/:codigo_ticket`).
 
 ### Added
+- **Componente Modular `SingleImageDropzone.jsx` (`frontend/src/components/common/SingleImageDropzone.jsx`):**
+  - Componente genérico y reutilizable para la carga y previsualización de imágenes individuales con interfaz Dropzone interactiva (`onDragOver`, `onDragLeave`, `onDrop`, `onClick`).
+  - Encapsula validaciones de formato (`JPG`, `PNG`, `WEBP`) y límite de peso en megabytes (`maxSizeMB`), preview local inmediato (Blob/ObjectURL) con fallback de iniciales o icono, y botón flotante de eliminación con `e.stopPropagation()`.
+  - Refactorización de `WorkerModal.jsx` para delegar la gestión del avatar al nuevo componente reutilizable.
+- **Componente Modular `Tooltip.jsx` (`frontend/src/components/common/Tooltip.jsx`):**
+  - Tooltip flotante con backdrop-blur, tipografía compacta, soporte para 4 orientaciones (`right`, `left`, `top`, `bottom`) y prop `enabled` para activación condicional.
+  - Integrado en `Sidebar.jsx` para los enlaces de navegación, botón de tema y modo del menú cuando la barra lateral está colapsada.
+- **Componente Modular `ResetFiltersButton.jsx` (`frontend/src/components/common/ResetFiltersButton.jsx`):**
+  - Botón de limpieza de filtros con animación fluida `MorphIcon` (`X` <-> `Check`) de 1200ms, integrado en `WorkersPage.jsx` y `ClientsPage.jsx`.
 - **Integración de Cloudinary para Gestión de Fotos de Perfil (`foto_perfil_url`):**
   - **Backend (`cloudinary.js`, `upload.js`, `workers.controller.js` y `workers.routes.js`):** SDK de Cloudinary configurado con subida por streaming en formato optimizado WebP (`uploadImageBuffer`), eliminación automática de fotos previas (`deleteImageByUrl`), convención de carpetas (`siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`), middleware Multer con almacenamiento en memoria y límite de 5MB, y endpoint dedicado `POST /api/trabajadores/upload-avatar`.
   - **Frontend (`WorkerModal.jsx` y `workers.service.js`):** Selector interactivo estilo **Dropzone** (`onDragOver`, `onDrop`, `onClick`) con preview local instantáneo (`URL.createObjectURL`), overlay animado al hover en avatar, botón flotante de eliminación con prevención de propagación (`e.stopPropagation()`), timeout extendido de 120s en Axios para redes lentas, y estados visuales de carga en tiempo real (*"Subiendo y optimizando imagen..."*).

@@ -218,6 +218,34 @@ frontend/
     * **Paso 2:** Diagnóstico y Checklist (Falla reportada, condiciones estéticas y pruebas iniciales).
     * **Paso 3:** Presupuesto y Confirmación (Costos previstos, garantía y emisión de orden).
 
+### 8.3 Catálogo de Componentes Comunes Reutilizables (`frontend/src/components/common/`)
+
+1. **`SingleImageDropzone.jsx` (Zona de Carga Multimedia / Avatar):**
+   * **Props Estándar:**
+     * `value`: URL remota de la imagen guardada (`string | null`).
+     * `preview`: URL de previsualización local (`Data URL | Blob | ObjectURL | null`).
+     * `onChange`: Callback `(file: File) => void` al seleccionar o soltar un archivo válido.
+     * `onRemove`: Callback `() => void` al presionar el botón de eliminar.
+     * `disabled`: Bloquea las interacciones durante operaciones asíncronas (`boolean`).
+     * `maxSizeMB`: Límite máximo en MB (por defecto: `5`).
+     * `label`: Texto principal personalizable (por defecto: *"Arrastra o haz clic para cambiar foto"*).
+     * `description`: Texto secundario (por defecto: *"JPG, PNG o WEBP · Máx. 5MB"*).
+     * `initials`: Iniciales o texto fallback si no hay imagen (`string`).
+     * `className`: Clases adicionales de Tailwind (`string`).
+   * **Comportamiento:** Encapsula drag & drop (`onDragOver`, `onDragLeave`, `onDrop`), click trigger, validación de tipos MIME y tamaño, preview local inmediato y botón de eliminación con `e.stopPropagation()`.
+
+2. **`Select.jsx` (Selector Personalizado):**
+   * **Props:** `value`, `onChange`, `items` (`{ id, label, supportingText, avatarUrl, icon, disabled }`), `placeholder`, `label`, `hint`, `error`, `isRequired`, `disabled`.
+
+3. **`Tooltip.jsx` (Tooltip Flotante Accesible):**
+   * **Props:** `children`, `content`, `position` (`'right' | 'left' | 'top' | 'bottom'`), `enabled` (`boolean`), `className`.
+
+4. **`ResetFiltersButton.jsx` (Botón de Reset Animado):**
+   * **Props:** `onClick`, `hasActiveFilters`, `disabled`, `durationMs` (por defecto: `1200`), `title`.
+
+5. **`Modal.jsx` y `ConfirmModal.jsx` (Ventanas Modales):**
+   * **Props:** `isOpen`, `onClose`, `title`, `description`, `maxWidth`, variantes (`danger`, `warning`, `info`), `isLoading`.
+
 ---
 
 ## 9. Reglas de Backend y Seguridad
