@@ -69,3 +69,36 @@
 .sileo-viewport {
   z-index: 99999 !important;
 }
+
+/* Sileo Toast - Centrado Completo del Contenido y Encabezado */
+[data-sileo-header] {
+  left: 0 !important;
+  right: 0 !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  justify-content: center !important;
+  width: fit-content !important;
+}
+
+[data-sileo-header-stack],
+[data-sileo-header-inner] {
+  justify-content: center !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+[data-sileo-content] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+[data-sileo-description] {
+  text-align: center !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+}

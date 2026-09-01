@@ -319,6 +319,27 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ---
 
+### 3.6 Subir Foto de Perfil (Cloudinary)
+- **Ruta:** `POST /api/trabajadores/upload-avatar`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Formato:** `multipart/form-data` con el campo `foto_perfil` (archivo de imagen).
+- **Formatos permitidos:** `image/jpeg`, `image/png`, `image/webp`.
+- **Límite de tamaño:** 5 MB.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Foto de perfil subida exitosamente.",
+    "foto_perfil_url": "https://res.cloudinary.com/cloudname/image/upload/v1234567890/siger-fmc/usuarios/abc123xyz.webp",
+    "public_id": "siger-fmc/usuarios/abc123xyz"
+  }
+  ```
+- **Errores:**
+  - `400 Bad Request`: Archivo faltante, formato no permitido o peso mayor a 5MB.
+  - `500 Internal Server Error`: Falla en la comunicación con el servicio de Cloudinary.
+
+---
+
 ## 4. Módulo de Gestión de Clientes (`/api/clientes`)
 
 ### 4.1 Listar Clientes

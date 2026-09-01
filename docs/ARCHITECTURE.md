@@ -194,3 +194,51 @@ Para optimizar la experiencia de usuario y la confiabilidad operativa, el fronte
    - Ventajas arquitectónicas: Garantiza compatibilidad nativa con el historial de navegación (botones atrás/adelante del navegador), previene pérdidas accidentales de datos extensos y permite validaciones modulares por etapa (Cliente/Equipo -> Diagnóstico/Checklist -> Presupuesto/Condiciones).
 2. **Modales Atómicos y de Confirmación (`Modal.jsx`, `ConfirmModal.jsx`):**
    - Acciones puntuales que no requieren salir de la tabla o vista actual (ej. creación rápida de un nuevo cliente desde un selector, edición de datos de trabajadores, o confirmación modal obligatoria para activar/desactivar cuentas y registrar repuestos extras).
+
+---
+
+## 5. Pipeline de Gestión Multimedia y Cloudinary
+
+Para garantizar alta disponibilidad, velocidad de carga y mínimo consumo de almacenamiento en el servidor de base de datos, los archivos multimedia (fotos de perfil y evidencias de reparación) se procesan mediante un pipeline optimizado en la nube:
+
+```
+┌────────────────┐       multipart/form-data       ┌────────────────────────┐
+│ Cliente React  ├────────────────────────────────►│ Servidor Express      │
+│ (Dropzone / UI)│                                 │ (Multer MemoryStorage) │
+└────────────────┘                                 └───────────┬────────────┘
+                                                                │ Stream Buffer (RAM)
+                                                                ▼
+┌────────────────┐          URL segura / HTTPS      ┌────────────────────────┐
+│  PostgreSQL    │◄────────────────────────────────┤ SDK Cloudinary v2      │
+│ (Columna URL)  │                                 │ (WebP / 500x500 Auto)  │
+└────────────────┘                                 └────────────────────────┘
+```
+
+### 5.1 Especificación del Pipeline de Subida
+
+1. **Recepción en Memoria ([upload.js](file:///c:/Users/pc/Desktop/SIGER-FMC/backend/src/middlewares/upload.js)):**
+   - `multer.memoryStorage()`: El archivo se procesa directamente en memoria RAM sin persistir temporalmente en el disco local del servidor, eliminando problemas de permisos o archivos temporales residuales.
+   - **Filtro estricto de tipos MIME:** Solo se admiten formatos `image/jpeg`, `image/png` y `image/webp`.
+   - **Límite de tamaño:** 5 MB por archivo.
+
+2. **Streaming y Transformación ([cloudinary.js](file:///c:/Users/pc/Desktop/SIGER-FMC/backend/src/config/cloudinary.js)):**
+   - `uploadImageBuffer(buffer, folder)`: Transmite el buffer mediante `Readable.from(buffer).pipe(cloudinary.uploader.upload_stream(...))`.
+   - **Formato Inteligente:** Conversión automática a formato optimizado **WebP** (`format: 'webp'`).
+   - **Compresión y Dimensiones:** Calidad adaptativa (`quality: 'auto'`) y límite de resolución (`500x500`, `crop: 'limit'`).
+
+### 5.2 Convención de Carpetas en Cloudinary
+
+| Carpeta Destino | Uso y Tipo de Recurso | Entidad Asociada |
+| :--- | :--- | :--- |
+| **`siger-fmc/personal-fmc`** | Avatares y fotos de perfil de trabajadores | `datos_trabajadores.foto_perfil_url` |
+| **`siger-fmc/evidencias-tickets`** | Fotografías de entrada, diagnóstico y entrega de equipos | `evidencias_fotograficas.foto_url` |
+
+### 5.3 Ciclo de Limpieza de Recursos Huérfanos
+
+- **Función `deleteImageByUrl(imageUrl)`:** Al actualizar o remover un avatar en `updateWorker`, se extrae el `public_id` de la URL antigua y se destruye el asset remoto en Cloudinary vía `cloudinary.uploader.destroy(public_id)`.
+- **Prevención de Errores Silenciosos:** La eliminación es asíncrona no bloqueante; si el asset ya no existía en Cloudinary, la operación continúa exitosamente sin abortar la transacción de base de datos.
+
+### 5.4 Resiliencia en Redes y Experiencia Dropzone (Frontend)
+
+- **Timeout Extendido a 120s:** La función [uploadAvatar](file:///c:/Users/pc/Desktop/SIGER-FMC/frontend/src/services/workers.service.js) sobreescribe el timeout estándar de Axios con `timeout: 120000` para garantizar la subida en conexiones celulares o de baja velocidad.
+- **Dropzone Interactivo ([WorkerModal.jsx](file:///c:/Users/pc/Desktop/SIGER-FMC/frontend/src/components/workers/WorkerModal.jsx)):** Permite arrastrar y soltar archivos o hacer clic sobre toda la tarjeta, proporcionando preview local inmediato (`URL.createObjectURL`), feedback visual de progreso (*"Subiendo y optimizando imagen..."*) y botón dedicado para desvincular fotos.

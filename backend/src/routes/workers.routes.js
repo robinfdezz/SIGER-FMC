@@ -2,18 +2,27 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middlewares/authMiddleware');
 const { checkRole, requireBranchAccess } = require('../middlewares/roleMiddleware');
+const { upload, handleMulterErrors } = require('../middlewares/upload');
 const {
   getWorkers,
   getWorkerById,
   createWorker,
   updateWorker,
-  toggleWorkerStatus
+  toggleWorkerStatus,
+  uploadWorkerAvatar
 } = require('../controllers/workers.controller');
 
 // Todas las rutas requieren autenticación y privilegios de administración
 router.use(authMiddleware);
 router.use(checkRole(['SuperAdmin', 'Admin_Sucursal']));
 router.use(requireBranchAccess);
+
+/**
+ * @route   POST /api/trabajadores/upload-avatar
+ * @desc    Subir foto de perfil de usuario a Cloudinary
+ * @access  Privado (SuperAdmin, Admin_Sucursal)
+ */
+router.post('/upload-avatar', handleMulterErrors(upload.single('foto_perfil')), uploadWorkerAvatar);
 
 /**
  * @route   GET /api/trabajadores

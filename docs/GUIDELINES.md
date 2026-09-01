@@ -84,9 +84,14 @@ frontend/
 ## 5. Reglas de Negocio y Flujo de Trabajo
 
 1. **Creación de Tickets:** Al registrar un servicio, se genera un código correlativo único (ej. `TKT-2026-0001`) y se crea automáticamente el primer registro en `Historial_Estados` con estado `RECIBIDO`.
-2. **Subida de Imágenes:**
-   * Las fotos se comprimen en React antes de subir (`maxWidth: 1920px`, `maxSizeMB: 0.3`).
-   * Se suben a Cloudinary y solo la URL se guarda en `Evidencias_Fotograficas`.
+2. **Subida y Procesamiento de Imágenes (Cloudinary):**
+   * **Pipeline de Backend:** Multer en memoria (`memoryStorage`, límite de 5MB) transmite por streaming en RAM (`Readable.from(buffer)`) al SDK de Cloudinary.
+   * **Optimización Automática:** Formato WebP inteligente (`format: 'webp'`), compresión adaptativa (`quality: 'auto'`) y dimensiones restringidas (`500x500`, `crop: 'limit'`).
+   * **Estructura de Carpetas:**
+     * `siger-fmc/personal-fmc`: Avatares de trabajadores y administradores.
+     * `siger-fmc/evidencias-tickets`: Fotos de equipos recibidos, diagnóstico y entrega.
+   * **Limpieza de Recursos Huérfanos:** Al actualizar o remover fotos, se invoca `deleteImageByUrl(url)` para destruir el asset previo en Cloudinary.
+   * **Experiencia de Usuario (Dropzone):** Modales con selector dropzone completo (`onDragOver`, `onDrop`, `onClick`), preview instantáneo (`URL.createObjectURL`), feedback animado y timeout de petición extendido a 120 segundos.
 3. **Manejo de Incidencias:**
    * Si una incidencia incluye costo de repuesto, inicia con `aprobado_por_cliente = 0`.
    * El `costo_final_confirmado` del ticket no suma este valor hasta que se confirme la aprobación.

@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { getPool } = require('../config/db');
+const { uploadImageBuffer, deleteImageByUrl } = require('../config/cloudinary');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -450,7 +451,7 @@ const updateWorker = async (req, res) => {
 
     // 1. Verificar existencia del trabajador
     const checkWorkerRes = await pool.query(
-      'SELECT id, sucursal_id, rol_id, password FROM datos_trabajadores WHERE id = $1',
+      'SELECT id, sucursal_id, rol_id, password, foto_perfil_url FROM datos_trabajadores WHERE id = $1',
       [workerId]
     );
 
@@ -497,6 +498,17 @@ const updateWorker = async (req, res) => {
     const cleanEmail = correo !== undefined ? String(correo).trim().toLowerCase() : undefined;
     const cleanCedula = cedula !== undefined ? String(cedula).replace(/\D/g, '') : undefined;
     const cleanTelefono = telefono !== undefined ? String(telefono).replace(/\D/g, '') : undefined;
+
+    // Gestionar foto_perfil_url y eliminación de imagen anterior en Cloudinary
+    const newFotoUrl = foto_perfil_url !== undefined
+      ? (foto_perfil_url && String(foto_perfil_url).trim().length > 0 ? String(foto_perfil_url).trim() : null)
+      : currentWorker.foto_perfil_url;
+
+    if (currentWorker.foto_perfil_url && currentWorker.foto_perfil_url !== newFotoUrl) {
+      deleteImageByUrl(currentWorker.foto_perfil_url).catch((err) =>
+        console.error('⚠️ Error al eliminar foto anterior de Cloudinary:', err.message)
+      );
+    }
 
     // 3. Validar duplicados en otros trabajadores
     const duplicateQuery = `
@@ -565,7 +577,7 @@ const updateWorker = async (req, res) => {
         correo = COALESCE($6, correo),
         rol_id = COALESCE($7, rol_id),
         sucursal_id = $8,
-        foto_perfil_url = COALESCE($9, foto_perfil_url),
+        foto_perfil_url = $9,
         password = $10,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $11
@@ -593,7 +605,7 @@ const updateWorker = async (req, res) => {
       cleanEmail !== undefined ? cleanEmail : null,
       rol_id !== undefined ? parseInt(rol_id, 10) : null,
       branchToAssign,
-      foto_perfil_url !== undefined ? (foto_perfil_url ? String(foto_perfil_url).trim() : null) : null,
+      newFotoUrl,
       finalPassword,
       workerId
     ]);
@@ -685,10 +697,42 @@ const toggleWorkerStatus = async (req, res) => {
   }
 };
 
+/**
+ * Subir foto de perfil a Cloudinary.
+ * POST /api/trabajadores/upload-avatar
+ */
+const uploadWorkerAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        ok: false,
+        message: 'No se ha seleccionado ningún archivo de imagen para subir.'
+      });
+    }
+
+    const result = await uploadImageBuffer(req.file.buffer, 'siger-fmc/personal-fmc');
+
+    return res.status(200).json({
+      ok: true,
+      message: 'Foto de perfil subida exitosamente.',
+      foto_perfil_url: result.secure_url,
+      public_id: result.public_id
+    });
+  } catch (error) {
+    console.error('❌ Error en uploadWorkerAvatar:', error);
+    return res.status(500).json({
+      ok: false,
+      message: 'Ocurrió un error al procesar y subir la imagen a Cloudinary.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 module.exports = {
   getWorkers,
   getWorkerById,
   createWorker,
   updateWorker,
-  toggleWorkerStatus
+  toggleWorkerStatus,
+  uploadWorkerAvatar
 };

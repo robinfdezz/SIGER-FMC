@@ -63,7 +63,8 @@ Cada orden de servicio transita de manera estructurada a través de 8 estados se
 ---
 
 ## 6. Stack Tecnológico
-* **Frontend:** React, Tailwind CSS, Vite, Lucide Icons.
+* **Frontend:** React, Tailwind CSS, Vite, Lucide Icons, Morphicons, Sileo (Toaster).
 * **Backend:** Node.js, Express.js.
 * **Base de Datos:** PostgreSQL (`siger_fmc_db`) vía driver nativo `pg` con Connection Pooling.
+* **Gestión Multimedia:** Cloudinary SDK v2 + Multer (MemoryStorage), compresión adaptativa a WebP (`siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`).
 * **Seguridad y Sesión:** Autenticación basada en JSON Web Tokens (JWT) con contraseñas encriptadas en `bcryptjs`.

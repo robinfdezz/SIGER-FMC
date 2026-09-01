@@ -3,12 +3,11 @@ import DashboardLayout from '../components/DashboardLayout';
 import WorkerModal from '../components/workers/WorkerModal';
 import ConfirmModal from '../components/common/ConfirmModal';
 import Select from '../components/common/Select';
+import ResetFiltersButton from '../components/common/ResetFiltersButton';
 import { getWorkers, toggleWorkerStatus } from '../services/workers.service';
 import { getRoles, getSucursales } from '../services/catalogs.service';
 import { useAuth } from '../context/AuthContext';
 import { sileo } from 'sileo';
-import { MorphIcon } from 'morphicons/react';
-import { X, Check } from 'lucide';
 import {
   UserPlus,
   Search,
@@ -209,15 +208,10 @@ const WorkersPage = () => {
   );
 
   const handleClearFilters = () => {
-    if (!hasActiveFilters || isResetting) return;
     setSearchTerm('');
     setSelectedRole('');
     setSelectedBranch('all');
     setSelectedStatus('all');
-    setIsResetting(true);
-    setTimeout(() => {
-      setIsResetting(false);
-    }, 1200);
   };
 
   // Filtrado de usuarios
@@ -380,25 +374,10 @@ const WorkersPage = () => {
                 </div>
 
                 {/* Botón Acción Limpiar Filtros con MorphIcon */}
-                <button
-                  type="button"
+                <ResetFiltersButton
                   onClick={handleClearFilters}
-                  disabled={!hasActiveFilters && !isResetting}
-                  aria-label="Limpiar filtros"
-                  title="Limpiar filtros"
-                  className={`p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all flex items-center justify-center shrink-0 ${isResetting
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60'
-                    : hasActiveFilters
-                      ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-red-500 dark:hover:text-red-400 cursor-pointer shadow-xs'
-                      : 'bg-neutral-50/50 dark:bg-neutral-900/30 text-neutral-300 dark:text-neutral-600 opacity-40 cursor-not-allowed pointer-events-none'
-                    }`}
-                >
-                  <MorphIcon
-                    icon={isResetting ? Check : X}
-                    size={16}
-                    spring="smooth"
-                  />
-                </button>
+                  hasActiveFilters={hasActiveFilters}
+                />
               </div>
             </div>
 

@@ -6,9 +6,10 @@ Sistema web especializado para el taller de servicio técnico **Franyer Mobile C
 
 ## 🛠️ Stack Tecnológico
 
-- **Backend:** Node.js, Express, PostgreSQL (`pg` Connection Pool), JWT, BcryptJS.
-- **Frontend:** React (Vite), React Router v6, Tailwind CSS (Estilo Supabase Dark/Light), Lucide React, Morphicons (Iconos animados), Axios.
+- **Backend:** Node.js, Express, PostgreSQL (`pg` Connection Pool), JWT, BcryptJS, Cloudinary SDK, Multer (Memory Storage).
+- **Frontend:** React (Vite), React Router v6, Tailwind CSS (Estilo Supabase Dark/Light), Lucide React, Morphicons (Iconos animados), Sileo (Toaster), Axios.
 - **Base de Datos:** PostgreSQL (`siger_fmc_db`).
+- **Gestión Multimedia / Cloudinary:** Carga optimizada en buffer, streaming WebP (`siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`) y eliminación automática de recursos huérfanos.
 - **Flujo de Ramas Git:**
   - `main`: Rama principal / producción estable.
   - `develop`: Rama de integración activa para desarrollo.
@@ -21,35 +22,40 @@ Sistema web especializado para el taller de servicio técnico **Franyer Mobile C
 SIGER-FMC/
 ├── backend/                  # Servidor API Express + PostgreSQL
 │   ├── src/
-│   │   ├── config/           # db.js (PostgreSQL connection pool)
-│   │   ├── controllers/      # auth.controller.js
-│   │   ├── middlewares/      # authMiddleware.js (JWT)
-│   │   ├── routes/           # auth.routes.js
+│   │   ├── config/           # db.js (PostgreSQL pool), cloudinary.js (SDK & Upload)
+│   │   ├── controllers/      # auth, workers, clients, etc.
+│   │   ├── middlewares/      # authMiddleware.js, roleMiddleware.js, upload.js (Multer)
+│   │   ├── routes/           # auth.routes.js, workers.routes.js, clients.routes.js, etc.
 │   │   ├── db/               # init.sql (DDL + Seeds para PostgreSQL)
 │   │   └── app.js            # Configuración Express, CORS y middlewares
 │   ├── server.js             # Entrada del servidor backend
 │   ├── package.json
-│   └── .env                  # Variables de entorno del backend
+│   ├── .env                  # Variables de entorno privadas (ignorado por Git)
+│   └── .env.example          # Plantilla pública de variables requeridas
 │
 ├── frontend/                 # Aplicación Cliente React + Vite
 │   ├── src/
-│   │   ├── components/       # ProtectedRoute, ThemeToggle, Navbar, Sidebar
+│   │   ├── components/       # Layouts, Modales (WorkerModal, ClientModal), Select, Dropzones
 │   │   ├── context/          # AuthContext (Sesión), ThemeContext (Dark/Light)
-│   │   ├── pages/
-│   │   │   ├── Login/        # LoginPage (Diseño Supabase, alertas, recordar)
-│   │   │   └── Dashboard/    # DashboardPage (Vista protegida, perfil, roles)
-│   │   ├── services/         # api.js (Axios con interceptor JWT)
+│   │   ├── pages/            # LoginPage, DashboardPage, WorkersPage, ClientsPage, etc.
+│   │   ├── services/         # api.js (Axios), workers.service.js, clients.service.js
 │   │   ├── App.jsx           # Rutas y providers
 │   │   ├── main.jsx          # Montaje
-│   │   └── index.css         # Tailwind y tipografía Inter/Outfit
+│   │   └── index.css         # Tailwind y tipografía Sora/Outfit/Inter
 │   ├── package.json
-│   ├── tailwind.config.js    # Paleta Supabase (Grafito, Rose/Red acento)
+│   ├── tailwind.config.js    # Paleta corporativa (Grafito, Rose/Red acento)
 │   ├── vite.config.js        # Proxy a /api
 │   └── .env                  # Variables de entorno frontend
 │
 └── docs/
-    ├── DATABASE.md           # Estructura y diccionario de base de datos PostgreSQL
-    └── GUIDELINES.md         # Guía de arquitectura y diseño UI/UX
+    ├── DOCUMENTACION_GENERAL.md # Índice maestro y mapa documental del proyecto
+    ├── ARCHITECTURE.md          # Arquitectura global, capas y pipeline de imágenes
+    ├── API.md                   # Catálogo completo de endpoints REST y ejemplos
+    ├── DATABASE.md              # Diccionario de datos y modelo relacional PostgreSQL
+    ├── GUIDELINES.md            # Guía de estándares de desarrollo y UI/UX
+    ├── PROJECT_CONTEXT.md       # Visión, roles y reglas de negocio
+    ├── AI_RULES.md              # Reglas y restricciones de desarrollo para agentes AI
+    └── CHANGELOG.md             # Registro cronológico de cambios y versiones
 ```
 
 ---

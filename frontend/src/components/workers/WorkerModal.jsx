@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Modal from '../common/Modal';
 import Select from '../common/Select';
-import { createWorker, updateWorker } from '../../services/workers.service';
+import { createWorker, updateWorker, uploadAvatar } from '../../services/workers.service';
 import { useAuth } from '../../context/AuthContext';
 import { sileo } from 'sileo';
 import { MorphIcon } from 'morphicons/react';
 import { Eye, EyeOff } from 'lucide';
+import { Camera, Trash2, RefreshCw, UploadCloud } from 'lucide-react';
 
 const INITIAL_FORM_STATE = {
   nombre: '',
@@ -73,6 +74,14 @@ const WorkerModal = ({
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+
+  // Estados para avatar / foto de perfil y dropzone
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [avatarRemoved, setAvatarRemoved] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
 
   const isEdit = Boolean(worker && worker.id);
   const selectedRoleObj = availableRoles.find((r) => String(r.id) === String(formData.rol_id)) || rolesList.find((r) => String(r.id) === String(formData.rol_id));
@@ -105,8 +114,16 @@ const WorkerModal = ({
     String(formData.rol_id || '') !== String(worker?.rol_id || '') ||
     String(formData.sucursal_id || '') !== String(worker?.sucursal_id || '') ||
     Boolean(formData.password && formData.password.trim().length > 0) ||
+    avatarFile !== null ||
+    avatarRemoved ||
     (formData.foto_perfil_url || '').trim() !== (worker?.foto_perfil_url || '').trim()
   );
+
+  const getInitials = (nombre, apellido) => {
+    const n = nombre ? nombre.charAt(0).toUpperCase() : '';
+    const a = apellido ? apellido.charAt(0).toUpperCase() : '';
+    return `${n}${a}` || 'US';
+  };
 
   useEffect(() => {
     if (worker && isEdit) {
@@ -133,9 +150,74 @@ const WorkerModal = ({
           : (sucursalesList.length > 0 ? String(sucursalesList[0].id) : '')
       });
     }
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setAvatarRemoved(false);
+    setIsDragging(false);
     setErrors({});
     setShowPassword(false);
   }, [worker, isEdit, isOpen, roles, sucursales, isBranchAdmin, currentUser]);
+
+  const processFile = (file) => {
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      sileo.error({
+        title: 'Formato no permitido',
+        description: 'Solo se permiten imágenes en formato JPG, PNG o WEBP.'
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      sileo.error({
+        title: 'Archivo muy pesado',
+        description: 'La imagen no puede exceder los 5MB de tamaño.'
+      });
+      return;
+    }
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setAvatarRemoved(false);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    processFile(file);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    processFile(file);
+  };
+
+  const handleRemoveAvatar = (e) => {
+    e.stopPropagation();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setAvatarRemoved(true);
+    setFormData((prev) => ({ ...prev, foto_perfil_url: '' }));
+  };
 
   const handleChange = (e) => {
     let { name, value } = e.target;
@@ -281,25 +363,51 @@ const WorkerModal = ({
       return;
     }
 
-    const payload = {
-      nombre: formData.nombre.trim(),
-      apellido: formData.apellido.trim(),
-      usuario: formData.usuario.trim().toLowerCase(),
-      cedula: formData.cedula.trim(),
-      telefono: formData.telefono.trim(),
-      correo: formData.correo.trim().toLowerCase(),
-      rol_id: parseInt(formData.rol_id, 10),
-      sucursal_id: isSuperAdminRole ? null : (formData.sucursal_id ? parseInt(formData.sucursal_id, 10) : null),
-      foto_perfil_url: formData.foto_perfil_url.trim() || null
-    };
-
-    if (formData.password && formData.password.trim().length > 0) {
-      payload.password = formData.password.trim();
-    }
+    let finalFotoUrl = formData.foto_perfil_url ? formData.foto_perfil_url.trim() : null;
 
     setIsSubmitting(true);
 
     try {
+      // 1. Si se seleccionó un nuevo archivo local, subirlo a Cloudinary con feedback de carga
+      if (avatarFile) {
+        setStatusMessage('Subiendo y optimizando imagen...');
+        try {
+          const uploadRes = await uploadAvatar(avatarFile);
+          if (uploadRes?.foto_perfil_url) {
+            finalFotoUrl = uploadRes.foto_perfil_url;
+          }
+        } catch (uploadErr) {
+          setIsSubmitting(false);
+          setStatusMessage('');
+          const errDetail = uploadErr.response?.data?.message || uploadErr.message || 'No se pudo subir la imagen a Cloudinary.';
+          sileo.error({
+            title: 'Error al subir foto de perfil',
+            description: errDetail
+          });
+          return;
+        }
+      } else if (avatarRemoved) {
+        finalFotoUrl = null;
+      }
+
+      setStatusMessage(isEdit ? 'Actualizando datos del usuario...' : 'Registrando usuario en el sistema...');
+
+      const payload = {
+        nombre: formData.nombre.trim(),
+        apellido: formData.apellido.trim(),
+        usuario: formData.usuario.trim().toLowerCase(),
+        cedula: formData.cedula.trim(),
+        telefono: formData.telefono.trim(),
+        correo: formData.correo.trim().toLowerCase(),
+        rol_id: parseInt(formData.rol_id, 10),
+        sucursal_id: isSuperAdminRole ? null : (formData.sucursal_id ? parseInt(formData.sucursal_id, 10) : null),
+        foto_perfil_url: finalFotoUrl
+      };
+
+      if (formData.password && formData.password.trim().length > 0) {
+        payload.password = formData.password.trim();
+      }
+
       const apiCall = isEdit
         ? updateWorker(worker.id, payload)
         : createWorker(payload);
@@ -326,6 +434,7 @@ const WorkerModal = ({
       console.error('Error al guardar usuario:', err);
     } finally {
       setIsSubmitting(false);
+      setStatusMessage('');
     }
   };
 
@@ -344,6 +453,79 @@ const WorkerModal = ({
       <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
         {/* Cuerpo Scroleable */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-3.5">
+          {/* Dropzone de Foto de Perfil / Avatar */}
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`group relative flex items-center gap-3.5 sm:gap-4 p-3 sm:p-3.5 rounded-2xl border border-dashed transition-all duration-200 cursor-pointer ${
+              isDragging
+                ? 'border-red-500 bg-red-50/70 dark:bg-red-950/30 dark:border-red-500/80 ring-2 ring-red-500/20'
+                : 'border-neutral-200 hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600 bg-neutral-50/50 hover:bg-neutral-50 dark:bg-neutral-900/40 dark:hover:bg-neutral-900/70'
+            }`}
+          >
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept="image/png,image/jpeg,image/webp,image/jpg"
+              className="hidden"
+            />
+
+            {/* Avatar con Overlay al Hover */}
+            <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 font-bold text-base sm:text-lg flex items-center justify-center shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden font-outfit shadow-2xs">
+              {avatarPreview ? (
+                <img
+                  src={avatarPreview}
+                  alt="Preview avatar"
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              ) : formData.foto_perfil_url ? (
+                <img
+                  src={formData.foto_perfil_url}
+                  alt="Avatar actual"
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              ) : (
+                <span>{getInitials(formData.nombre, formData.apellido)}</span>
+              )}
+
+              {/* Overlay al pasar el mouse */}
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white">
+                <UploadCloud size={20} className="transition-transform group-hover:scale-110" />
+              </div>
+            </div>
+
+            {/* Contenido Descriptivo e Interactivo */}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-neutral-800 dark:text-neutral-200 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
+                {avatarPreview || formData.foto_perfil_url
+                  ? 'Arrastra o haz clic para cambiar foto'
+                  : 'Arrastra una foto aquí o haz clic para subir'}
+              </p>
+              <p className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5 font-inter">
+                JPG, PNG o WEBP · Máx. 5MB
+              </p>
+            </div>
+
+            {/* Botón Eliminar Foto en Extremo Derecho */}
+            {(avatarPreview || formData.foto_perfil_url) && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveAvatar(e);
+                }}
+                title="Eliminar foto de perfil"
+                aria-label="Eliminar foto de perfil"
+                className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center shrink-0 rounded-xl bg-red-50 text-red-500 hover:bg-red-600 hover:text-white dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-600 dark:hover:text-white transition-all duration-200 active:scale-95 cursor-pointer z-10"
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+          </div>
           {/* Fila 1: Nombre y Apellido */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
@@ -583,7 +765,14 @@ const WorkerModal = ({
             disabled={isSubmitting || (isEdit && !hasChanges)}
             className="px-5 py-2 text-xs sm:text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
           >
-            {isSubmitting ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Crear Usuario'}
+            {isSubmitting ? (
+              <>
+                <RefreshCw size={14} className="animate-spin" />
+                <span>{statusMessage || (isEdit ? 'Guardando...' : 'Creando...')}</span>
+              </>
+            ) : (
+              <span>{isEdit ? 'Guardar Cambios' : 'Crear Usuario'}</span>
+            )}
           </button>
         </div>
       </form>
