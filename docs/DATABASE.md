@@ -18,7 +18,8 @@
 | `telefono_principal`| VARCHAR(20) | NO | Teléfono de contacto oficial |
 | `correo_contacto` | VARCHAR(100) | NO | Correo oficial de contacto |
 | `direccion_fiscal` | TEXT | NO | Dirección fiscal de la matriz |
-| `logo_url` | VARCHAR(255) | SÍ | URL del logotipo de la empresa |
+| `logo_url` | TEXT | SÍ | URL del logotipo de la empresa |
+| `logo_public_id` | VARCHAR(150) | SÍ | ID único del archivo en Cloudinary para gestión y borrado del logotipo |
 | `created_at` | TIMESTAMPTZ | SÍ | Fecha de creación (CURRENT_TIMESTAMP) |
 | `updated_at` | TIMESTAMPTZ | SÍ | Fecha de modificación (CURRENT_TIMESTAMP) |
 
@@ -57,7 +58,8 @@
 | `telefono` | VARCHAR(20) | NO | Teléfono móvil / WhatsApp (solo dígitos numéricos, min. 10) |
 | `correo` | VARCHAR(100) | NO | Correo electrónico institucional / login (Único, sin espacios) |
 | `password` | TEXT | NO | Contraseña con hash Bcrypt (min. 8 caracteres, sin espacios) |
-| `foto_perfil_url` | VARCHAR(255) | SÍ | URL del avatar / foto de perfil |
+| `foto_perfil_url` | TEXT | SÍ | URL del avatar / foto de perfil |
+| `foto_perfil_public_id` | VARCHAR(150) | SÍ | ID único del archivo en Cloudinary para gestión y borrado del avatar |
 | `ultimo_login` | TIMESTAMPTZ | SÍ | Último acceso al sistema |
 | `created_at` | TIMESTAMPTZ | SÍ | Timestamp de creación |
 | `updated_at` | TIMESTAMPTZ | SÍ | Timestamp de actualización |
