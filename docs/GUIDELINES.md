@@ -251,8 +251,11 @@ frontend/
 4. **`ResetFiltersButton.jsx` (Botón de Reset Animado):**
    * **Props:** `onClick`, `hasActiveFilters`, `disabled`, `durationMs` (por defecto: `1200`), `title`.
 
-5. **`Modal.jsx` y `ConfirmModal.jsx` (Ventanas Modales):**
+5. **`Modal.jsx` y Modales de Formulario (`WorkerModal.jsx`, `ClientModal.jsx`, `BranchModal.jsx`):**
    * **Props:** `isOpen`, `onClose`, `title`, `description`, `maxWidth`, variantes (`danger`, `warning`, `info`), `isLoading`.
+   * **Estructura y Dimensiones:** Ancho homologado a `maxWidth="max-w-3xl"`, esquinas curvas `rounded-2xl`, cabecera fija, scroll interno con padding `p-4 sm:p-6` y pie de acciones consistente.
+   * **Control de Campos por Rol (RBAC):**
+     * En `BranchModal.jsx`: cuando el usuario autenticado tiene rol `Admin_Sucursal`, los campos `codigo_sucursal` y `nombre_sucursal` se renderizan deshabilitados y de solo lectura (`disabled`, `opacity-60 bg-zinc-100 dark:bg-zinc-800 cursor-not-allowed select-none`), permitiendo la edición únicamente de los campos operativos `telefono` y `direccion`. En el backend, el endpoint `PUT /api/configuracion/sucursales/:id` descarta cualquier mutación sobre dichos campos institucionales para roles no globales.
 
 6. **`Button.jsx` (Botón Reutilizable):**
    * **Props:** `children`, `onClick`, `type` (`'button' | 'submit' | 'reset'`), `variant` (`'primary' | 'secondary' | 'danger' | 'outline' | 'ghost'`), `size` (`'sm' | 'md' | 'lg'`), `disabled`, `isLoading` (spinner `Loader2` integrado), `icon` (componente o elemento), `iconPosition` (`'left' | 'right'`), `className`.

@@ -397,13 +397,16 @@ const updateBranch = async (req, res) => {
     const pool = getPool();
 
     // 1. Verificar existencia de la sucursal
-    const checkRes = await pool.query('SELECT id, codigo_sucursal FROM datos_sucursales WHERE id = $1', [branchId]);
+    const checkRes = await pool.query('SELECT id, codigo_sucursal, nombre_sucursal FROM datos_sucursales WHERE id = $1', [branchId]);
     if (checkRes.rows.length === 0) {
       return res.status(404).json({
         ok: false,
         message: 'Sucursal no encontrada.'
       });
     }
+
+    const currentBranch = checkRes.rows[0];
+    const isSuperAdmin = req.user?.rol_nombre === 'SuperAdmin';
 
     const {
       codigo_sucursal,
@@ -412,34 +415,53 @@ const updateBranch = async (req, res) => {
       direccion
     } = req.body;
 
-    // 2. Validaciones de campos
-    if (!codigo_sucursal || typeof codigo_sucursal !== 'string' || codigo_sucursal.trim().length === 0) {
-      return res.status(400).json({
-        ok: false,
-        message: 'El código de la sucursal es obligatorio.'
-      });
-    }
-    const cleanCode = codigo_sucursal.trim().toUpperCase();
-    if (cleanCode.length > 10) {
-      return res.status(400).json({
-        ok: false,
-        message: 'El código de la sucursal no puede exceder los 10 caracteres.'
-      });
+    let finalCode = currentBranch.codigo_sucursal;
+    let finalName = currentBranch.nombre_sucursal;
+
+    // 2. Validaciones de campos específicos de SuperAdmin
+    if (isSuperAdmin) {
+      if (!codigo_sucursal || typeof codigo_sucursal !== 'string' || codigo_sucursal.trim().length === 0) {
+        return res.status(400).json({
+          ok: false,
+          message: 'El código de la sucursal es obligatorio.'
+        });
+      }
+      finalCode = codigo_sucursal.trim().toUpperCase();
+      if (finalCode.length > 10) {
+        return res.status(400).json({
+          ok: false,
+          message: 'El código de la sucursal no puede exceder los 10 caracteres.'
+        });
+      }
+
+      if (!nombre_sucursal || typeof nombre_sucursal !== 'string' || nombre_sucursal.trim().length < 2) {
+        return res.status(400).json({
+          ok: false,
+          message: 'El nombre de la sucursal es obligatorio y debe tener al menos 2 caracteres.'
+        });
+      }
+      if (nombre_sucursal.trim().length > 100) {
+        return res.status(400).json({
+          ok: false,
+          message: 'El nombre de la sucursal no puede exceder los 100 caracteres.'
+        });
+      }
+      finalName = nombre_sucursal.trim();
+
+      // Validar unicidad del código de sucursal
+      const dupRes = await pool.query(
+        'SELECT id FROM datos_sucursales WHERE UPPER(codigo_sucursal) = $1 AND id != $2',
+        [finalCode, branchId]
+      );
+      if (dupRes.rows.length > 0) {
+        return res.status(409).json({
+          ok: false,
+          message: `El código de sucursal "${finalCode}" ya está registrado en otra sede.`
+        });
+      }
     }
 
-    if (!nombre_sucursal || typeof nombre_sucursal !== 'string' || nombre_sucursal.trim().length < 2) {
-      return res.status(400).json({
-        ok: false,
-        message: 'El nombre de la sucursal es obligatorio y debe tener al menos 2 caracteres.'
-      });
-    }
-    if (nombre_sucursal.trim().length > 100) {
-      return res.status(400).json({
-        ok: false,
-        message: 'El nombre de la sucursal no puede exceder los 100 caracteres.'
-      });
-    }
-
+    // 3. Validaciones de campos operativos (telefono y direccion)
     if (!telefono || typeof telefono !== 'string' || telefono.trim().length === 0) {
       return res.status(400).json({
         ok: false,
@@ -468,18 +490,6 @@ const updateBranch = async (req, res) => {
       });
     }
 
-    // 3. Validar unicidad del código de sucursal
-    const dupRes = await pool.query(
-      'SELECT id FROM datos_sucursales WHERE UPPER(codigo_sucursal) = $1 AND id != $2',
-      [cleanCode, branchId]
-    );
-    if (dupRes.rows.length > 0) {
-      return res.status(409).json({
-        ok: false,
-        message: `El código de sucursal "${cleanCode}" ya está registrado en otra sede.`
-      });
-    }
-
     // 4. Actualizar únicamente campos informativos (prohibido modificar 'activo')
     const updateQuery = `
       UPDATE datos_sucursales
@@ -503,10 +513,10 @@ const updateBranch = async (req, res) => {
     `;
 
     const updateRes = await pool.query(updateQuery, [
-      cleanCode,
-      nombre_sucursal.trim(),
+      finalCode,
+      finalName,
       cleanTel,
-      direccion.trim(),
+      cleanDireccion,
       branchId
     ]);
 

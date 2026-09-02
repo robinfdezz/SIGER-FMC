@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
+import { useAuth } from '../../context/AuthContext';
 import { updateBranch } from '../../services/configuracion.service';
 import { sileo } from 'sileo';
 import { Building2, Phone, MapPin, Hash } from 'lucide-react';
@@ -18,6 +19,9 @@ export const BranchModal = ({
   onSuccess,
   branch = null
 }) => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.rol_nombre === 'SuperAdmin';
+
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,20 +66,22 @@ export const BranchModal = ({
   const validate = () => {
     const newErrors = {};
 
-    const cleanCode = formData.codigo_sucursal.trim().toUpperCase();
-    if (!cleanCode) {
-      newErrors.codigo_sucursal = 'El código de la sucursal es obligatorio.';
-    } else if (cleanCode.length > 10) {
-      newErrors.codigo_sucursal = 'El código no puede superar los 10 caracteres.';
-    }
+    if (isSuperAdmin) {
+      const cleanCode = formData.codigo_sucursal.trim().toUpperCase();
+      if (!cleanCode) {
+        newErrors.codigo_sucursal = 'El código de la sucursal es obligatorio.';
+      } else if (cleanCode.length > 10) {
+        newErrors.codigo_sucursal = 'El código no puede superar los 10 caracteres.';
+      }
 
-    const cleanNombre = formData.nombre_sucursal.trim();
-    if (!cleanNombre) {
-      newErrors.nombre_sucursal = 'El nombre de la sucursal es obligatorio.';
-    } else if (cleanNombre.length < 2) {
-      newErrors.nombre_sucursal = 'Debe tener al menos 2 caracteres.';
-    } else if (cleanNombre.length > 100) {
-      newErrors.nombre_sucursal = 'No puede exceder los 100 caracteres.';
+      const cleanNombre = formData.nombre_sucursal.trim();
+      if (!cleanNombre) {
+        newErrors.nombre_sucursal = 'El nombre de la sucursal es obligatorio.';
+      } else if (cleanNombre.length < 2) {
+        newErrors.nombre_sucursal = 'Debe tener al menos 2 caracteres.';
+      } else if (cleanNombre.length > 100) {
+        newErrors.nombre_sucursal = 'No puede exceder los 100 caracteres.';
+      }
     }
 
     const cleanTel = formData.telefono.replace(/\D/g, '');
@@ -107,8 +113,8 @@ export const BranchModal = ({
 
     try {
       const payload = {
-        codigo_sucursal: formData.codigo_sucursal.trim().toUpperCase(),
-        nombre_sucursal: formData.nombre_sucursal.trim(),
+        codigo_sucursal: isSuperAdmin ? formData.codigo_sucursal.trim().toUpperCase() : branch.codigo_sucursal,
+        nombre_sucursal: isSuperAdmin ? formData.nombre_sucursal.trim() : branch.nombre_sucursal,
         telefono: formData.telefono.trim(),
         direccion: formData.direccion.trim()
       };
@@ -173,11 +179,13 @@ export const BranchModal = ({
                   onChange={(e) => handleChange('codigo_sucursal', e.target.value)}
                   placeholder="SUC-01"
                   maxLength={10}
-                  disabled={isSubmitting}
-                  className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all font-mono uppercase ${
-                    errors.codigo_sucursal
-                      ? 'border-red-500 focus:ring-red-500/20'
-                      : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10'
+                  disabled={isSubmitting || !isSuperAdmin}
+                  className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border font-mono uppercase transition-all ${
+                    !isSuperAdmin
+                      ? 'opacity-60 bg-zinc-100 dark:bg-zinc-800 text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 cursor-not-allowed select-none'
+                      : errors.codigo_sucursal
+                      ? 'border-red-500 focus:ring-red-500/20 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2'
+                      : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2'
                   }`}
                 />
               </div>
@@ -230,11 +238,13 @@ export const BranchModal = ({
                 onChange={(e) => handleChange('nombre_sucursal', e.target.value)}
                 placeholder="Franyer Mobile Center - San Francisco"
                 maxLength={100}
-                disabled={isSubmitting}
-                className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all ${
-                  errors.nombre_sucursal
-                    ? 'border-red-500 focus:ring-red-500/20'
-                    : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10'
+                disabled={isSubmitting || !isSuperAdmin}
+                className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border transition-all ${
+                  !isSuperAdmin
+                    ? 'opacity-60 bg-zinc-100 dark:bg-zinc-800 text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 cursor-not-allowed select-none'
+                    : errors.nombre_sucursal
+                    ? 'border-red-500 focus:ring-red-500/20 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2'
+                    : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2'
                 }`}
               />
             </div>

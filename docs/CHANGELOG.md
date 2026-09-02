@@ -39,6 +39,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - **Homologación de Dimensiones y Modales:**
   - Unificación de `BranchModal.jsx` a `maxWidth="max-w-3xl"`, bordes `rounded-2xl` y scroll `p-4 sm:p-6` en simetría con `WorkerModal.jsx` y `ClientModal.jsx`.
 - **Experiencia Visual y Control de Roles:**
+  - Restricción granular de edición en `BranchModal.jsx` y endpoint `PUT /api/configuracion/sucursales/:id`: bloqueo de código y nombre de sucursal para el rol Administrador de Sucursal (`disabled` y preservación de valores originales sin mutación en el backend).
   - Iconos semánticos (`CheckCircle2`, `XCircle`) en badges de estado en Usuarios, Clientes y Sucursales.
   - Rediseño de banner de advertencia en `CompanyProfileTab.jsx` a tonos rojos institucionales con `<ShieldAlert />`.
   - Atenuación simétrica (`opacity-50 select-none pointer-events-none`) en bloques no editables para `Admin_Sucursal`.

@@ -15,8 +15,7 @@ import {
   Lock,
   Save,
   ShieldCheck,
-  ShieldAlert,
-  CheckCircle2
+  ShieldAlert
 } from 'lucide-react';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -264,14 +263,6 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
                   className="w-full"
                 />
               </div>
-
-              {formData.logo_url && (
-                <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between text-xs text-slate-400">
-                  <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
-                    <CheckCircle2 size={14} /> Logotipo activo en Cloudinary
-                  </span>
-                </div>
-              )}
             </div>
           </div>
 

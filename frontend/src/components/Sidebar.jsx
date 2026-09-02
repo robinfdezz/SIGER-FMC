@@ -158,30 +158,32 @@ const Sidebar = () => {
       </nav>
 
       {/* Sección Inferior / Controles */}
-      <div className="p-2 border-t border-zinc-100 dark:border-dark-border space-y-1 relative" ref={configMenuRef}>
+      <div className="p-2 border-t border-zinc-100 dark:border-dark-border space-y-1 relative flex flex-col items-center justify-center" ref={configMenuRef}>
 
         {/* 1. Botón de Tema (Icono animado MorphIcon con Tooltip) */}
-        <Tooltip
-          content={isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
-          position="right"
-          enabled={!isExpanded}
-        >
-          <button
-            onClick={toggleTheme}
-            type="button"
-            aria-label={isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
-            className="w-full flex items-center justify-center p-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
+        <div className="w-full flex items-center justify-center">
+          <Tooltip
+            content={isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
+            position="right"
+            enabled={!isExpanded}
           >
-            <MorphIcon
-              icon={isDark ? Moon : Sun}
-              size={20}
-              className={isDark ? "text-red-500" : "text-zinc-600 dark:text-zinc-400"}
-            />
-          </button>
-        </Tooltip>
+            <button
+              onClick={toggleTheme}
+              type="button"
+              aria-label={isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
+              className="w-full flex items-center justify-center p-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
+            >
+              <MorphIcon
+                icon={isDark ? Moon : Sun}
+                size={20}
+                className={isDark ? "text-red-500" : "text-zinc-600 dark:text-zinc-400"}
+              />
+            </button>
+          </Tooltip>
+        </div>
 
         {/* 2. Botón de Modo del Sidebar (Icono central con Tooltip) */}
-        <div className="relative">
+        <div className="relative w-full flex items-center justify-center">
           <Tooltip
             content="Modo de barra lateral"
             position="right"
@@ -191,10 +193,11 @@ const Sidebar = () => {
               onClick={() => setShowConfigMenu((prev) => !prev)}
               type="button"
               aria-label="Modo de barra lateral"
-              className={`w-full flex items-center justify-center p-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${showConfigMenu
+              className={`w-full flex items-center justify-center p-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                showConfigMenu
                   ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
-                }`}
+              }`}
             >
               {sidebarMode === 'expanded' && <PanelLeftClose className="w-5 h-5" />}
               {sidebarMode === 'hover' && <MousePointer className="w-5 h-5" />}
@@ -208,10 +211,11 @@ const Sidebar = () => {
               <button
                 onClick={() => handleModeChange('expanded')}
                 type="button"
-                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${sidebarMode === 'expanded'
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                  sidebarMode === 'expanded'
                     ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium'
                     : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                  }`}
+                }`}
               >
                 <span>Fijo Expandido</span>
                 {sidebarMode === 'expanded' && <Check className="w-3.5 h-3.5" />}
@@ -220,10 +224,11 @@ const Sidebar = () => {
               <button
                 onClick={() => handleModeChange('hover')}
                 type="button"
-                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${sidebarMode === 'hover'
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                  sidebarMode === 'hover'
                     ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium'
                     : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                  }`}
+                }`}
               >
                 <span>Auto-expandir</span>
                 {sidebarMode === 'hover' && <Check className="w-3.5 h-3.5" />}
@@ -232,10 +237,11 @@ const Sidebar = () => {
               <button
                 onClick={() => handleModeChange('collapsed')}
                 type="button"
-                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${sidebarMode === 'collapsed'
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                  sidebarMode === 'collapsed'
                     ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium'
                     : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                  }`}
+                }`}
               >
                 <span>Fijo Colapsado</span>
                 {sidebarMode === 'collapsed' && <Check className="w-3.5 h-3.5" />}
