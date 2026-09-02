@@ -19,9 +19,9 @@ export default {
         },
         light: {
           bg: '#FAFAFA',
-          surface: '#FFFFFF',
-          card: '#FFFFFF',
-          input: '#FFFFFF',
+          surface: '#FEFDFD',
+          card: '#FEFDFD',
+          input: '#FEFDFD',
           border: '#E4E4E7',
           borderDark: '#D4D4D8'
         },

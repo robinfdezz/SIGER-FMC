@@ -35,7 +35,7 @@ const Tooltip = ({
   };
 
   return (
-    <div className="relative group/tooltip flex w-full">
+    <div className="relative group/tooltip inline-flex items-center">
       {children}
       <div
         role="tooltip"

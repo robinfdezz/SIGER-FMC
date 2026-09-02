@@ -95,8 +95,8 @@ const DashboardLayout = ({ children }) => {
       {/* 2. Menú Móvil / Tablet Fullscreen (< 1024px) */}
       <div
         className={`fixed inset-0 top-16 z-50 bg-white dark:bg-[#121212] overflow-y-auto lg:hidden flex flex-col justify-between p-5 sm:p-6 transition-all duration-300 ease-in-out ${mobileMenuOpen
-            ? 'opacity-100 pointer-events-auto translate-y-0'
-            : 'opacity-0 pointer-events-none -translate-y-4'
+          ? 'opacity-100 pointer-events-auto translate-y-0'
+          : 'opacity-0 pointer-events-none -translate-y-4'
           }`}
       >
         <div className="space-y-6">
@@ -125,15 +125,15 @@ const DashboardLayout = ({ children }) => {
                   to={item.path}
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-medium transition-colors ${isActive
-                      ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold'
-                      : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                    ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold'
+                    : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
                     }`}
                 >
                   <div className="flex items-center gap-3.5">
                     <Icon
                       className={`w-5 h-5 flex-shrink-0 ${isActive
-                          ? 'text-brand-600 dark:text-brand-400'
-                          : 'text-zinc-400'
+                        ? 'text-brand-600 dark:text-brand-400'
+                        : 'text-zinc-400'
                         }`}
                     />
                     <span>{item.name}</span>

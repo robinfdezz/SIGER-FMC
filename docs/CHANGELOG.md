@@ -9,50 +9,47 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 ## [Unreleased]
 
 ### Planned
-- Implementación de la interfaz y endpoints del Módulo de Recepción de Tickets y Gestión de Clientes (Fase 2).
+- Módulo de Recepción de Tickets (Fase 2: apertura y gestión de órdenes de servicio).
 - Módulo de Banco de Trabajo y Diagnóstico Técnico.
-- Integración con almacenamiento en la nube (Cloudinary) para evidencias fotográficas.
 - Portal público de seguimiento de tickets para clientes (`/tracking/:codigo_ticket`).
 
+---
+
+## [0.5.0] - 2026-09-02
+
 ### Added
-- **Componente Modular `Button.jsx` (`frontend/src/components/common/Button.jsx`):**
-  - Componente de botón reutilizable con variantes visuales (`primary`, `secondary`, `danger`, `outline`, `ghost`), tamaños (`sm`, `md`, `lg`), soporte para iconos (izq/der) y spinner animado `Loader2` integrado durante operaciones asíncronas (`isLoading`).
-- **Módulo Frontend de Configuración del Sistema (`frontend/src/pages/ConfigurationPage.jsx`):**
-  - **Estructura en Pestañas:** Pestaña "Perfil de la Empresa" (`CompanyProfileTab.jsx`) con selector Dropzone para el logotipo corporativo, validaciones fiscales (`RNC`, razón social, dirección, correo, teléfono) y subida optimizada a Cloudinary; y pestaña "Sucursales Físicas" (`BranchesTab.jsx`) con visualización en tarjetas de sedes, badges de estado y modal de edición (`BranchModal.jsx`).
-  - **Control de Acceso RBAC en UI:** Restringido en enrutador (`App.jsx`) y menú de navegación (`Sidebar.jsx` y `DashboardLayout.jsx`) para `SuperAdmin` y `Admin_Sucursal`. `Admin_Sucursal` tiene el perfil de empresa en modo solo lectura y únicamente puede editar su propia sucursal asignada.
-- **Módulo Backend de Configuración del Sistema (`/api/configuracion`):**
-  - **Perfil de Empresa Matriz (`datos_companhia`):** Endpoints `GET /companhia`, `POST /companhia/upload-logo` (subida a Cloudinary en carpeta `siger-fmc/companhia`) y `PUT /companhia` (upsert y eliminación automática de logo previo en Cloudinary). Acceso restringido exclusivamente a `SuperAdmin`.
-  - **Gestión Informativa de Sucursales (`datos_sucursales`):** Endpoints `GET /sucursales` y `PUT /sucursales/:id` para actualización de campos informativos (`codigo_sucursal`, `nombre_sucursal`, `telefono`, `direccion`) con control RBAC estricto (`Admin_Sucursal` restringido a su propia sucursal) y sin permitir creación ni borrado.
-- **Componente Modular `SingleImageDropzone.jsx` (`frontend/src/components/common/SingleImageDropzone.jsx`):**
-  - Componente genérico y reutilizable para la carga y previsualización de imágenes individuales con interfaz Dropzone interactiva (`onDragOver`, `onDragLeave`, `onDrop`, `onClick`).
-  - Encapsula validaciones de formato (`JPG`, `PNG`, `WEBP`) y límite de peso en megabytes (`maxSizeMB`), preview local inmediato (Blob/ObjectURL) con fallback de iniciales o icono, y botón flotante de eliminación con `e.stopPropagation()`.
-  - Refactorización de `WorkerModal.jsx` para delegar la gestión del avatar al nuevo componente reutilizable.
-- **Componente Modular `Tooltip.jsx` (`frontend/src/components/common/Tooltip.jsx`):**
-  - Tooltip flotante con backdrop-blur, tipografía compacta, soporte para 4 orientaciones (`right`, `left`, `top`, `bottom`) y prop `enabled` para activación condicional.
-  - Integrado en `Sidebar.jsx` para los enlaces de navegación, botón de tema y modo del menú cuando la barra lateral está colapsada.
-- **Componente Modular `ResetFiltersButton.jsx` (`frontend/src/components/common/ResetFiltersButton.jsx`):**
-  - Botón de limpieza de filtros con animación fluida `MorphIcon` (`X` <-> `Check`) de 1200ms, integrado en `WorkersPage.jsx` y `ClientsPage.jsx`.
-- **Integración de Cloudinary para Gestión de Fotos de Perfil (`foto_perfil_url`):**
-  - **Backend (`cloudinary.js`, `upload.js`, `workers.controller.js` y `workers.routes.js`):** SDK de Cloudinary configurado con subida por streaming en formato optimizado WebP (`uploadImageBuffer`), eliminación automática de fotos previas (`deleteImageByUrl`), convención de carpetas (`siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`), middleware Multer con almacenamiento en memoria y límite de 5MB, y endpoint dedicado `POST /api/trabajadores/upload-avatar`.
-  - **Frontend (`WorkerModal.jsx` y `workers.service.js`):** Selector interactivo estilo **Dropzone** (`onDragOver`, `onDrop`, `onClick`) con preview local instantáneo (`URL.createObjectURL`), overlay animado al hover en avatar, botón flotante de eliminación con prevención de propagación (`e.stopPropagation()`), timeout extendido de 120s en Axios para redes lentas, y estados visuales de carga en tiempo real (*"Subiendo y optimizando imagen..."*).
-- **Módulo de Gestión de Clientes y Control RBAC Granular (Fase 2):**
-  - **Backend (`clients.controller.js` y `clients.routes.js`):** Endpoints REST protegidos con middleware `checkRole`: listado y detalle con acceso de solo lectura para técnicos (`GET /api/clientes` y `GET /:id`), creación y edición autorizadas para roles administrativos y secretaría (`POST` y `PUT` exclusivo para `SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `403` para `Tecnico`), validación estricta de campos obligatorios (`nombre`, `apellido` NOT NULL, `cedula_rnc` única y `telefono`), y borrado lógico restringido a administradores (`PATCH /:id/toggle-status` exclusivo para `SuperAdmin` y `Admin_Sucursal`).
-  - **Frontend (`ClientsPage.jsx` y `ClientModal.jsx`):** Homologación visual idéntica al estándar de `WorkersPage.jsx`: resumen de conteo inferior (*"Mostrando X de Y clientes registrados"*), avatares redondeados `rounded-xl` (`w-10 h-10`), badges de estado en cápsula suave con punto indicador, opacidad para registros inactivos, y modal estilizado con los mismos patrones de botones y cabeceras de `WorkerModal.jsx`.
-  - **Navegación y Rutas (`App.jsx`, `Sidebar.jsx`, `DashboardLayout.jsx`):** Ruta protegida `/clientes` y acceso en menú lateral de escritorio y móvil con icono `Contact`.
-- **Componente Modular `Select.jsx` (Diseño Untitled UI):**
-  - Implementación del componente reutilizable `Select.jsx` con soporte de `label`, `hint`, `tooltip`, `isRequired`, `placeholder`, `items` (con `id`, `label`, `supportingText`, `avatarUrl`, `icon`, `disabled`), `value`, `onChange` y `disabled`.
-  - Estilizado con Tailwind CSS (Dark/Light), flecha chevron rotativa animada, checkmark de selección activa y cierre automático ante clic exterior (`mousedown`/`touchstart`).
-- Componente modular reutilizable `ConfirmModal.jsx` con variantes (`danger`, `warning`, `info`) y soporte de carga asíncrona.
-- Modal de confirmación interactivo antes de alternar el estado activo/inactivo de trabajadores.
+- **Módulo de Gestión de Clientes y Control RBAC Granular:**
+  - Backend: Endpoints REST protegidos para listado, detalle, creación, edición y alternado lógico de estado (`/api/clientes`).
+  - Frontend: Vistas `ClientsPage.jsx` y modal `ClientModal.jsx` con resumen de conteo, avatares y badges de estado.
+- **Módulo de Configuración del Sistema (`/configuracion`):**
+  - Pestaña "Perfil de la Empresa" (`CompanyProfileTab.jsx`) para datos institucionales y subida de logotipo.
+  - Pestaña "Sucursales Físicas" (`BranchesTab.jsx`) con tarjetas de sedes y modal de edición (`BranchModal.jsx`).
+  - Backend (`/api/configuracion`): Endpoints de lectura y actualización para `datos_companhia` y `datos_sucursales` con validación RBAC estricta.
+- **Integración con Almacenamiento en la Nube (Cloudinary):**
+  - Carga optimizada por streaming en WebP y eliminación automática de archivos previos (`public_id`) para fotos de perfil y logotipos corporativos.
+  - Componente común `SingleImageDropzone.jsx` con validaciones de tipo/peso y preview local inmediato.
+- **Componentes Comunes Reutilizables:**
+  - `Badge.jsx`: Soporte de variantes semánticas, punto indicador (`showDot`) e integración de iconos vectoriales de `lucide-react`.
+  - `Button.jsx`: Variantes (`primary`, `secondary`, `outline`), estados de carga asíncrona (`Loader2`) y dimensiones normalizadas.
+  - `Select.jsx` (Untitled UI) y `ResetFiltersButton.jsx` con animación morfométrica.
 
 ### Changed
-- **Interacción Suave en Menú Lateral (`Sidebar.jsx`):**
-  - Implementación de temporizadores debounce controlados por `useRef` para eventos del mouse en modo hover: retardo de entrada de 110ms (previene aperturas accidentales) y retardo de salida de 220ms (evita cierres bruscos al navegar o hacer clic).
-  - Limpieza rigurosa de timers en desmontaje y cambio de modo de visualización.
-- Reemplazo de todos los elementos `<select>` nativos en `WorkersPage.jsx` (filtros de Rol, Sucursal y Estado) y `WorkerModal.jsx` (selectores de Rol y Sucursal) por el nuevo componente `Select.jsx`.
-- Configuración global de `Toaster` (Sileo) reubicada a `top-center` y sincronizada dinámicamente con `ThemeContext` (Dark/Light).
+- **Estandarización de Paleta Global y Superficies:**
+  - Color de texto base institucional `#2C2C2C` (eliminando negro puro `#000000`) y fondo neutro para tarjetas y contenedores `#FEFDFD`.
+- **Homologación de Dimensiones y Modales:**
+  - Unificación de `BranchModal.jsx` a `maxWidth="max-w-3xl"`, bordes `rounded-2xl` y scroll `p-4 sm:p-6` en simetría con `WorkerModal.jsx` y `ClientModal.jsx`.
+- **Experiencia Visual y Control de Roles:**
+  - Iconos semánticos (`CheckCircle2`, `XCircle`) en badges de estado en Usuarios, Clientes y Sucursales.
+  - Rediseño de banner de advertencia en `CompanyProfileTab.jsx` a tonos rojos institucionales con `<ShieldAlert />`.
+  - Atenuación simétrica (`opacity-50 select-none pointer-events-none`) en bloques no editables para `Admin_Sucursal`.
+  - Reubicación del botón de recarga en la barra de navegación horizontal en `ConfigurationPage.jsx`.
 
-## [1.4.0] - 2026-08-27
+### Removed
+- Retiro del componente `Tooltip` sobre el botón pasivo "Solo Lectura" en `BranchesTab.jsx`.
+
+---
+
+## [0.4.0] - 2026-08-27
 
 ### Security
 - **Ajuste de Expiración Estricta de JWT (8 Horas):**
@@ -100,7 +97,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [1.3.0] - 2026-08-26
+## [0.3.0] - 2026-08-26
 
 ### Added
 - **Diseño y Tipografía Global:**
@@ -127,7 +124,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [1.2.0] - 2026-08-26
+## [0.2.0] - 2026-08-26
 
 ### Added
 - **Módulo Backend de Trabajadores (`datos_trabajadores`):**
@@ -143,7 +140,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [1.1.0] - 2026-08-25
+## [0.1.1] - 2026-08-25
 
 ### Added
 - Creación de la tabla `clientes` y normalización relacional con `servicios_recepcion`.
@@ -172,7 +169,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [1.0.0] - 2026-08-16
+## [0.1.0] - 2026-08-16
 
 ### Added
 - Configuración inicial de la arquitectura en 3 capas: Frontend (React 18 + Vite + Tailwind CSS) y Backend (Node.js + Express).

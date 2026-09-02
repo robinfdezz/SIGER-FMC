@@ -146,11 +146,11 @@ export const BranchModal = ({
       onClose={onClose}
       title={`Editar Sucursal: ${branch?.nombre_sucursal || ''}`}
       description="Modifique la información operativa y de contacto de esta sede física."
-      maxWidth="max-w-xl"
+      maxWidth="max-w-3xl"
     >
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col h-full">
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
         {/* Form Body con Scroll */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4">
           {errors.general && (
             <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs sm:text-sm">
               {errors.general}

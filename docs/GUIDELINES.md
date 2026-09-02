@@ -63,6 +63,13 @@ frontend/
 
 ## 4. Sistema de Diseño y UI/UX
 
+### Paleta de Colores Base Institucional
+* **Texto Principal (Tema Claro):** `#2C2C2C` (Gris carbón suave de alto contraste. Prohibido el uso de negro puro `#000000` o `text-black`).
+* **Texto Principal (Tema Oscuro):** `#F4F4F5` / `text-slate-100`.
+* **Fondo Claro Institucional (Light):** `#FEFDFD` para superficies, tarjetas (`card`), contenedores y campos de formulario.
+* **Fondo Oscuro Institucional (Dark):** `#121212` para fondos generales, `#18181B` para superficies y `#1E1E24` para tarjetas.
+* **Acento de Marca (Brand):** `#E11D48` (`brand-600` / Rojo FMC).
+
 ### Paleta de Colores por Estado de Servicio
 * **Recibido:** `#6B7280` (Gris neutro)
 * **En Diagnóstico:** `#3B82F6` (Azul informativo)
@@ -73,10 +80,11 @@ frontend/
 * **Entregado:** `#059669` (Verde oscuro / Completado)
 * **Cancelado / No Reparado:** `#EF4444` (Rojo / Detenido)
 
-### Reglas de Interfaz
+### Reglas de Interfaz y Convenciones Visuales
 * **Diseño Responsive:** Optimizado para tablets y móviles (uso de técnicos en banco de trabajo).
 * **Feedback Visual:** Spinners en peticiones asíncronas, toasts de notificación para acciones exitosas/fallidas.
 * **Fotos de Perfil:** Si el usuario no tiene `foto_perfil_url`, mostrar un avatar con sus iniciales.
+* **Atenuación en Modo Solo Lectura:** Bloques y formularios no editables por restricciones de rol (RBAC) aplican la directriz uniforme `opacity-50 select-none pointer-events-none` junto a un banner explicativo conciso.
 * **Seguimiento Público:** Vista minimalista y limpia para clientes sin requerir inicio de sesión.
 
 ---
@@ -249,6 +257,13 @@ frontend/
 6. **`Button.jsx` (Botón Reutilizable):**
    * **Props:** `children`, `onClick`, `type` (`'button' | 'submit' | 'reset'`), `variant` (`'primary' | 'secondary' | 'danger' | 'outline' | 'ghost'`), `size` (`'sm' | 'md' | 'lg'`), `disabled`, `isLoading` (spinner `Loader2` integrado), `icon` (componente o elemento), `iconPosition` (`'left' | 'right'`), `className`.
    * **Estética:** Bordes redondeados `rounded-xl`, sombra suave, transiciones y variantes consistentes con el diseño de la aplicación.
+
+7. **`Badge.jsx` (Insignia / Chip de Estado):**
+   * **Props:** `children`, `variant` (`'success' | 'danger' | 'warning' | 'info' | 'neutral'`), `size` (`'sm' | 'md'`), `showDot` (`boolean`, por defecto: `true`), `icon` (componente funcional de `lucide-react`, ej. `CheckCircle2`, `XCircle`, `Sparkles`), `className`.
+   * **Comportamiento y Renderizado:**
+     * Si se pasa la prop `icon`, se renderiza con dimensionamiento adaptativo proporcional (`w-3 h-3` para `size="sm"` y `w-3.5 h-3.5` para `size="md"`) heredando el color semántico de la variante.
+     * Si no se pasa `icon` y `showDot` es `true`, renderiza el punto indicador circular (`w-1.5 h-1.5 rounded-full`).
+   * **Estética:** Bordes suaves `rounded-lg`, padding equilibrado y tipografía `font-medium text-xs`.
 
 ---
 

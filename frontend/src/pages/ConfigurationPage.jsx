@@ -52,55 +52,54 @@ export const ConfigurationPage = () => {
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
         {/* Cabecera Principal */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight">
-              Configuración del Sistema
-            </h1>
-            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 font-inter">
-              Parametrización institucional de la empresa matriz, identidad visual y sedes operativas.
-            </p>
-          </div>
-
-          {/* Acción Superior Derecha */}
-          <div className="flex items-center gap-2 self-start md:self-center">
-            <button
-              onClick={loadData}
-              disabled={loading}
-              title="Recargar configuración"
-              className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            </button>
-          </div>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight">
+            Configuración del Sistema
+          </h1>
+          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 font-inter">
+            Parametrización institucional de la empresa matriz, identidad visual y sedes operativas.
+          </p>
         </div>
 
-        {/* Selector de Pestañas (Tabs) */}
-        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 w-full sm:w-fit">
-          <button
-            type="button"
-            onClick={() => setActiveTab('companhia')}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
-              activeTab === 'companhia'
-                ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-            }`}
-          >
-            <Building2 size={16} />
-            <span>Perfil de la Empresa</span>
-          </button>
+        {/* Fila de Pestañas (Tabs) y Acción de Recarga */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Selector de Pestañas (Tabs) */}
+          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 w-full sm:w-fit">
+            <button
+              type="button"
+              onClick={() => setActiveTab('companhia')}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
+                activeTab === 'companhia'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
+                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+              }`}
+            >
+              <Building2 size={16} />
+              <span>Perfil de la Empresa</span>
+            </button>
 
+            <button
+              type="button"
+              onClick={() => setActiveTab('sucursales')}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
+                activeTab === 'sucursales'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
+                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+              }`}
+            >
+              <Store size={16} />
+              <span>Sucursales Físicas</span>
+            </button>
+          </div>
+
+          {/* Botón de Recarga a la Derecha */}
           <button
-            type="button"
-            onClick={() => setActiveTab('sucursales')}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
-              activeTab === 'sucursales'
-                ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-            }`}
+            onClick={loadData}
+            disabled={loading}
+            title="Recargar configuración"
+            className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer disabled:opacity-50 self-end sm:self-center"
           >
-            <Store size={16} />
-            <span>Sucursales Físicas</span>
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
 

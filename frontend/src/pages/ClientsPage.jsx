@@ -3,6 +3,7 @@ import DashboardLayout from '../components/DashboardLayout';
 import ClientModal from '../components/clients/ClientModal';
 import ConfirmModal from '../components/common/ConfirmModal';
 import Select from '../components/common/Select';
+import Badge from '../components/common/Badge';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
 import { useAuth } from '../context/AuthContext';
 import { getClients, toggleClientStatus } from '../services/clients.service';
@@ -18,7 +19,9 @@ import {
   RefreshCw,
   Users,
   CreditCard,
-  Calendar
+  Calendar,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 
 export const ClientsPage = () => {
@@ -391,20 +394,12 @@ export const ClientsPage = () => {
 
                         {/* Columna 5: Estado */}
                         <td className="py-3.5 px-4 sm:px-6 text-center">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${
-                              client.activo
-                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/60'
-                                : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 border-neutral-200 dark:border-neutral-700'
-                            }`}
+                          <Badge
+                            variant={client.activo ? 'success' : 'neutral'}
+                            icon={client.activo ? CheckCircle2 : XCircle}
                           >
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${
-                                client.activo ? 'bg-emerald-500' : 'bg-neutral-400'
-                              }`}
-                            />
                             {client.activo ? 'Activo' : 'Inactivo'}
-                          </span>
+                          </Badge>
                         </td>
 
                         {/* Columna 6: Acciones (Homologadas con WorkersPage.jsx) */}

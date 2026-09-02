@@ -15,6 +15,7 @@ import {
   Lock,
   Save,
   ShieldCheck,
+  ShieldAlert,
   CheckCircle2
 } from 'lucide-react';
 
@@ -215,16 +216,13 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
     <div className="space-y-6">
       {/* Banner de Modo Solo Lectura para Admin Sucursal */}
       {!isSuperAdmin && (
-        <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300">
-          <div className="p-1 rounded-lg bg-amber-500/20 shrink-0 mt-0.5">
-            <Lock size={18} />
+        <div className="flex items-center gap-3 p-3.5 sm:p-4 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-800 dark:text-red-300 text-xs sm:text-sm">
+          <div className="p-1.5 rounded-lg bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 shrink-0">
+            <ShieldAlert size={18} />
           </div>
-          <div className="text-xs sm:text-sm">
-            <p className="font-semibold">Modo de Solo Lectura</p>
-            <p className="opacity-90 mt-0.5 font-inter">
-              Como Administrador de Sucursal, solo puede consultar los datos fiscales y el logotipo de la compañía. La edición está reservada para el Super Administrador.
-            </p>
-          </div>
+          <p className="font-medium font-inter">
+            La edición está reservada para el Super Administrador.
+          </p>
         </div>
       )}
 
@@ -233,17 +231,19 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Columna Izquierda: Logotipo Oficial */}
           <div className="lg:col-span-4 flex flex-col">
-            <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs flex-1 flex flex-col justify-between">
+            <div className={`p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs flex-1 flex flex-col justify-between ${
+              !isSuperAdmin ? 'opacity-50 select-none pointer-events-none' : ''
+            }`}>
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                  <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-slate-800 dark:text-slate-200">
                     <ImageIcon size={18} />
                   </div>
-                  <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 font-outfit">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 font-outfit">
                     Logotipo Oficial
                   </h3>
                 </div>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 font-inter">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 font-inter">
                   Imagen institucional mostrada en facturas, recibos impresos y portal de seguimiento.
                 </p>
 
@@ -266,7 +266,7 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
               </div>
 
               {formData.logo_url && (
-                <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between text-xs text-neutral-400">
+                <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between text-xs text-slate-400">
                   <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
                     <CheckCircle2 size={14} /> Logotipo activo en Cloudinary
                   </span>
@@ -277,7 +277,9 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
 
           {/* Columna Derecha: Formulario de Datos Fiscales y Contacto */}
           <div className="lg:col-span-8">
-            <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
+            <div className={`p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4 ${
+              !isSuperAdmin ? 'opacity-50 select-none pointer-events-none' : ''
+            }`}>
               <div className="border-b border-neutral-100 dark:border-neutral-800/80 pb-3 mb-4">
                 <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 font-outfit">
                   Datos Fiscales y de Contacto
@@ -310,11 +312,10 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
                       placeholder="Franyer Mobile Center, S.R.L."
                       maxLength={100}
                       disabled={!isSuperAdmin || isSubmitting}
-                      className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all disabled:bg-neutral-100 dark:disabled:bg-neutral-800/60 disabled:cursor-not-allowed ${
-                        errors.nombre_empresa
+                      className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all disabled:bg-neutral-100 dark:disabled:bg-neutral-800/60 disabled:cursor-not-allowed ${errors.nombre_empresa
                           ? 'border-red-500 focus:ring-red-500/20'
                           : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10'
-                      }`}
+                        }`}
                     />
                   </div>
                   {errors.nombre_empresa && (
@@ -338,11 +339,10 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
                       placeholder="133-18964-1"
                       maxLength={20}
                       disabled={!isSuperAdmin || isSubmitting}
-                      className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all font-mono disabled:bg-neutral-100 dark:disabled:bg-neutral-800/60 disabled:cursor-not-allowed ${
-                        errors.rnc
+                      className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all font-mono disabled:bg-neutral-100 dark:disabled:bg-neutral-800/60 disabled:cursor-not-allowed ${errors.rnc
                           ? 'border-red-500 focus:ring-red-500/20'
                           : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10'
-                      }`}
+                        }`}
                     />
                   </div>
                   {errors.rnc && (
@@ -366,11 +366,10 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
                       placeholder="8493421998"
                       maxLength={20}
                       disabled={!isSuperAdmin || isSubmitting}
-                      className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all disabled:bg-neutral-100 dark:disabled:bg-neutral-800/60 disabled:cursor-not-allowed ${
-                        errors.telefono_principal
+                      className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all disabled:bg-neutral-100 dark:disabled:bg-neutral-800/60 disabled:cursor-not-allowed ${errors.telefono_principal
                           ? 'border-red-500 focus:ring-red-500/20'
                           : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10'
-                      }`}
+                        }`}
                     />
                   </div>
                   {errors.telefono_principal && (
@@ -394,11 +393,10 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
                       placeholder="contacto@franyermobile.com"
                       maxLength={100}
                       disabled={!isSuperAdmin || isSubmitting}
-                      className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all disabled:bg-neutral-100 dark:disabled:bg-neutral-800/60 disabled:cursor-not-allowed ${
-                        errors.correo_contacto
+                      className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all disabled:bg-neutral-100 dark:disabled:bg-neutral-800/60 disabled:cursor-not-allowed ${errors.correo_contacto
                           ? 'border-red-500 focus:ring-red-500/20'
                           : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10'
-                      }`}
+                        }`}
                     />
                   </div>
                   {errors.correo_contacto && (
@@ -422,11 +420,10 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
                     placeholder="San Francisco de Macorís, Provincia Duarte, República Dominicana"
                     rows={3}
                     disabled={!isSuperAdmin || isSubmitting}
-                    className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all resize-none disabled:bg-neutral-100 dark:disabled:bg-neutral-800/60 disabled:cursor-not-allowed ${
-                      errors.direccion_fiscal
+                    className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all resize-none disabled:bg-neutral-100 dark:disabled:bg-neutral-800/60 disabled:cursor-not-allowed ${errors.direccion_fiscal
                         ? 'border-red-500 focus:ring-red-500/20'
                         : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10'
-                    }`}
+                      }`}
                   />
                 </div>
                 {errors.direccion_fiscal && (
