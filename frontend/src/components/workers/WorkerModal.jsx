@@ -2,12 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../common/Modal';
 import Select from '../common/Select';
 import SingleImageDropzone from '../common/SingleImageDropzone';
+import Button from '../common/Button';
 import { createWorker, updateWorker, uploadAvatar } from '../../services/workers.service';
 import { useAuth } from '../../context/AuthContext';
 import { sileo } from 'sileo';
 import { MorphIcon } from 'morphicons/react';
 import { Eye, EyeOff } from 'lucide';
-import { RefreshCw } from 'lucide-react';
 
 const INITIAL_FORM_STATE = {
   nombre: '',
@@ -643,28 +643,28 @@ const WorkerModal = ({
 
         {/* Footer Fijo Abajo */}
         <div className="px-4 py-3 sm:px-6 sm:py-4 shrink-0 border-t border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/70 dark:bg-[#141416] flex items-center justify-end gap-3 rounded-b-2xl">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="md"
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2 text-xs sm:text-sm font-medium bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
           >
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
+            variant="primary"
+            size="md"
             disabled={isSubmitting || (isEdit && !hasChanges)}
-            className="px-5 py-2 text-xs sm:text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+            isLoading={isSubmitting}
           >
-            {isSubmitting ? (
-              <>
-                <RefreshCw size={14} className="animate-spin" />
-                <span>{statusMessage || (isEdit ? 'Guardando...' : 'Creando...')}</span>
-              </>
-            ) : (
-              <span>{isEdit ? 'Guardar Cambios' : 'Crear Usuario'}</span>
-            )}
-          </button>
+            {isSubmitting
+              ? statusMessage || (isEdit ? 'Guardando...' : 'Creando...')
+              : isEdit
+              ? 'Guardar Cambios'
+              : 'Crear Usuario'}
+          </Button>
         </div>
       </form>
     </Modal>

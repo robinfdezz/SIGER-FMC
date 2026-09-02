@@ -7,6 +7,7 @@ import LoginPage from './pages/Login/LoginPage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
 import WorkersPage from './pages/WorkersPage';
 import ClientsPage from './pages/ClientsPage';
+import ConfigurationPage from './pages/ConfigurationPage';
 import { useTheme } from './context/ThemeContext';
 import { Toaster } from 'sileo';
 import 'sileo/styles.css';
@@ -50,6 +51,15 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={['SuperAdmin', 'Admin_Sucursal']}>
                   <WorkersPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/configuracion"
+              element={
+                <ProtectedRoute allowedRoles={['SuperAdmin', 'Admin_Sucursal']}>
+                  <ConfigurationPage />
                 </ProtectedRoute>
               }
             />

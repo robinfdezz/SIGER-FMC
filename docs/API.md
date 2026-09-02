@@ -972,3 +972,166 @@ Gestión integral de los usuarios y empleados del sistema con control de acceso 
   }
   ```
 
+---
+
+## 7. Módulo de Configuración del Sistema (`/api/configuracion`)
+
+Módulo administrativo para la parametrización de la empresa matriz y la gestión informativa de sucursales físicas.
+
+- **Acceso:** Exclusivo para roles `SuperAdmin` y `Admin_Sucursal` (bloqueado para `Secretaria` y `Tecnico`).
+- **Aislamiento de Sucursal:** Los administradores de sucursal (`Admin_Sucursal`) solo tienen permisos para modificar la información de su propia sucursal asignada.
+
+---
+
+### 7.1 Perfil de Empresa Matriz (`/api/configuracion/companhia`)
+
+#### 7.1.1 Obtener Perfil de la Empresa
+- **Ruta:** `GET /api/configuracion/companhia`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Perfil de la empresa obtenido con éxito.",
+    "data": {
+      "id": 1,
+      "nombre_empresa": "Franyer Mobile Center, S.R.L.",
+      "rnc": "133-18964-1",
+      "telefono_principal": "8493421998",
+      "correo_contacto": "franyermobilecenter@gmail.com",
+      "direccion_fiscal": "ADM LOCAL SAN FCO MACORIS",
+      "logo_url": "https://res.cloudinary.com/cloud_name/image/upload/v1234/siger-fmc/companhia/logo_empresa.webp",
+      "logo_public_id": "siger-fmc/companhia/logo_empresa",
+      "created_at": "2026-08-25T21:37:51.988Z",
+      "updated_at": "2026-09-02T14:00:00.000Z"
+    }
+  }
+  ```
+
+#### 7.1.2 Subir Logotipo de la Empresa
+- **Ruta:** `POST /api/configuracion/companhia/upload-logo`
+- **Acceso:** Privado (`SuperAdmin`)
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: multipart/form-data`
+- **Form Data:**
+  - `logo`: Archivo binario de imagen (JPG, PNG, WEBP, máx. 5MB).
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Logotipo subido exitosamente.",
+    "logo_url": "https://res.cloudinary.com/cloud_name/image/upload/v1234567890/siger-fmc/companhia/abc123xyz.webp",
+    "logo_public_id": "siger-fmc/companhia/abc123xyz"
+  }
+  ```
+
+#### 7.1.3 Actualizar Datos de la Empresa
+- **Ruta:** `PUT /api/configuracion/companhia`
+- **Acceso:** Privado (`SuperAdmin`)
+- **Body (JSON):**
+  ```json
+  {
+    "nombre_empresa": "Franyer Mobile Center, S.R.L.",
+    "rnc": "133-18964-1",
+    "telefono_principal": "8493421998",
+    "correo_contacto": "franyermobilecenter@gmail.com",
+    "direccion_fiscal": "San Francisco de Macorís, Rep. Dom.",
+    "logo_url": "https://res.cloudinary.com/.../siger-fmc/companhia/nuevo_logo.webp",
+    "logo_public_id": "siger-fmc/companhia/nuevo_logo"
+  }
+  ```
+- **Comportamiento Multimedia:**
+  - Si se actualiza el logotipo y existía un `logo_public_id` previo, el backend elimina automáticamente el archivo anterior de Cloudinary.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Información de la empresa actualizada exitosamente.",
+    "data": {
+      "id": 1,
+      "nombre_empresa": "Franyer Mobile Center, S.R.L.",
+      "rnc": "133-18964-1",
+      "telefono_principal": "8493421998",
+      "correo_contacto": "franyermobilecenter@gmail.com",
+      "direccion_fiscal": "San Francisco de Macorís, Rep. Dom.",
+      "logo_url": "https://res.cloudinary.com/.../siger-fmc/companhia/nuevo_logo.webp",
+      "logo_public_id": "siger-fmc/companhia/nuevo_logo",
+      "updated_at": "2026-09-02T14:05:00.000Z"
+    }
+  }
+  ```
+
+---
+
+### 7.2 Gestión de Sucursales (`/api/configuracion/sucursales`)
+
+#### 7.2.1 Listar Sucursales
+- **Ruta:** `GET /api/configuracion/sucursales`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Listado de sucursales obtenido con éxito.",
+    "data": [
+      {
+        "id": 1,
+        "companhia_id": 1,
+        "codigo_sucursal": "SUC-01",
+        "nombre_sucursal": "Franyer Mobile Center - SFM",
+        "telefono": "8493421998",
+        "direccion": "San Francisco de Macoris",
+        "activo": true,
+        "created_at": "2026-08-25T21:42:59.821Z",
+        "updated_at": "2026-08-25T21:42:59.821Z"
+      },
+      {
+        "id": 2,
+        "companhia_id": 1,
+        "codigo_sucursal": "SUC-02",
+        "nombre_sucursal": "Franyer Mobile Center - Castillo",
+        "telefono": "8093132513",
+        "direccion": "Castillo",
+        "activo": true,
+        "created_at": "2026-08-25T21:42:59.821Z",
+        "updated_at": "2026-08-25T21:42:59.821Z"
+      }
+    ],
+    "total": 2
+  }
+  ```
+
+#### 7.2.2 Actualizar Sucursal Existente
+- **Ruta:** `PUT /api/configuracion/sucursales/:id`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal` de la sucursal `:id`)
+- **Body (JSON):**
+  ```json
+  {
+    "codigo_sucursal": "SUC-01",
+    "nombre_sucursal": "Franyer Mobile Center - SFM Principal",
+    "telefono": "8493421998",
+    "direccion": "Av. Presidente Antonio Guzmán Fernández #12, SFM"
+  }
+  ```
+- **Reglas:**
+  - `Admin_Sucursal` solo puede actualizar su `:id` de sucursal asignado (retorna `403` si intenta actualizar otra sede).
+  - Solo se actualizan campos informativos (`codigo_sucursal`, `nombre_sucursal`, `telefono`, `direccion`).
+  - No se permite crear (POST), eliminar (DELETE) ni modificar el estado lógico `activo`.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Sucursal actualizada exitosamente.",
+    "data": {
+      "id": 1,
+      "companhia_id": 1,
+      "codigo_sucursal": "SUC-01",
+      "nombre_sucursal": "Franyer Mobile Center - SFM Principal",
+      "telefono": "8493421998",
+      "direccion": "Av. Presidente Antonio Guzmán Fernández #12, SFM",
+      "activo": true,
+      "updated_at": "2026-09-02T14:10:00.000Z"
+    }
+  }
+  ```
+
+

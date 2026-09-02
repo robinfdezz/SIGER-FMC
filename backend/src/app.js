@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth.routes');
 const workersRoutes = require('./routes/workers.routes');
 const clientsRoutes = require('./routes/clients.routes');
 const catalogsRoutes = require('./routes/catalogs.routes');
+const configuracionRoutes = require('./routes/configuracion.routes');
 
 const app = express();
 
@@ -72,6 +73,7 @@ app.use('/api/clientes', clientsRoutes);
 app.use('/api/catalogos', catalogsRoutes);
 app.use('/api/sucursales', catalogsRoutes);
 app.use('/api/roles', catalogsRoutes);
+app.use('/api/configuracion', configuracionRoutes);
 
 // Manejador de rutas no encontradas (404)
 app.use((req, res) => {

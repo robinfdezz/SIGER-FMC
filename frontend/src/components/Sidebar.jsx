@@ -25,7 +25,7 @@ const MENU_ITEMS = [
   { id: 'clientes', name: 'Clientes', path: '/clientes', icon: Contact },
   { id: 'taller', name: 'Banco de Trabajo', path: '/taller', icon: Wrench },
   { id: 'trabajadores', name: 'Usuarios', path: '/trabajadores', icon: Users, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
-  { id: 'config', name: 'Configuración', path: '/configuracion', icon: Settings },
+  { id: 'config', name: 'Configuración', path: '/configuracion', icon: Settings, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
 ];
 
 const Sidebar = () => {

@@ -15,6 +15,14 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - Portal público de seguimiento de tickets para clientes (`/tracking/:codigo_ticket`).
 
 ### Added
+- **Componente Modular `Button.jsx` (`frontend/src/components/common/Button.jsx`):**
+  - Componente de botón reutilizable con variantes visuales (`primary`, `secondary`, `danger`, `outline`, `ghost`), tamaños (`sm`, `md`, `lg`), soporte para iconos (izq/der) y spinner animado `Loader2` integrado durante operaciones asíncronas (`isLoading`).
+- **Módulo Frontend de Configuración del Sistema (`frontend/src/pages/ConfigurationPage.jsx`):**
+  - **Estructura en Pestañas:** Pestaña "Perfil de la Empresa" (`CompanyProfileTab.jsx`) con selector Dropzone para el logotipo corporativo, validaciones fiscales (`RNC`, razón social, dirección, correo, teléfono) y subida optimizada a Cloudinary; y pestaña "Sucursales Físicas" (`BranchesTab.jsx`) con visualización en tarjetas de sedes, badges de estado y modal de edición (`BranchModal.jsx`).
+  - **Control de Acceso RBAC en UI:** Restringido en enrutador (`App.jsx`) y menú de navegación (`Sidebar.jsx` y `DashboardLayout.jsx`) para `SuperAdmin` y `Admin_Sucursal`. `Admin_Sucursal` tiene el perfil de empresa en modo solo lectura y únicamente puede editar su propia sucursal asignada.
+- **Módulo Backend de Configuración del Sistema (`/api/configuracion`):**
+  - **Perfil de Empresa Matriz (`datos_companhia`):** Endpoints `GET /companhia`, `POST /companhia/upload-logo` (subida a Cloudinary en carpeta `siger-fmc/companhia`) y `PUT /companhia` (upsert y eliminación automática de logo previo en Cloudinary). Acceso restringido exclusivamente a `SuperAdmin`.
+  - **Gestión Informativa de Sucursales (`datos_sucursales`):** Endpoints `GET /sucursales` y `PUT /sucursales/:id` para actualización de campos informativos (`codigo_sucursal`, `nombre_sucursal`, `telefono`, `direccion`) con control RBAC estricto (`Admin_Sucursal` restringido a su propia sucursal) y sin permitir creación ni borrado.
 - **Componente Modular `SingleImageDropzone.jsx` (`frontend/src/components/common/SingleImageDropzone.jsx`):**
   - Componente genérico y reutilizable para la carga y previsualización de imágenes individuales con interfaz Dropzone interactiva (`onDragOver`, `onDragLeave`, `onDrop`, `onClick`).
   - Encapsula validaciones de formato (`JPG`, `PNG`, `WEBP`) y límite de peso en megabytes (`maxSizeMB`), preview local inmediato (Blob/ObjectURL) con fallback de iniciales o icono, y botón flotante de eliminación con `e.stopPropagation()`.

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import Button from './Button';
 
 const ConfirmModal = ({
   isOpen,
@@ -30,16 +31,6 @@ const ConfirmModal = ({
   }, [isOpen, onClose, isLoading]);
 
   if (!isOpen) return null;
-
-  const getConfirmButtonStyles = () => {
-    switch (variant) {
-      case 'danger':
-      case 'success':
-      case 'warning':
-      default:
-        return 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500/20';
-    }
-  };
 
   const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs w-full h-full min-h-screen">
@@ -73,22 +64,25 @@ const ConfirmModal = ({
 
         {/* Acciones */}
         <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-neutral-100 dark:border-neutral-800/80">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="md"
             onClick={onClose}
             disabled={isLoading}
-            className="px-4 py-2 text-xs sm:text-sm font-medium bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
           >
             {cancelText}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant={variant === 'danger' ? 'danger' : 'primary'}
+            size="md"
             onClick={onConfirm}
             disabled={isLoading}
-            className={`px-4 py-2 text-xs sm:text-sm font-medium rounded-xl shadow-xs transition-colors disabled:opacity-50 flex items-center gap-2 focus:outline-none focus:ring-2 cursor-pointer ${getConfirmButtonStyles()}`}
+            isLoading={isLoading}
           >
-            {isLoading ? 'Procesando...' : confirmText}
-          </button>
+            {confirmText}
+          </Button>
         </div>
       </div>
     </div>

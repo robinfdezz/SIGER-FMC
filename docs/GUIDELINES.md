@@ -246,6 +246,10 @@ frontend/
 5. **`Modal.jsx` y `ConfirmModal.jsx` (Ventanas Modales):**
    * **Props:** `isOpen`, `onClose`, `title`, `description`, `maxWidth`, variantes (`danger`, `warning`, `info`), `isLoading`.
 
+6. **`Button.jsx` (Botón Reutilizable):**
+   * **Props:** `children`, `onClick`, `type` (`'button' | 'submit' | 'reset'`), `variant` (`'primary' | 'secondary' | 'danger' | 'outline' | 'ghost'`), `size` (`'sm' | 'md' | 'lg'`), `disabled`, `isLoading` (spinner `Loader2` integrado), `icon` (componente o elemento), `iconPosition` (`'left' | 'right'`), `className`.
+   * **Estética:** Bordes redondeados `rounded-xl`, sombra suave, transiciones y variantes consistentes con el diseño de la aplicación.
+
 ---
 
 ## 9. Reglas de Backend y Seguridad
