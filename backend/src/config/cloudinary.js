@@ -43,6 +43,25 @@ const uploadImageBuffer = (buffer, folder = 'siger-fmc/personal-fmc', customOpti
 };
 
 /**
+ * Elimina directamente un asset de Cloudinary utilizando su public_id.
+ * @param {string} publicId - ID público del asset en Cloudinary (ej: 'siger-fmc/personal-fmc/abc123xyz').
+ * @returns {Promise<object|null>} Resultado de la eliminación de Cloudinary o null si no se proporcionó ID.
+ */
+const deleteImageByPublicId = async (publicId) => {
+  if (!publicId || typeof publicId !== 'string' || publicId.trim().length === 0) {
+    return null;
+  }
+
+  try {
+    const result = await cloudinary.uploader.destroy(publicId.trim());
+    return result;
+  } catch (error) {
+    console.error(`⚠️ Error al eliminar asset de Cloudinary por public_id (${publicId}):`, error.message);
+    return null;
+  }
+};
+
+/**
  * Extrae el public_id de una URL de Cloudinary y elimina la imagen.
  * @param {string} imageUrl - URL pública de la imagen en Cloudinary.
  * @returns {Promise<object|null>} Resultado de la eliminación o null si la URL no es de Cloudinary.
@@ -71,10 +90,9 @@ const deleteImageByUrl = async (imageUrl) => {
 
     if (!publicId) return null;
 
-    const result = await cloudinary.uploader.destroy(publicId);
-    return result;
+    return await deleteImageByPublicId(publicId);
   } catch (error) {
-    console.error('⚠️ Error al eliminar imagen previa de Cloudinary:', error.message);
+    console.error('⚠️ Error al eliminar imagen previa de Cloudinary por URL:', error.message);
     return null;
   }
 };
@@ -82,5 +100,6 @@ const deleteImageByUrl = async (imageUrl) => {
 module.exports = {
   cloudinary,
   uploadImageBuffer,
+  deleteImageByPublicId,
   deleteImageByUrl
 };

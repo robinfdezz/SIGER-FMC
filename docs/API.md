@@ -783,3 +783,192 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 | `GET` | `/api/catalogos/sucursales` | Autenticado | Lista sedes físicas activas (`datos_sucursales`). |
 | `GET` | `/api/catalogos/roles` | `SuperAdmin` | Lista roles del sistema (`roles_equipo`). |
 | `GET` | `/api/catalogos/tecnicos` | Autenticado | Lista técnicos disponibles por sucursal (`datos_trabajadores`). |
+
+---
+
+## 6. Módulo de Gestión de Trabajadores / Usuarios (`/api/trabajadores`)
+
+Gestión integral de los usuarios y empleados del sistema con control de acceso por roles (RBAC) y soporte de fotos de perfil optimizadas en Cloudinary.
+
+### 6.1 Subir Foto de Perfil / Avatar
+- **Ruta:** `POST /api/trabajadores/upload-avatar`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: multipart/form-data`
+- **Form Data:**
+  - `foto_perfil`: Archivo binario de imagen (`image/jpeg`, `image/png`, `image/webp`, máx. 5MB).
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Foto de perfil subida exitosamente.",
+    "foto_perfil_url": "https://res.cloudinary.com/cloud_name/image/upload/v1234567890/siger-fmc/personal-fmc/abc123xyz.webp",
+    "public_id": "siger-fmc/personal-fmc/abc123xyz",
+    "foto_perfil_public_id": "siger-fmc/personal-fmc/abc123xyz"
+  }
+  ```
+
+---
+
+### 6.2 Obtener Listado de Trabajadores
+- **Ruta:** `GET /api/trabajadores`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Query Params:**
+  - `sucursal_id` (opcional, solo `SuperAdmin`): Filtrar por ID de sucursal.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Listado de trabajadores obtenido con éxito.",
+    "data": [
+      {
+        "id": 1,
+        "sucursal_id": 1,
+        "rol_id": 4,
+        "usuario": "tecnico_juan",
+        "nombre": "Juan",
+        "apellido": "Pérez",
+        "cedula": "40200000001",
+        "telefono": "8095550101",
+        "correo": "juan.perez@franyermobile.com",
+        "foto_perfil_url": "https://res.cloudinary.com/.../abc123xyz.webp",
+        "foto_perfil_public_id": "siger-fmc/personal-fmc/abc123xyz",
+        "ultimo_login": "2026-08-30T10:00:00.000Z",
+        "created_at": "2026-08-20T12:00:00.000Z",
+        "updated_at": "2026-09-02T13:00:00.000Z",
+        "activo": true,
+        "rol_nombre": "Tecnico",
+        "sucursal_nombre": "Sucursal Principal",
+        "sucursal_codigo": "SUC-01"
+      }
+    ],
+    "total": 1
+  }
+  ```
+
+---
+
+### 6.3 Obtener Detalle de un Trabajador
+- **Ruta:** `GET /api/trabajadores/:id`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "data": {
+      "id": 1,
+      "sucursal_id": 1,
+      "rol_id": 4,
+      "usuario": "tecnico_juan",
+      "nombre": "Juan",
+      "apellido": "Pérez",
+      "cedula": "40200000001",
+      "telefono": "8095550101",
+      "correo": "juan.perez@franyermobile.com",
+      "foto_perfil_url": "https://res.cloudinary.com/.../abc123xyz.webp",
+      "foto_perfil_public_id": "siger-fmc/personal-fmc/abc123xyz",
+      "activo": true,
+      "rol_nombre": "Tecnico",
+      "sucursal_nombre": "Sucursal Principal",
+      "sucursal_codigo": "SUC-01"
+    }
+  }
+  ```
+
+---
+
+### 6.4 Registrar un Nuevo Trabajador
+- **Ruta:** `POST /api/trabajadores`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Body (JSON):**
+  ```json
+  {
+    "nombre": "Carlos",
+    "apellido": "López",
+    "usuario": "clopez",
+    "cedula": "40212345678",
+    "telefono": "8095550102",
+    "correo": "carlos.lopez@franyermobile.com",
+    "rol_id": 4,
+    "sucursal_id": 1,
+    "password": "Password123",
+    "foto_perfil_url": "https://res.cloudinary.com/.../abc123xyz.webp",
+    "foto_perfil_public_id": "siger-fmc/personal-fmc/abc123xyz"
+  }
+  ```
+- **Respuesta Exitosa (`201 Created`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Usuario registrado exitosamente.",
+    "data": {
+      "id": 2,
+      "usuario": "clopez",
+      "nombre": "Carlos",
+      "apellido": "López",
+      "foto_perfil_url": "https://res.cloudinary.com/.../abc123xyz.webp",
+      "foto_perfil_public_id": "siger-fmc/personal-fmc/abc123xyz",
+      "activo": true
+    }
+  }
+  ```
+
+---
+
+### 6.5 Actualizar Trabajador
+- **Ruta:** `PUT /api/trabajadores/:id`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Body (JSON):**
+  ```json
+  {
+    "nombre": "Carlos",
+    "apellido": "López",
+    "usuario": "clopez",
+    "cedula": "40212345678",
+    "telefono": "8095550102",
+    "correo": "carlos.lopez@franyermobile.com",
+    "rol_id": 4,
+    "sucursal_id": 1,
+    "password": "",
+    "foto_perfil_url": "https://res.cloudinary.com/.../nuevo_avatar.webp",
+    "foto_perfil_public_id": "siger-fmc/personal-fmc/nuevo_avatar"
+  }
+  ```
+- **Comportamiento Multimedia en Actualización:**
+  - Si se proporciona un nuevo avatar o se establece `foto_perfil_url: null` (eliminación voluntaria), el backend elimina automáticamente la imagen anterior de Cloudinary utilizando `foto_perfil_public_id` con `cloudinary.uploader.destroy()`.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Usuario actualizado exitosamente.",
+    "data": {
+      "id": 2,
+      "usuario": "clopez",
+      "foto_perfil_url": "https://res.cloudinary.com/.../nuevo_avatar.webp",
+      "foto_perfil_public_id": "siger-fmc/personal-fmc/nuevo_avatar",
+      "activo": true,
+      "updated_at": "2026-09-02T13:15:00.000Z"
+    }
+  }
+  ```
+
+---
+
+### 6.6 Alternar Estado Activo / Inactivo (Borrado Lógico)
+- **Ruta:** `PATCH /api/trabajadores/:id/toggle-status`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "El trabajador Carlos López ha sido desactivado exitosamente.",
+    "data": {
+      "id": 2,
+      "usuario": "clopez",
+      "nombre": "Carlos",
+      "apellido": "López",
+      "activo": false,
+      "updated_at": "2026-09-02T13:20:00.000Z"
+    }
+  }
+  ```
+

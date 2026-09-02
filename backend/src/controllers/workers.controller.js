@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { getPool } = require('../config/db');
-const { uploadImageBuffer, deleteImageByUrl } = require('../config/cloudinary');
+const { uploadImageBuffer, deleteImageByPublicId, deleteImageByUrl } = require('../config/cloudinary');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -180,6 +180,7 @@ const getWorkers = async (req, res) => {
         t.telefono,
         t.correo,
         t.foto_perfil_url,
+        t.foto_perfil_public_id,
         t.ultimo_login,
         t.created_at,
         t.updated_at,
@@ -249,6 +250,7 @@ const getWorkerById = async (req, res) => {
         t.telefono,
         t.correo,
         t.foto_perfil_url,
+        t.foto_perfil_public_id,
         t.ultimo_login,
         t.created_at,
         t.updated_at,
@@ -322,7 +324,8 @@ const createWorker = async (req, res) => {
       correo,
       rol_id,
       sucursal_id,
-      foto_perfil_url
+      foto_perfil_url,
+      foto_perfil_public_id
     } = req.body;
 
     const cleanUsername = String(usuario).trim().toLowerCase();
@@ -388,8 +391,9 @@ const createWorker = async (req, res) => {
         telefono,
         correo,
         password,
-        foto_perfil_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        foto_perfil_url,
+        foto_perfil_public_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING 
         id,
         sucursal_id,
@@ -401,6 +405,7 @@ const createWorker = async (req, res) => {
         telefono,
         correo,
         foto_perfil_url,
+        foto_perfil_public_id,
         activo,
         created_at
     `;
@@ -415,7 +420,8 @@ const createWorker = async (req, res) => {
       cleanTelefono,
       cleanEmail,
       hashedPassword,
-      foto_perfil_url ? String(foto_perfil_url).trim() : null
+      foto_perfil_url ? String(foto_perfil_url).trim() : null,
+      foto_perfil_public_id ? String(foto_perfil_public_id).trim() : null
     ]);
 
     return res.status(201).json({
@@ -451,7 +457,7 @@ const updateWorker = async (req, res) => {
 
     // 1. Verificar existencia del trabajador
     const checkWorkerRes = await pool.query(
-      'SELECT id, sucursal_id, rol_id, password, foto_perfil_url FROM datos_trabajadores WHERE id = $1',
+      'SELECT id, sucursal_id, rol_id, password, foto_perfil_url, foto_perfil_public_id FROM datos_trabajadores WHERE id = $1',
       [workerId]
     );
 
@@ -491,7 +497,8 @@ const updateWorker = async (req, res) => {
       correo,
       rol_id,
       sucursal_id,
-      foto_perfil_url
+      foto_perfil_url,
+      foto_perfil_public_id
     } = req.body;
 
     const cleanUsername = usuario !== undefined ? String(usuario).trim().toLowerCase() : undefined;
@@ -499,15 +506,34 @@ const updateWorker = async (req, res) => {
     const cleanCedula = cedula !== undefined ? String(cedula).replace(/\D/g, '') : undefined;
     const cleanTelefono = telefono !== undefined ? String(telefono).replace(/\D/g, '') : undefined;
 
-    // Gestionar foto_perfil_url y eliminación de imagen anterior en Cloudinary
-    const newFotoUrl = foto_perfil_url !== undefined
-      ? (foto_perfil_url && String(foto_perfil_url).trim().length > 0 ? String(foto_perfil_url).trim() : null)
-      : currentWorker.foto_perfil_url;
+    // Gestionar foto_perfil_url, foto_perfil_public_id y eliminación previa en Cloudinary
+    let newFotoUrl = currentWorker.foto_perfil_url;
+    let newPublicId = currentWorker.foto_perfil_public_id;
 
-    if (currentWorker.foto_perfil_url && currentWorker.foto_perfil_url !== newFotoUrl) {
-      deleteImageByUrl(currentWorker.foto_perfil_url).catch((err) =>
-        console.error('⚠️ Error al eliminar foto anterior de Cloudinary:', err.message)
-      );
+    if (foto_perfil_url !== undefined) {
+      newFotoUrl = (foto_perfil_url && String(foto_perfil_url).trim().length > 0)
+        ? String(foto_perfil_url).trim()
+        : null;
+
+      newPublicId = (newFotoUrl && foto_perfil_public_id && String(foto_perfil_public_id).trim().length > 0)
+        ? String(foto_perfil_public_id).trim()
+        : null;
+
+      // Si la foto cambió o fue eliminada voluntariamente, destruir la imagen previa en Cloudinary
+      if (
+        (currentWorker.foto_perfil_public_id || currentWorker.foto_perfil_url) &&
+        (currentWorker.foto_perfil_public_id !== newPublicId || currentWorker.foto_perfil_url !== newFotoUrl)
+      ) {
+        if (currentWorker.foto_perfil_public_id) {
+          deleteImageByPublicId(currentWorker.foto_perfil_public_id).catch((err) =>
+            console.error('⚠️ Error al eliminar foto anterior de Cloudinary por public_id:', err.message)
+          );
+        } else if (currentWorker.foto_perfil_url) {
+          deleteImageByUrl(currentWorker.foto_perfil_url).catch((err) =>
+            console.error('⚠️ Error al eliminar foto anterior de Cloudinary por URL:', err.message)
+          );
+        }
+      }
     }
 
     // 3. Validar duplicados en otros trabajadores
@@ -578,9 +604,10 @@ const updateWorker = async (req, res) => {
         rol_id = COALESCE($7, rol_id),
         sucursal_id = $8,
         foto_perfil_url = $9,
-        password = $10,
+        foto_perfil_public_id = $10,
+        password = $11,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $11
+      WHERE id = $12
       RETURNING 
         id,
         sucursal_id,
@@ -592,6 +619,7 @@ const updateWorker = async (req, res) => {
         telefono,
         correo,
         foto_perfil_url,
+        foto_perfil_public_id,
         activo,
         updated_at
     `;
@@ -606,6 +634,7 @@ const updateWorker = async (req, res) => {
       rol_id !== undefined ? parseInt(rol_id, 10) : null,
       branchToAssign,
       newFotoUrl,
+      newPublicId,
       finalPassword,
       workerId
     ]);
@@ -716,7 +745,8 @@ const uploadWorkerAvatar = async (req, res) => {
       ok: true,
       message: 'Foto de perfil subida exitosamente.',
       foto_perfil_url: result.secure_url,
-      public_id: result.public_id
+      public_id: result.public_id,
+      foto_perfil_public_id: result.public_id
     });
   } catch (error) {
     console.error('❌ Error en uploadWorkerAvatar:', error);

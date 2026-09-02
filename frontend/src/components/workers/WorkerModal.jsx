@@ -138,7 +138,8 @@ const WorkerModal = ({
         sucursal_id: isBranchAdmin
           ? String(currentUser?.sucursal_id || worker.sucursal_id || '')
           : (worker.sucursal_id ? String(worker.sucursal_id) : ''),
-        foto_perfil_url: worker.foto_perfil_url || ''
+        foto_perfil_url: worker.foto_perfil_url || '',
+        foto_perfil_public_id: worker.foto_perfil_public_id || ''
       });
     } else {
       setFormData({
@@ -314,6 +315,7 @@ const WorkerModal = ({
     }
 
     let finalFotoUrl = formData.foto_perfil_url ? formData.foto_perfil_url.trim() : null;
+    let finalPublicId = formData.foto_perfil_public_id ? formData.foto_perfil_public_id.trim() : (worker?.foto_perfil_public_id || null);
 
     setIsSubmitting(true);
 
@@ -325,6 +327,7 @@ const WorkerModal = ({
           const uploadRes = await uploadAvatar(avatarFile);
           if (uploadRes?.foto_perfil_url) {
             finalFotoUrl = uploadRes.foto_perfil_url;
+            finalPublicId = uploadRes.public_id || uploadRes.foto_perfil_public_id || null;
           }
         } catch (uploadErr) {
           setIsSubmitting(false);
@@ -338,6 +341,7 @@ const WorkerModal = ({
         }
       } else if (avatarRemoved) {
         finalFotoUrl = null;
+        finalPublicId = null;
       }
 
       setStatusMessage(isEdit ? 'Actualizando datos del usuario...' : 'Registrando usuario en el sistema...');
@@ -351,7 +355,8 @@ const WorkerModal = ({
         correo: formData.correo.trim().toLowerCase(),
         rol_id: parseInt(formData.rol_id, 10),
         sucursal_id: isSuperAdminRole ? null : (formData.sucursal_id ? parseInt(formData.sucursal_id, 10) : null),
-        foto_perfil_url: finalFotoUrl
+        foto_perfil_url: finalFotoUrl,
+        foto_perfil_public_id: finalPublicId
       };
 
       if (formData.password && formData.password.trim().length > 0) {
