@@ -332,6 +332,27 @@ const updateCompanyProfile = async (req, res) => {
 // ============================================================================
 
 /**
+ * Valida y parsea valores para columnas JSONB.
+ */
+const parseJsonObject = (val, fieldName) => {
+  if (val === undefined) return undefined;
+  if (val === null) return {};
+  if (typeof val === 'object' && !Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return parsed;
+      }
+      throw new Error();
+    } catch {
+      throw new Error(`El campo ${fieldName} debe ser un objeto JSON válido.`);
+    }
+  }
+  throw new Error(`El campo ${fieldName} debe ser un objeto JSON válido.`);
+};
+
+/**
  * Listar todas las sucursales del sistema.
  * GET /api/configuracion/sucursales
  */
@@ -346,6 +367,8 @@ const getBranches = async (req, res) => {
         nombre_sucursal,
         telefono,
         direccion,
+        config_tickets,
+        config_etiquetas,
         activo,
         created_at,
         updated_at
@@ -397,7 +420,10 @@ const updateBranch = async (req, res) => {
     const pool = getPool();
 
     // 1. Verificar existencia de la sucursal
-    const checkRes = await pool.query('SELECT id, codigo_sucursal, nombre_sucursal FROM datos_sucursales WHERE id = $1', [branchId]);
+    const checkRes = await pool.query(
+      'SELECT id, codigo_sucursal, nombre_sucursal, config_tickets, config_etiquetas FROM datos_sucursales WHERE id = $1',
+      [branchId]
+    );
     if (checkRes.rows.length === 0) {
       return res.status(404).json({
         ok: false,
@@ -412,7 +438,9 @@ const updateBranch = async (req, res) => {
       codigo_sucursal,
       nombre_sucursal,
       telefono,
-      direccion
+      direccion,
+      config_tickets,
+      config_etiquetas
     } = req.body;
 
     let finalCode = currentBranch.codigo_sucursal;
@@ -489,8 +517,39 @@ const updateBranch = async (req, res) => {
         message: 'La dirección física de la sucursal es obligatoria y debe tener al menos 3 caracteres.'
       });
     }
+    if (cleanDireccion.length > 200) {
+      return res.status(400).json({
+        ok: false,
+        message: 'La dirección física de la sucursal no puede exceder los 200 caracteres.'
+      });
+    }
 
-    // 4. Actualizar únicamente campos informativos (prohibido modificar 'activo')
+    // 4. Validaciones y procesamiento de configuraciones JSONB (config_tickets y config_etiquetas)
+    let finalTickets = currentBranch.config_tickets || {};
+    if (config_tickets !== undefined) {
+      try {
+        finalTickets = parseJsonObject(config_tickets, 'config_tickets');
+      } catch (err) {
+        return res.status(400).json({
+          ok: false,
+          message: err.message
+        });
+      }
+    }
+
+    let finalEtiquetas = currentBranch.config_etiquetas || {};
+    if (config_etiquetas !== undefined) {
+      try {
+        finalEtiquetas = parseJsonObject(config_etiquetas, 'config_etiquetas');
+      } catch (err) {
+        return res.status(400).json({
+          ok: false,
+          message: err.message
+        });
+      }
+    }
+
+    // 5. Actualizar únicamente campos informativos y de configuración (prohibido modificar 'activo')
     const updateQuery = `
       UPDATE datos_sucursales
       SET 
@@ -498,8 +557,10 @@ const updateBranch = async (req, res) => {
         nombre_sucursal = $2,
         telefono = $3,
         direccion = $4,
+        config_tickets = $5,
+        config_etiquetas = $6,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $5
+      WHERE id = $7
       RETURNING 
         id,
         companhia_id,
@@ -507,6 +568,8 @@ const updateBranch = async (req, res) => {
         nombre_sucursal,
         telefono,
         direccion,
+        config_tickets,
+        config_etiquetas,
         activo,
         created_at,
         updated_at
@@ -517,6 +580,8 @@ const updateBranch = async (req, res) => {
       finalName,
       cleanTel,
       cleanDireccion,
+      JSON.stringify(finalTickets),
+      JSON.stringify(finalEtiquetas),
       branchId
     ]);
 

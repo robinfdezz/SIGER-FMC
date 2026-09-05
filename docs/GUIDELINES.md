@@ -245,8 +245,9 @@ frontend/
 2. **`Select.jsx` (Selector Personalizado):**
    * **Props:** `value`, `onChange`, `items` (`{ id, label, supportingText, avatarUrl, icon, disabled }`), `placeholder`, `label`, `hint`, `error`, `isRequired`, `disabled`.
 
-3. **`Tooltip.jsx` (Tooltip Flotante Accesible):**
-   * **Props:** `children`, `content`, `position` (`'right' | 'left' | 'top' | 'bottom'`), `enabled` (`boolean`), `className`.
+3. **`Tooltip.jsx` (Tooltip Flotante Accesible en Chevrón / Clip-Path):**
+   * **Props:** `children`, `content`, `position` (`'right' | 'left' | 'top' | 'bottom'`, por defecto: `'right'`), `enabled` (`boolean`), `className`.
+   * **Comportamiento:** Renderiza el globo de información con forma poligonal continua mediante `clip-path` (chevrón/etiqueta apuntando hacia el disparador), padding adaptativo, sombra `shadow-md` y fondo neutro sólido (`bg-neutral-900 dark:bg-zinc-800 text-white`).
 
 4. **`ResetFiltersButton.jsx` (Botón de Reset Animado):**
    * **Props:** `onClick`, `hasActiveFilters`, `disabled`, `durationMs` (por defecto: `1200`), `title`.

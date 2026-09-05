@@ -98,6 +98,8 @@ export const BranchModal = ({
       newErrors.direccion = 'La dirección física de la sede es obligatoria.';
     } else if (cleanDireccion.length < 3) {
       newErrors.direccion = 'Debe tener al menos 3 caracteres.';
+    } else if (cleanDireccion.length > 200) {
+      newErrors.direccion = 'No puede exceder los 200 caracteres.';
     }
 
     setErrors(newErrors);
@@ -267,6 +269,7 @@ export const BranchModal = ({
                 onChange={(e) => handleChange('direccion', e.target.value)}
                 placeholder="Av. Presidente Antonio Guzmán Fernández #12, SFM"
                 rows={3}
+                maxLength={200}
                 disabled={isSubmitting}
                 className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all resize-none ${
                   errors.direccion

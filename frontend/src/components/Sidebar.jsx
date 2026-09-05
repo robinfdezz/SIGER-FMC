@@ -95,7 +95,7 @@ const Sidebar = () => {
     leaveTimeoutRef.current = setTimeout(() => {
       setIsHovered(false);
       setShowConfigMenu(false);
-    }, 220);
+    }, 1);
   };
 
   const handleModeChange = (mode) => {
@@ -110,11 +110,11 @@ const Sidebar = () => {
     <aside
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`relative z-20 h-full hidden lg:flex flex-col border-r border-zinc-200 dark:border-dark-border bg-white dark:bg-dark-surface transition-all duration-300 ease-in-out select-none flex-shrink-0 ${sidebarMode === 'hover' && isHovered
-          ? 'w-64 shadow-2xl absolute md:relative left-0 top-0 bottom-0'
-          : sidebarMode === 'collapsed' || (sidebarMode === 'hover' && !isHovered)
-            ? 'w-16'
-            : 'w-64'
+      className={`relative z-20 h-full hidden lg:flex flex-col border-r border-zinc-200 dark:border-dark-border bg-white dark:bg-dark-surface transition-all duration-50 ease-in-out select-none flex-shrink-0 ${sidebarMode === 'hover' && isHovered
+        ? 'w-64 shadow-2xl absolute md:relative left-0 top-0 bottom-0'
+        : sidebarMode === 'collapsed' || (sidebarMode === 'hover' && !isHovered)
+          ? 'w-16'
+          : 'w-64'
         }`}
     >
       {/* Navegación Principal */}
@@ -133,14 +133,14 @@ const Sidebar = () => {
               <NavLink
                 to={item.path}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group relative w-full ${isActive
-                    ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold shadow-xs'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                  ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-semibold shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
                   } ${!isExpanded ? 'justify-center px-0' : ''}`}
               >
                 <Icon
                   className={`w-5 h-5 flex-shrink-0 transition-colors ${isActive
-                      ? 'text-brand-600 dark:text-brand-400'
-                      : 'text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200'
+                    ? 'text-brand-600 dark:text-brand-400'
+                    : 'text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200'
                     }`}
                 />
 
@@ -193,11 +193,10 @@ const Sidebar = () => {
               onClick={() => setShowConfigMenu((prev) => !prev)}
               type="button"
               aria-label="Modo de barra lateral"
-              className={`w-full flex items-center justify-center p-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                showConfigMenu
-                  ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
-              }`}
+              className={`w-full flex items-center justify-center p-2 rounded-xl text-sm font-medium transition-colors cursor-pointer ${showConfigMenu
+                ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                }`}
             >
               {sidebarMode === 'expanded' && <PanelLeftClose className="w-5 h-5" />}
               {sidebarMode === 'hover' && <MousePointer className="w-5 h-5" />}
@@ -211,11 +210,10 @@ const Sidebar = () => {
               <button
                 onClick={() => handleModeChange('expanded')}
                 type="button"
-                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
-                  sidebarMode === 'expanded'
-                    ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium'
-                    : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                }`}
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${sidebarMode === 'expanded'
+                  ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium'
+                  : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  }`}
               >
                 <span>Fijo Expandido</span>
                 {sidebarMode === 'expanded' && <Check className="w-3.5 h-3.5" />}
@@ -224,11 +222,10 @@ const Sidebar = () => {
               <button
                 onClick={() => handleModeChange('hover')}
                 type="button"
-                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
-                  sidebarMode === 'hover'
-                    ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium'
-                    : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                }`}
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${sidebarMode === 'hover'
+                  ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium'
+                  : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  }`}
               >
                 <span>Auto-expandir</span>
                 {sidebarMode === 'hover' && <Check className="w-3.5 h-3.5" />}
@@ -237,11 +234,10 @@ const Sidebar = () => {
               <button
                 onClick={() => handleModeChange('collapsed')}
                 type="button"
-                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${
-                  sidebarMode === 'collapsed'
-                    ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium'
-                    : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                }`}
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-colors cursor-pointer ${sidebarMode === 'collapsed'
+                  ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-medium'
+                  : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  }`}
               >
                 <span>Fijo Colapsado</span>
                 {sidebarMode === 'collapsed' && <Check className="w-3.5 h-3.5" />}

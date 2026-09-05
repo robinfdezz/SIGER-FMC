@@ -31,7 +31,9 @@
 | `codigo_sucursal`| VARCHAR(10) | NO | Código único identificador (ej. 'SUC-01', 'SUC-02') |
 | `nombre_sucursal`| VARCHAR(100) | NO | Nombre descriptivo de la sucursal |
 | `telefono` | VARCHAR(20) | NO | Teléfono directo de la sucursal |
-| `direccion` | TEXT | NO | Ubicación física |
+| `direccion` | VARCHAR(200) | NO | Ubicación física |
+| `config_tickets` | JSONB | NO | Configuración de formato e impresión de comprobantes térmicos |
+| `config_etiquetas`| JSONB | NO | Configuración de formato e impresión de stickers de taller |
 | `created_at` | TIMESTAMPTZ | SÍ | Timestamp de creación |
 | `updated_at` | TIMESTAMPTZ | SÍ | Timestamp de actualización |
 | `activo` | BOOLEAN | NO | Estado lógico (Default: TRUE) |
@@ -115,10 +117,10 @@
 | `marca_equipo` | VARCHAR(50) | NO | Marca (Apple, Samsung, Xiaomi, HP, etc.) |
 | `modelo_equipo` | VARCHAR(50) | NO | Modelo (iPhone 13, Galaxy S23, etc.) |
 | `num_serie_imei` | VARCHAR(50) | SÍ | Número de serie o IMEI |
-| `datos_acceso_equipo`| TEXT | SÍ | PIN, patrón o clave de desbloqueo |
+| `datos_acceso_equipo`| JSONB | SÍ | PIN, patrón o datos de acceso en formato JSON |
 | `falla_reportada`| TEXT | NO | Problema descrito al ingresar el equipo |
 | `observaciones_recepcion`| TEXT | SÍ | Detalles estéticos y condición inicial |
-| `checklist_entrada`| TEXT | SÍ | Inspección inicial en formato JSON |
+| `checklist_entrada`| JSONB | SÍ | Inspección inicial en formato JSON |
 | `costo_previsto` | NUMERIC(10,2)| NO | Presupuesto inicial (Default: 0.00) |
 | `monto_anticipo` | NUMERIC(10,2)| NO | Abono o pago inicial dejado por el cliente (Default: 0.00) |
 | `monto_descuento`| NUMERIC(10,2)| NO | Descuento aplicado (Default: 0.00) |
