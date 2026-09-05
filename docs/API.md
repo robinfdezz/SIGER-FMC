@@ -1080,23 +1080,45 @@ Módulo administrativo para la parametrización de la empresa matriz y la gesti�
         "nombre_sucursal": "Franyer Mobile Center - SFM",
         "telefono": "8493421998",
         "direccion": "San Francisco de Macoris",
+        "config_tickets": {
+          "ancho_papel_mm": 80,
+          "mostrar_logo": true,
+          "mostrar_datos_empresa": true,
+          "mostrar_datos_sucursal": true,
+          "mostrar_cliente": true,
+          "mostrar_equipo": true,
+          "mostrar_falla": true,
+          "mostrar_observaciones": true,
+          "mostrar_desglose_costos": true,
+          "mostrar_garantia": true,
+          "mostrar_qr_consulta": true,
+          "mostrar_mensaje_cortesia": true,
+          "terminos_garantia": "Garantía válida únicamente presentando este comprobante...",
+          "mensaje_cortesia": "¡Gracias por su preferencia!...",
+          "tamano_fuente": "md"
+        },
+        "config_etiquetas": {
+          "preset": "50x30",
+          "ancho_mm": 50,
+          "alto_mm": 30,
+          "orientacion": "horizontal",
+          "incluir_nombre_empresa": true,
+          "incluir_codigo_ticket": true,
+          "incluir_cliente": true,
+          "incluir_telefono": true,
+          "incluir_equipo": true,
+          "incluir_falla": true,
+          "incluir_fecha": true,
+          "incluir_tecnico": false,
+          "incluir_metodo_desbloqueo": true,
+          "tamano_fuente": "md"
+        },
         "activo": true,
         "created_at": "2026-08-25T21:42:59.821Z",
-        "updated_at": "2026-08-25T21:42:59.821Z"
-      },
-      {
-        "id": 2,
-        "companhia_id": 1,
-        "codigo_sucursal": "SUC-02",
-        "nombre_sucursal": "Franyer Mobile Center - Castillo",
-        "telefono": "8093132513",
-        "direccion": "Castillo",
-        "activo": true,
-        "created_at": "2026-08-25T21:42:59.821Z",
-        "updated_at": "2026-08-25T21:42:59.821Z"
+        "updated_at": "2026-09-05T11:40:00.000Z"
       }
     ],
-    "total": 2
+    "total": 1
   }
   ```
 
@@ -1109,12 +1131,45 @@ Módulo administrativo para la parametrización de la empresa matriz y la gesti�
     "codigo_sucursal": "SUC-01",
     "nombre_sucursal": "Franyer Mobile Center - SFM Principal",
     "telefono": "8493421998",
-    "direccion": "Av. Presidente Antonio Guzmán Fernández #12, SFM"
+    "direccion": "Av. Presidente Antonio Guzmán Fernández #12, SFM",
+    "config_tickets": {
+      "ancho_papel_mm": 80,
+      "mostrar_logo": true,
+      "mostrar_datos_empresa": true,
+      "mostrar_datos_sucursal": true,
+      "mostrar_cliente": true,
+      "mostrar_equipo": true,
+      "mostrar_falla": true,
+      "mostrar_observaciones": true,
+      "mostrar_desglose_costos": true,
+      "mostrar_garantia": true,
+      "mostrar_qr_consulta": true,
+      "mostrar_mensaje_cortesia": true,
+      "terminos_garantia": "Garantía válida únicamente presentando este comprobante...",
+      "mensaje_cortesia": "¡Gracias por su preferencia!...",
+      "tamano_fuente": "md"
+    },
+    "config_etiquetas": {
+      "preset": "50x30",
+      "ancho_mm": 50,
+      "alto_mm": 30,
+      "orientacion": "horizontal",
+      "incluir_nombre_empresa": true,
+      "incluir_codigo_ticket": true,
+      "incluir_cliente": true,
+      "incluir_telefono": true,
+      "incluir_equipo": true,
+      "incluir_falla": true,
+      "incluir_fecha": true,
+      "incluir_tecnico": false,
+      "incluir_metodo_desbloqueo": true,
+      "tamano_fuente": "md"
+    }
   }
   ```
 - **Reglas:**
   - `Admin_Sucursal` solo puede actualizar su `:id` de sucursal asignado (retorna `403` si intenta actualizar otra sede).
-  - Solo se actualizan campos informativos (`codigo_sucursal`, `nombre_sucursal`, `telefono`, `direccion`).
+  - Permite actualizar campos informativos (`codigo_sucursal`, `nombre_sucursal`, `telefono`, `direccion`) y las configuraciones JSONB (`config_tickets`, `config_etiquetas`).
   - No se permite crear (POST), eliminar (DELETE) ni modificar el estado lógico `activo`.
 - **Respuesta Exitosa (`200 OK`):**
   ```json
@@ -1128,8 +1183,10 @@ Módulo administrativo para la parametrización de la empresa matriz y la gesti�
       "nombre_sucursal": "Franyer Mobile Center - SFM Principal",
       "telefono": "8493421998",
       "direccion": "Av. Presidente Antonio Guzmán Fernández #12, SFM",
+      "config_tickets": { ... },
+      "config_etiquetas": { ... },
       "activo": true,
-      "updated_at": "2026-09-02T14:10:00.000Z"
+      "updated_at": "2026-09-05T11:40:00.000Z"
     }
   }
   ```

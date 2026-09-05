@@ -22,9 +22,17 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   - Backend: Endpoints REST protegidos para listado, detalle, creación, edición y alternado lógico de estado (`/api/clientes`).
   - Frontend: Vistas `ClientsPage.jsx` y modal `ClientModal.jsx` con resumen de conteo, avatares y badges de estado.
 - **Módulo de Configuración del Sistema (`/configuracion`):**
-  - Pestaña "Perfil de la Empresa" (`CompanyProfileTab.jsx`) para datos institucionales y subida de logotipo.
-  - Pestaña "Sucursales Físicas" (`BranchesTab.jsx`) con tarjetas de sedes y modal de edición (`BranchModal.jsx`).
-  - Backend (`/api/configuracion`): Endpoints de lectura y actualización para `datos_companhia` y `datos_sucursales` con validación RBAC estricta.
+  - Pestaña "Perfil de la Empresa" (`CompanyProfileTab.jsx`) para datos institucionales, contacto fiscal (RNC, razón social) y gestión de logotipo institucional con subida por streaming a Cloudinary.
+  - Pestaña "Sucursales Físicas" (`BranchesTab.jsx`) con tarjetas de sedes, creación, edición, alternado de estado lógico (activo/inactivo), control de sede principal y restricción RBAC para `Admin_Sucursal`.
+  - Pestaña "Impresión y Comprobantes" (`PrintingTab.jsx`):
+    * Persistencia de objetos JSONB (`config_tickets`, `config_etiquetas`) en PostgreSQL.
+    * Rediseño ergonómico con selectores interactivos de tipo cápsula/chip (`flex flex-wrap gap-2.5` en estilo `rose-50`).
+    * Previsualización fidedigna de ticket térmico POS (80mm/58mm) en escala de grises monocromática nítida con márgenes de corte, RNC, logotipo con `grayscale contrast-150`, código QR de rastreo ampliado (`w-40 h-40`, SVG `w-full h-full`) con URL de seguimiento (`www.franyermobile.com/status`) y código `FMC-2026-0089`.
+    * Previsualización adaptativa de sticker de taller (`LabelPreview.jsx`) con escalado dinámico de tipografía y matriz según dimensiones (`50x30`, `40x25`, `60x40`), envoltorio de datos largos (`break-words line-clamp-2`), e integración del **Método de Desbloqueo** del equipo (`PatternLockSvg` para patrón Android 3x3 y `UnlockMethodView` para PIN/Clave/Sin Bloqueo).
+  - Backend (`/api/configuracion`): Endpoints de lectura y actualización para `datos_companhia` y `datos_sucursales` con sanitización automática de claves obsoletas (`formato_codigo`).
+  - Navegación y UX: Sincronización de la pestaña activa en `ConfigurationPage.jsx` con parámetros de búsqueda de la URL (`useSearchParams` -> `?tab=perfil|sucursales|impresion`) para persistencia ante recarga (F5) y enlaces directos.
+- **Componentes Comunes Reutilizables:**
+  - `PatternLock.jsx`: Componente independiente para dibujado vectorial del patrón de desbloqueo Android (matriz 3x3 grid) y visualización de métodos de acceso (`UnlockMethodView`).
 - **Integración con Almacenamiento en la Nube (Cloudinary):**
   - Carga optimizada por streaming en WebP y eliminación automática de archivos previos (`public_id`) para fotos de perfil y logotipos corporativos.
   - Componente común `SingleImageDropzone.jsx` con validaciones de tipo/peso y preview local inmediato.

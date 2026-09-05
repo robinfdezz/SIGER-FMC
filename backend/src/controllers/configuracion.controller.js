@@ -548,6 +548,9 @@ const updateBranch = async (req, res) => {
         });
       }
     }
+    if (finalEtiquetas && typeof finalEtiquetas === 'object') {
+      delete finalEtiquetas.formato_codigo;
+    }
 
     // 5. Actualizar únicamente campos informativos y de configuración (prohibido modificar 'activo')
     const updateQuery = `

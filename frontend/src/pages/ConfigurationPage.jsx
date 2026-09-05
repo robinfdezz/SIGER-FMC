@@ -1,24 +1,39 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import CompanyProfileTab from '../components/configuration/CompanyProfileTab';
 import BranchesTab from '../components/configuration/BranchesTab';
+import PrintingTab from '../components/configuration/PrintingTab';
 import { getCompanyProfile, getBranches } from '../services/configuracion.service';
 import { sileo } from 'sileo';
 import {
   Building2,
   Store,
+  Printer,
   Loader2,
   RefreshCw,
   AlertTriangle
 } from 'lucide-react';
 
 export const ConfigurationPage = () => {
-  const [activeTab, setActiveTab] = useState('companhia'); // 'companhia' | 'sucursales'
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const [companyData, setCompanyData] = useState(null);
   const [branches, setBranches] = useState([]);
+
+  // Determina la pestaña activa validando los parámetros de la URL (?tab=perfil|sucursales|impresion)
+  const tabParam = searchParams.get('tab');
+  const activeTab = useMemo(() => {
+    if (tabParam === 'sucursales') return 'sucursales';
+    if (tabParam === 'impresion') return 'impresion';
+    return 'perfil'; // Valor por defecto
+  }, [tabParam]);
+
+  const handleTabChange = (tabKey) => {
+    setSearchParams({ tab: tabKey });
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -57,19 +72,19 @@ export const ConfigurationPage = () => {
             Configuración del Sistema
           </h1>
           <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 font-inter">
-            Parametrización institucional de la empresa matriz, identidad visual y sedes operativas.
+            Parametrización institucional de la empresa matriz, identidad visual, sedes operativas y formatos de impresión.
           </p>
         </div>
 
         {/* Fila de Pestañas (Tabs) y Acción de Recarga */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Selector de Pestañas (Tabs) */}
-          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 w-full sm:w-fit">
+          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 w-full sm:w-fit flex-wrap">
             <button
               type="button"
-              onClick={() => setActiveTab('companhia')}
+              onClick={() => handleTabChange('perfil')}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
-                activeTab === 'companhia'
+                activeTab === 'perfil' || activeTab === 'companhia'
                   ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
                   : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
               }`}
@@ -80,7 +95,7 @@ export const ConfigurationPage = () => {
 
             <button
               type="button"
-              onClick={() => setActiveTab('sucursales')}
+              onClick={() => handleTabChange('sucursales')}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
                 activeTab === 'sucursales'
                   ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
@@ -89,6 +104,19 @@ export const ConfigurationPage = () => {
             >
               <Store size={16} />
               <span>Sucursales Físicas</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange('impresion')}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
+                activeTab === 'impresion'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
+                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
+              }`}
+            >
+              <Printer size={16} />
+              <span>Impresión y Comprobantes</span>
             </button>
           </div>
 
@@ -137,7 +165,7 @@ export const ConfigurationPage = () => {
         {/* Contenido de la Pestaña Activa */}
         {!loading && !error && (
           <div>
-            {activeTab === 'companhia' && (
+            {(activeTab === 'perfil' || activeTab === 'companhia') && (
               <CompanyProfileTab
                 companyData={companyData}
                 onRefresh={loadData}
@@ -147,6 +175,14 @@ export const ConfigurationPage = () => {
             {activeTab === 'sucursales' && (
               <BranchesTab
                 branches={branches}
+                onRefresh={loadData}
+              />
+            )}
+
+            {activeTab === 'impresion' && (
+              <PrintingTab
+                branches={branches}
+                companyData={companyData}
                 onRefresh={loadData}
               />
             )}

@@ -32,11 +32,56 @@
 | `nombre_sucursal`| VARCHAR(100) | NO | Nombre descriptivo de la sucursal |
 | `telefono` | VARCHAR(20) | NO | Teléfono directo de la sucursal |
 | `direccion` | VARCHAR(200) | NO | Ubicación física |
-| `config_tickets` | JSONB | NO | Configuración de formato e impresión de comprobantes térmicos |
-| `config_etiquetas`| JSONB | NO | Configuración de formato e impresión de stickers de taller |
+| `config_tickets` | JSONB | NO | Configuración de formato e impresión de comprobantes térmicos POS |
+| `config_etiquetas`| JSONB | NO | Configuración de formato e impresión de stickers adhesivos de taller |
 | `created_at` | TIMESTAMPTZ | SÍ | Timestamp de creación |
 | `updated_at` | TIMESTAMPTZ | SÍ | Timestamp de actualización |
 | `activo` | BOOLEAN | NO | Estado lógico (Default: TRUE) |
+
+#### Esquema JSONB: `config_tickets` (Comprobantes Térmicos POS)
+Configuración parametrizable de impresión de comprobantes en papel térmico de 80mm o 58mm:
+```json
+{
+  "ancho_papel_mm": 80,
+  "mostrar_logo": true,
+  "mostrar_datos_empresa": true,
+  "mostrar_datos_sucursal": true,
+  "mostrar_cliente": true,
+  "mostrar_equipo": true,
+  "mostrar_falla": true,
+  "mostrar_observaciones": true,
+  "mostrar_desglose_costos": true,
+  "mostrar_garantia": true,
+  "mostrar_qr_consulta": true,
+  "mostrar_mensaje_cortesia": true,
+  "terminos_garantia": "Garantía válida únicamente presentando este comprobante. No cubre caídas, humedad, sellos rotos ni manipulación por terceros.",
+  "mensaje_cortesia": "¡Gracias por su preferencia! Su equipo está en manos de profesionales certificados.",
+  "tamano_fuente": "md"
+}
+```
+
+#### Esquema JSONB: `config_etiquetas` (Stickers Adhesivos de Taller)
+Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dispositivos recibidos:
+```json
+{
+  "preset": "50x30",
+  "ancho_mm": 50,
+  "alto_mm": 30,
+  "orientacion": "horizontal",
+  "incluir_nombre_empresa": true,
+  "incluir_codigo_ticket": true,
+  "incluir_cliente": true,
+  "incluir_telefono": true,
+  "incluir_equipo": true,
+  "incluir_falla": true,
+  "incluir_fecha": true,
+  "incluir_tecnico": false,
+  "incluir_metodo_desbloqueo": true,
+  "tamano_fuente": "md"
+}
+```
+
+---
 
 ### `roles_equipo` (Niveles de Permisos)
 | Campo | Tipo | Nulo | Descripción |
