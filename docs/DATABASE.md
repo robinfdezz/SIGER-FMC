@@ -152,6 +152,8 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | `sucursal_id` | INT | NO | FK -> `datos_sucursales(id)` ON DELETE RESTRICT |
 | `categoria_id` | INT | NO | FK -> `categorias_dispositivos(id)` ON DELETE RESTRICT |
 | `cliente_id` | INT | SÍ | FK -> `clientes(id)` ON UPDATE CASCADE ON DELETE SET NULL |
+| `servicio_origen_id` | INT | SÍ | FK -> `servicios_recepcion(id)` ON UPDATE CASCADE ON DELETE RESTRICT (ID de la orden previa original si es un reingreso por garantía) |
+| `es_garantia` | BOOLEAN | NO | Flag lógico que identifica si la orden es un reingreso por garantía (Default: FALSE) |
 | `nombre_cliente` | VARCHAR(100) | SÍ | Nombre de cliente (Obligatorio si `cliente_id` es NULL) |
 | `telefono_cliente`| VARCHAR(20) | SÍ | Teléfono de contacto directo |
 | `cedula_cliente` | VARCHAR(20) | SÍ | Documento del cliente |
@@ -178,9 +180,11 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | `updated_at` | TIMESTAMPTZ | SÍ | Timestamp de actualización |
 | `activo` | BOOLEAN | NO | Estado lógico (Default: TRUE) |
 
-> **Restricciones Check (`servicios_recepcion`):**
+> **Restricciones Check y Llaves Foráneas (`servicios_recepcion`):**
 > - `chk_identificacion_cliente`: `(cliente_id IS NOT NULL) OR (nombre_cliente IS NOT NULL)`
 > - `chk_prioridad`: `prioridad IN ('baja', 'media', 'alta', 'urgente')`
+> - `chk_servicio_no_autoreferencia`: `CHECK (id != servicio_origen_id)`
+> - `fk_servicio_garantia_origen`: `FOREIGN KEY (servicio_origen_id) REFERENCES servicios_recepcion(id) ON UPDATE CASCADE ON DELETE RESTRICT`
 
 ### `tecnicos_asignados` (Asignación Técnica)
 | Campo | Tipo | Nulo | Descripción |
@@ -240,6 +244,7 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 
 - `idx_servicios_sucursal` -> `servicios_recepcion(sucursal_id)`
 - `idx_servicios_cliente` -> `servicios_recepcion(cliente_id)`
+- `idx_servicios_garantia_origen` -> `servicios_recepcion(servicio_origen_id)`
 - `idx_servicios_estado` -> `servicios_recepcion(estado_actual_id)`
 - `idx_servicios_prioridad` -> `servicios_recepcion(prioridad)`
 - `idx_tecnicos_servicio` -> `tecnicos_asignados(servicio_id)`

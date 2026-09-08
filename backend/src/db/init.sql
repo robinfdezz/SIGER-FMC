@@ -107,6 +107,8 @@ CREATE TABLE IF NOT EXISTS servicios_recepcion (
     sucursal_id INT NOT NULL,
     categoria_id INT NOT NULL,
     cliente_id INT NULL,
+    servicio_origen_id INT NULL,
+    es_garantia BOOLEAN NOT NULL DEFAULT FALSE,
     nombre_cliente VARCHAR(100) NULL,
     telefono_cliente VARCHAR(20) NULL,
     cedula_cliente VARCHAR(20) NULL,
@@ -134,12 +136,15 @@ CREATE TABLE IF NOT EXISTS servicios_recepcion (
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT chk_identificacion_cliente CHECK ((cliente_id IS NOT NULL) OR (nombre_cliente IS NOT NULL)),
     CONSTRAINT chk_prioridad CHECK (prioridad IN ('baja', 'media', 'alta', 'urgente')),
+    CONSTRAINT chk_servicio_no_autoreferencia CHECK (id != servicio_origen_id),
     CONSTRAINT fk_servicio_sucursal FOREIGN KEY (sucursal_id) 
         REFERENCES datos_sucursales(id) ON DELETE RESTRICT,
     CONSTRAINT fk_servicio_categoria FOREIGN KEY (categoria_id) 
         REFERENCES categorias_dispositivos(id) ON DELETE RESTRICT,
     CONSTRAINT fk_servicio_cliente FOREIGN KEY (cliente_id) 
         REFERENCES clientes(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT fk_servicio_garantia_origen FOREIGN KEY (servicio_origen_id) 
+        REFERENCES servicios_recepcion(id) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT fk_servicio_recepcionista FOREIGN KEY (usuario_recepcion_id) 
         REFERENCES datos_trabajadores(id) ON DELETE RESTRICT,
     CONSTRAINT fk_servicio_estado FOREIGN KEY (estado_actual_id) 
@@ -222,6 +227,7 @@ CREATE TABLE IF NOT EXISTS evidencias_fotograficas (
 -- ============================================================================
 CREATE INDEX IF NOT EXISTS idx_servicios_sucursal ON servicios_recepcion(sucursal_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_cliente ON servicios_recepcion(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_servicios_garantia_origen ON servicios_recepcion(servicio_origen_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_estado ON servicios_recepcion(estado_actual_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_prioridad ON servicios_recepcion(prioridad);
 CREATE INDEX IF NOT EXISTS idx_tecnicos_servicio ON tecnicos_asignados(servicio_id);
