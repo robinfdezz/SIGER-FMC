@@ -30,20 +30,45 @@ import {
 
 const DEFAULT_CONFIG_TICKETS = {
   ancho_papel_mm: 80, // 80 | 58
-  mostrar_logo: true,
-  mostrar_datos_empresa: true,
-  mostrar_datos_sucursal: true,
+  copias_impresion: 1, // 1 | 2
+  imprimir_logo: true,
+  mostrar_rnc: true,
+  mostrar_contacto_sucursal: true,
   mostrar_cliente: true,
   mostrar_equipo: true,
   mostrar_falla: true,
   mostrar_observaciones: true,
-  mostrar_desglose_costos: true,
-  mostrar_garantia: true,
-  mostrar_qr_consulta: true,
+  mostrar_costo_y_anticipo: true,
+  mostrar_checklist_recepcion: true,
+  incluir_qr_tracking: true,
+  imprimir_garantia: true,
+  clausula_garantia_defecto: 'Garantía válida únicamente presentando este comprobante. No cubre caídas, humedad, sellos rotos ni manipulación por terceros.',
   mostrar_mensaje_cortesia: true,
-  terminos_garantia: 'Garantía válida únicamente presentando este comprobante. No cubre caídas, humedad, sellos rotos ni manipulación por terceros.',
-  mensaje_cortesia: '¡Gracias por su preferencia! Su equipo está en manos de profesionales certificados.',
-  tamano_fuente: 'md' // 'sm' | 'md' | 'lg'
+  mensaje_cortesia: '¡Gracias por su preferencia! Su equipo está en manos de profesionales certificados.'
+};
+
+/**
+ * Normaliza y sanea el objeto config_tickets eliminando claves redundantes o heredadas
+ */
+const normalizeTicketsConfig = (raw = {}) => {
+  return {
+    ancho_papel_mm: Number(raw.ancho_papel_mm) === 58 ? 58 : 80,
+    copias_impresion: Number(raw.copias_impresion) === 2 ? 2 : 1,
+    imprimir_logo: raw.imprimir_logo !== undefined ? Boolean(raw.imprimir_logo) : (raw.mostrar_logo !== undefined ? Boolean(raw.mostrar_logo) : DEFAULT_CONFIG_TICKETS.imprimir_logo),
+    mostrar_rnc: raw.mostrar_rnc !== undefined ? Boolean(raw.mostrar_rnc) : (raw.mostrar_datos_empresa !== undefined ? Boolean(raw.mostrar_datos_empresa) : DEFAULT_CONFIG_TICKETS.mostrar_rnc),
+    mostrar_contacto_sucursal: raw.mostrar_contacto_sucursal !== undefined ? Boolean(raw.mostrar_contacto_sucursal) : (raw.mostrar_datos_sucursal !== undefined ? Boolean(raw.mostrar_datos_sucursal) : DEFAULT_CONFIG_TICKETS.mostrar_contacto_sucursal),
+    mostrar_cliente: raw.mostrar_cliente !== undefined ? Boolean(raw.mostrar_cliente) : DEFAULT_CONFIG_TICKETS.mostrar_cliente,
+    mostrar_equipo: raw.mostrar_equipo !== undefined ? Boolean(raw.mostrar_equipo) : DEFAULT_CONFIG_TICKETS.mostrar_equipo,
+    mostrar_falla: raw.mostrar_falla !== undefined ? Boolean(raw.mostrar_falla) : DEFAULT_CONFIG_TICKETS.mostrar_falla,
+    mostrar_observaciones: raw.mostrar_observaciones !== undefined ? Boolean(raw.mostrar_observaciones) : DEFAULT_CONFIG_TICKETS.mostrar_observaciones,
+    mostrar_costo_y_anticipo: raw.mostrar_costo_y_anticipo !== undefined ? Boolean(raw.mostrar_costo_y_anticipo) : (raw.mostrar_desglose_costos !== undefined ? Boolean(raw.mostrar_desglose_costos) : DEFAULT_CONFIG_TICKETS.mostrar_costo_y_anticipo),
+    mostrar_checklist_recepcion: raw.mostrar_checklist_recepcion !== undefined ? Boolean(raw.mostrar_checklist_recepcion) : DEFAULT_CONFIG_TICKETS.mostrar_checklist_recepcion,
+    incluir_qr_tracking: raw.incluir_qr_tracking !== undefined ? Boolean(raw.incluir_qr_tracking) : (raw.mostrar_qr_consulta !== undefined ? Boolean(raw.mostrar_qr_consulta) : DEFAULT_CONFIG_TICKETS.incluir_qr_tracking),
+    imprimir_garantia: raw.imprimir_garantia !== undefined ? Boolean(raw.imprimir_garantia) : (raw.mostrar_garantia !== undefined ? Boolean(raw.mostrar_garantia) : DEFAULT_CONFIG_TICKETS.imprimir_garantia),
+    clausula_garantia_defecto: raw.clausula_garantia_defecto || raw.terminos_garantia || DEFAULT_CONFIG_TICKETS.clausula_garantia_defecto,
+    mostrar_mensaje_cortesia: raw.mostrar_mensaje_cortesia !== undefined ? Boolean(raw.mostrar_mensaje_cortesia) : DEFAULT_CONFIG_TICKETS.mostrar_mensaje_cortesia,
+    mensaje_cortesia: raw.mensaje_cortesia || raw.mensaje_despedida || DEFAULT_CONFIG_TICKETS.mensaje_cortesia
+  };
 };
 
 const DEFAULT_CONFIG_ETIQUETAS = {
@@ -75,11 +100,12 @@ const SIZE_PRESETS = [
  */
 const ThermalTicketPreview = ({ config, branch, companyData }) => {
   const is58mm = Number(config.ancho_papel_mm) === 58;
+  const fontSizeClass = is58mm ? 'text-[11px]' : 'text-xs';
 
   return (
     <div className="flex justify-center select-none">
       <div
-        className={`bg-white text-black px-4 pt-7 pb-8 rounded-xl shadow-md border border-neutral-300 dark:border-neutral-700 transition-all font-mono text-xs ${
+        className={`bg-white text-black px-4 pt-7 pb-8 rounded-xl shadow-md border border-neutral-300 dark:border-neutral-700 transition-all font-mono ${fontSizeClass} ${
           is58mm ? 'w-[260px]' : 'w-[320px]'
         }`}
         style={{
@@ -88,7 +114,7 @@ const ThermalTicketPreview = ({ config, branch, companyData }) => {
       >
         {/* Cabecera del Ticket */}
         <div className="text-center space-y-1 border-b border-dashed border-neutral-400 pb-3 mb-2">
-          {config.mostrar_logo && companyData?.logo_url && (
+          {config.imprimir_logo && companyData?.logo_url && (
             <div className="flex justify-center mb-1">
               <img
                 src={companyData.logo_url}
@@ -98,18 +124,17 @@ const ThermalTicketPreview = ({ config, branch, companyData }) => {
             </div>
           )}
 
-          {config.mostrar_datos_empresa && (
-            <>
-              <div className="font-bold uppercase text-[13px]">
-                {companyData?.nombre_empresa || 'FRANYER MOBILE CENTER, S.R.L.'}
-              </div>
-              <div className="text-[10px] text-neutral-600">
-                RNC: {companyData?.rnc || '133-18964-1'}
-              </div>
-            </>
+          <div className="font-bold uppercase text-[13px]">
+            {companyData?.nombre_empresa || 'FRANYER MOBILE CENTER, S.R.L.'}
+          </div>
+
+          {config.mostrar_rnc && (
+            <div className="text-[10px] text-neutral-600">
+              RNC: {companyData?.rnc || '133-18964-1'}
+            </div>
           )}
 
-          {config.mostrar_datos_sucursal && (
+          {config.mostrar_contacto_sucursal && (
             <div className="text-[10.5px] text-neutral-700 font-sans mt-0.5">
               <span className="font-semibold">{branch?.nombre_sucursal || 'Sucursal Principal'}</span>
               <br />
@@ -134,6 +159,12 @@ const ThermalTicketPreview = ({ config, branch, companyData }) => {
             <span>Estado:</span>
             <span className="font-semibold uppercase text-neutral-800">Recibido en Taller</span>
           </div>
+          {Number(config.copias_impresion) === 2 && (
+            <div className="flex justify-between text-[9px] text-neutral-500 italic pt-0.5">
+              <span>Tipo de Impresión:</span>
+              <span>Original (Cliente)</span>
+            </div>
+          )}
         </div>
 
         {/* Datos del Cliente */}
@@ -174,8 +205,21 @@ const ThermalTicketPreview = ({ config, branch, companyData }) => {
           </div>
         )}
 
+        {/* Checklist de Recepción (Monocromático Térmico) */}
+        {config.mostrar_checklist_recepcion && (
+          <div className="border-b border-dashed border-neutral-400 pb-2 mb-2 text-[10px] space-y-1 text-neutral-900">
+            <div className="font-bold text-[10.5px] uppercase">Checklist Entrada:</div>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 font-mono text-[9.5px]">
+              <div className="flex items-center gap-1"><span>[✓]</span> <span>Enciende: Sí</span></div>
+              <div className="flex items-center gap-1"><span>[✓]</span> <span>Táctil: OK</span></div>
+              <div className="flex items-center gap-1"><span>[✓]</span> <span>Carga: Sí</span></div>
+              <div className="flex items-center gap-1"><span>[!]</span> <span>Cámara: Rayada</span></div>
+            </div>
+          </div>
+        )}
+
         {/* Desglose Financiero */}
-        {config.mostrar_desglose_costos && (
+        {config.mostrar_costo_y_anticipo && (
           <div className="border-b border-dashed border-neutral-400 pb-2 mb-2 text-[10.5px] space-y-1">
             <div className="flex justify-between">
               <span>Costo Estimado:</span>
@@ -193,7 +237,7 @@ const ThermalTicketPreview = ({ config, branch, companyData }) => {
         )}
 
         {/* Código QR de Consulta Web */}
-        {config.mostrar_qr_consulta && (
+        {config.incluir_qr_tracking && (
           <div className="text-center my-3 flex flex-col items-center">
             <div className="p-2 border border-neutral-300 rounded-lg bg-white w-40 h-40 flex items-center justify-center mx-auto shrink-0">
               <SvgQRCode className="w-full h-full text-black" />
@@ -213,12 +257,12 @@ const ThermalTicketPreview = ({ config, branch, companyData }) => {
         )}
 
         {/* Cláusula de Garantía */}
-        {config.mostrar_garantia && config.terminos_garantia && (
+        {config.imprimir_garantia && config.clausula_garantia_defecto && (
           <div className="border-t border-dashed border-neutral-400 pt-2 mb-2 text-[8.5px] text-neutral-600 text-center leading-tight font-sans">
             <div className="font-bold uppercase text-[9px] text-neutral-800 mb-0.5">
               Condiciones de Garantía
             </div>
-            {config.terminos_garantia}
+            {config.clausula_garantia_defecto}
           </div>
         )}
 
@@ -278,11 +322,7 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
       };
       delete cleanBranchEtiquetas.formato_codigo;
 
-      setTicketsConfig({
-        ...DEFAULT_CONFIG_TICKETS,
-        ...branchTickets
-      });
-
+      setTicketsConfig(normalizeTicketsConfig(branchTickets));
       setEtiquetasConfig(cleanBranchEtiquetas);
     }
   }, [activeBranch]);
@@ -290,12 +330,13 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
   // Verificar si hay modificaciones pendientes
   const hasChanges = useMemo(() => {
     if (!activeBranch) return false;
-    const origTickets = activeBranch.config_tickets || {};
+    const origTickets = normalizeTicketsConfig(activeBranch.config_tickets || {});
+    const currentTickets = normalizeTicketsConfig(ticketsConfig);
     const origEtiquetas = { ...(activeBranch.config_etiquetas || {}) };
     delete origEtiquetas.formato_codigo;
 
     return (
-      JSON.stringify(ticketsConfig) !== JSON.stringify({ ...DEFAULT_CONFIG_TICKETS, ...origTickets }) ||
+      JSON.stringify(currentTickets) !== JSON.stringify(origTickets) ||
       JSON.stringify(etiquetasConfig) !== JSON.stringify({ ...DEFAULT_CONFIG_ETIQUETAS, ...origEtiquetas })
     );
   }, [ticketsConfig, etiquetasConfig, activeBranch]);
@@ -330,7 +371,7 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
       const payload = {
         telefono: activeBranch.telefono,
         direccion: activeBranch.direccion,
-        config_tickets: ticketsConfig,
+        config_tickets: normalizeTicketsConfig(ticketsConfig),
         config_etiquetas: etiquetasConfig
       };
 
@@ -586,35 +627,58 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
               </div>
             </div>
 
-            {/* Ancho de Rollo Térmico */}
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-2">
-                Ancho de Rollo de Impresora Térmica
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleTicketChange('ancho_papel_mm', 80)}
-                  className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center ${
-                    Number(ticketsConfig.ancho_papel_mm) === 80
-                      ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
-                      : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
-                  }`}
-                >
-                  80 mm
-                </button>
+            {/* Selectores Base: Ancho y Copias de Impresión */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Ancho de Rollo */}
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-2">
+                  Ancho de Rollo
+                </label>
+                <div className="flex gap-1.5">
+                  {[
+                    { val: 80, label: '80 mm' },
+                    { val: 58, label: '58 mm' }
+                  ].map((item) => (
+                    <button
+                      key={item.val}
+                      type="button"
+                      onClick={() => handleTicketChange('ancho_papel_mm', item.val)}
+                      className={`flex-1 py-2 px-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center ${
+                        Number(ticketsConfig.ancho_papel_mm) === item.val
+                          ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
+                          : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleTicketChange('ancho_papel_mm', 58)}
-                  className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center ${
-                    Number(ticketsConfig.ancho_papel_mm) === 58
-                      ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
-                      : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
-                  }`}
-                >
-                  58 mm
-                </button>
+              {/* Copias de Impresión */}
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-2">
+                  Copias de Impresión
+                </label>
+                <div className="flex gap-1.5">
+                  {[
+                    { val: 1, label: '1 Copia' },
+                    { val: 2, label: '2 Copias' }
+                  ].map((item) => (
+                    <button
+                      key={item.val}
+                      type="button"
+                      onClick={() => handleTicketChange('copias_impresion', item.val)}
+                      className={`flex-1 py-2 px-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center ${
+                        Number(ticketsConfig.copias_impresion) === item.val
+                          ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
+                          : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -626,16 +690,18 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
 
               <div className="flex flex-wrap gap-2 sm:gap-2.5">
                 {[
-                  { key: 'mostrar_logo', label: 'Logotipo de la Empresa' },
-                  { key: 'mostrar_datos_empresa', label: 'Razón Social y RNC' },
-                  { key: 'mostrar_datos_sucursal', label: 'Dirección y Teléfono de Sede' },
+                  { key: 'imprimir_logo', label: 'Logotipo de la Empresa' },
+                  { key: 'mostrar_rnc', label: 'Razón Social y RNC' },
+                  { key: 'mostrar_contacto_sucursal', label: 'Dirección y Teléfono de Sede' },
                   { key: 'mostrar_cliente', label: 'Datos del Cliente (Nombre/Tel/Céd)' },
                   { key: 'mostrar_equipo', label: 'Equipo y Número de Serie / IMEI' },
                   { key: 'mostrar_falla', label: 'Diagnóstico / Falla Inicial' },
                   { key: 'mostrar_observaciones', label: 'Observaciones Estéticas' },
-                  { key: 'mostrar_desglose_costos', label: 'Desglose Financiero y Anticipo' },
-                  { key: 'mostrar_qr_consulta', label: 'Código QR para Rastreo Online' },
-                  { key: 'mostrar_garantia', label: 'Cláusula de Garantía' }
+                  { key: 'mostrar_costo_y_anticipo', label: 'Desglose Financiero y Anticipo' },
+                  { key: 'mostrar_checklist_recepcion', label: 'Checklist de Recepción' },
+                  { key: 'incluir_qr_tracking', label: 'Código QR para Rastreo Online' },
+                  { key: 'imprimir_garantia', label: 'Cláusula de Garantía' },
+                  { key: 'mostrar_mensaje_cortesia', label: 'Mensaje de Cortesía al Pie' }
                 ].map((item) => {
                   const isChecked = Boolean(ticketsConfig[item.key]);
                   return (
@@ -662,8 +728,8 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
                 Términos y Cláusula de Garantía
               </label>
               <textarea
-                value={ticketsConfig.terminos_garantia}
-                onChange={(e) => handleTicketChange('terminos_garantia', e.target.value)}
+                value={ticketsConfig.clausula_garantia_defecto}
+                onChange={(e) => handleTicketChange('clausula_garantia_defecto', e.target.value)}
                 rows={3}
                 placeholder="Garantía válida únicamente con este comprobante..."
                 className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-neutral-100/10 resize-none font-inter"
@@ -746,7 +812,7 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
               <span>
                 {previewMode === 'etiqueta'
                   ? `${etiquetasConfig.ancho_mm}×${etiquetasConfig.alto_mm}mm (${etiquetasConfig.orientacion})`
-                  : `${ticketsConfig.ancho_papel_mm}mm Rollo POS`}
+                  : `${ticketsConfig.ancho_papel_mm}mm · ${ticketsConfig.copias_impresion || 1} ${(ticketsConfig.copias_impresion || 1) === 1 ? 'copia' : 'copias'}`}
               </span>
             </div>
 
