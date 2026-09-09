@@ -38,6 +38,25 @@ const SIZE_PRESETS = [
   { id: 'manual', label: 'Personalizado', ancho: 50, alto: 30 }
 ];
 
+const MOCK_STICKER_SERVICE = {
+  codigo_ticket: 'FMC-2026-0089',
+  fecha_recepcion: '2026-09-09T16:00:00.000Z',
+  created_at: '2026-09-09T16:00:00.000Z',
+  nombre_cliente: 'Carlos Mendoza',
+  telefono_cliente: '829-555-0149',
+  marca_equipo: 'Samsung',
+  modelo_equipo: 'Galaxy S23 Ultra',
+  falla_reportada: 'Cambio de pantalla y revisión táctil',
+  tecnico_nombre: 'Carlos Técnico',
+  tecnico_asignado: 'Carlos Técnico',
+  datos_acceso_equipo: {
+    tipo: 'patron',
+    metodo: 'patron',
+    patron: [0, 1, 4, 7, 8], // Dibuja la "L" invertida 1-2-5-8-9
+    valor: '1-2-5-8-9'
+  }
+};
+
 export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
   const { user } = useAuth();
   const isSuperAdmin = user?.rol_nombre === 'SuperAdmin';
@@ -564,6 +583,7 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
               {previewMode === 'etiqueta' ? (
                 <div className="w-full flex justify-center">
                   <StickerTermico
+                    servicio={MOCK_STICKER_SERVICE}
                     config={etiquetasConfig}
                     branch={activeBranch}
                     companyData={companyData}
@@ -627,6 +647,7 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
         <div id="print-mount-point" className="print-only">
           {previewMode === 'etiqueta' ? (
             <StickerTermico
+              servicio={MOCK_STICKER_SERVICE}
               config={etiquetasConfig}
               branch={activeBranch}
               companyData={companyData}

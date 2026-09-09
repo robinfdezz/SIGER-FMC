@@ -7,7 +7,7 @@ import Badge from '../components/common/Badge';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
 import AnimatedIconButton from '../components/common/AnimatedIconButton';
 import { useAuth } from '../context/AuthContext';
-import { getServicios } from '../services/servicios.service';
+import { getServicios, getServicioById } from '../services/servicios.service';
 import { getEstados, getSucursales } from '../services/catalogs.service';
 import { getWorkers } from '../services/workers.service';
 import { getCompanyProfile, getBranches } from '../services/configuracion.service';
@@ -200,6 +200,22 @@ export const ServiciosPage = () => {
   const handlePostCreacionClose = () => {
     setShowPostCreacion(false);
     setOrdenAImprimir(null);
+  };
+
+  const handleImprimirClick = async (orden) => {
+    try {
+      const res = await getServicioById(orden.id);
+      if (res?.ok && res?.data) {
+        setOrdenAImprimir(res.data);
+      } else {
+        setOrdenAImprimir(orden);
+      }
+    } catch (err) {
+      console.error('Error al obtener detalle de orden para reimpresion:', err);
+      setOrdenAImprimir(orden);
+    } finally {
+      setShowPostCreacion(true);
+    }
   };
 
   // Opciones para los componentes Select
@@ -508,10 +524,7 @@ export const ServiciosPage = () => {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
-                            onClick={() => {
-                              setOrdenAImprimir(orden);
-                              setShowPostCreacion(true);
-                            }}
+                            onClick={() => handleImprimirClick(orden)}
                             className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer border border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
                             title="Imprimir comprobante o etiqueta"
                           >

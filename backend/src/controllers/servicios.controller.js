@@ -283,6 +283,14 @@ const createServicio = async (req, res) => {
 
     await client.query('COMMIT');
 
+    var tecNombreRes = cleanTecnicosIds.length > 0
+      ? await client.query(
+          'SELECT TRIM(CONCAT(nombre, \' \', apellido)) AS nombre_completo FROM datos_trabajadores WHERE id = $1',
+          [cleanTecnicosIds[0]]
+        )
+      : { rows: [] };
+    var primerTecnicoNombre = tecNombreRes.rows[0]?.nombre_completo || 'Sin asignar';
+
     return res.status(201).json({
       ok: true,
       message: 'Orden de servicio creada exitosamente.',
@@ -293,11 +301,24 @@ const createServicio = async (req, res) => {
         modelo_equipo: nuevaOrden.modelo_equipo,
         nombre_cliente: nuevaOrden.nombre_cliente,
         cliente_nombre: nuevaOrden.nombre_cliente,
+        telefono_cliente: nuevaOrden.telefono_cliente,
         falla_reportada: nuevaOrden.falla_reportada,
+        observaciones_recepcion: nuevaOrden.observaciones_recepcion,
+        observaciones: nuevaOrden.observaciones_recepcion,
+        checklist_entrada: nuevaOrden.checklist_entrada,
+        checklist_recepcion: nuevaOrden.checklist_entrada,
+        datos_acceso_equipo: nuevaOrden.datos_acceso_equipo,
+        datos_acceso: nuevaOrden.datos_acceso_equipo,
+        costo_previsto: nuevaOrden.costo_previsto,
+        monto_anticipo: nuevaOrden.monto_anticipo,
+        monto_descuento: nuevaOrden.monto_descuento,
         fecha_entrega_estimada: nuevaOrden.fecha_entrega_estimada,
         estado_actual_id: nuevaOrden.estado_actual_id,
         fotos_count: fotosUrls.length,
         tecnicos_count: cleanTecnicosIds.length,
+        tecnico_nombre: primerTecnicoNombre,
+        tecnico_asignado: primerTecnicoNombre,
+        tecnicos: tecNombreRes.rows[0] ? [{ id: cleanTecnicosIds[0], nombre_completo: primerTecnicoNombre }] : [],
         created_at: nuevaOrden.created_at
       }
     });
@@ -389,12 +410,25 @@ const getServicios = async (req, res) => {
       '  sr.prioridad,\n' +
       '  sr.marca_equipo,\n' +
       '  sr.modelo_equipo,\n' +
+      '  sr.num_serie_imei,\n' +
+      '  sr.datos_acceso_equipo,\n' +
       '  sr.falla_reportada,\n' +
+      '  sr.observaciones_recepcion,\n' +
+      '  sr.observaciones_recepcion AS observaciones,\n' +
+      '  sr.checklist_entrada,\n' +
+      '  sr.checklist_entrada AS checklist_recepcion,\n' +
+      '  sr.costo_previsto,\n' +
+      '  sr.monto_anticipo,\n' +
+      '  sr.monto_descuento,\n' +
+      '  sr.costo_final_confirmado,\n' +
       '  sr.es_garantia,\n' +
-      '  COALESCE(sr.nombre_cliente, TRIM(CONCAT(c.nombre, \' \', c.apellido))) AS nombre_cliente,\n' +
+      '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS nombre_cliente,\n' +
+      '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS cliente_nombre,\n' +
       '  COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,\n' +
+      '  COALESCE(sr.telefono_cliente, c.telefono) AS cliente_telefono,\n' +
       '  sr.fecha_entrega_estimada,\n' +
       '  sr.tiempo_garantia,\n' +
+      '  sr.condiciones_garantia,\n' +
       '  sr.created_at,\n' +
       '  sr.updated_at,\n' +
       '  es.nombre_estado AS estado,\n' +
@@ -402,6 +436,7 @@ const getServicios = async (req, res) => {
       '  cd.nombre_categoria AS categoria,\n' +
       '  ds.nombre_sucursal AS sucursal,\n' +
       '  TRIM(CONCAT(dt.nombre, \' \', dt.apellido)) AS recepcionista,\n' +
+      '  COALESCE((SELECT TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id ORDER BY ta.id ASC LIMIT 1), \'Sin asignar\') AS tecnico_nombre,\n' +
       '  COALESCE((SELECT json_agg(json_build_object(\'id\', dt_tec.id, \'nombre_completo\', TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)))) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), \'[]\'::json) AS tecnicos\n' +
       'FROM servicios_recepcion sr\n' +
       'LEFT JOIN estados_servicio es ON es.id = sr.estado_actual_id\n' +
@@ -448,6 +483,12 @@ const getServicioById = async (req, res) => {
     var result = await pool.query(
       'SELECT\n' +
       '  sr.*,\n' +
+      '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS nombre_cliente,\n' +
+      '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS cliente_nombre,\n' +
+      '  COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,\n' +
+      '  COALESCE(sr.telefono_cliente, c.telefono) AS cliente_telefono,\n' +
+      '  sr.checklist_entrada AS checklist_recepcion,\n' +
+      '  sr.observaciones_recepcion AS observaciones,\n' +
       '  es.nombre_estado AS estado,\n' +
       '  es.color_badge AS estado_color,\n' +
       '  cd.nombre_categoria AS categoria,\n' +
@@ -455,6 +496,7 @@ const getServicioById = async (req, res) => {
       '  TRIM(CONCAT(dt.nombre, \' \', dt.apellido)) AS recepcionista,\n' +
       '  TRIM(CONCAT(c.nombre, \' \', c.apellido)) AS nombre_cliente_reg,\n' +
       '  c.telefono AS telefono_cliente_reg,\n' +
+      '  COALESCE((SELECT TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id ORDER BY ta.id ASC LIMIT 1), \'Sin asignar\') AS tecnico_nombre,\n' +
       '  COALESCE((SELECT json_agg(json_build_object(\'id\', dt_tec.id, \'nombre_completo\', TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)))) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), \'[]\'::json) AS tecnicos\n' +
       'FROM servicios_recepcion sr\n' +
       'LEFT JOIN estados_servicio es ON es.id = sr.estado_actual_id\n' +
@@ -490,11 +532,15 @@ const getServicioByTicket = async (req, res) => {
       'SELECT\n' +
       '  sr.id, sr.codigo_ticket, sr.marca_equipo, sr.modelo_equipo,\n' +
       '  sr.falla_reportada, sr.prioridad, sr.es_garantia,\n' +
-      '  sr.nombre_cliente, sr.telefono_cliente,\n' +
+      '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS nombre_cliente,\n' +
+      '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS cliente_nombre,\n' +
+      '  COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,\n' +
+      '  COALESCE(sr.telefono_cliente, c.telefono) AS cliente_telefono,\n' +
       '  sr.fecha_entrega_estimada, sr.created_at,\n' +
       '  es.nombre_estado AS estado, es.color_badge AS estado_color\n' +
       'FROM servicios_recepcion sr\n' +
       'LEFT JOIN estados_servicio es ON es.id = sr.estado_actual_id\n' +
+      'LEFT JOIN clientes c ON c.id = sr.cliente_id\n' +
       'WHERE sr.codigo_ticket = $1 AND sr.activo = TRUE',
       [codigo]
     );

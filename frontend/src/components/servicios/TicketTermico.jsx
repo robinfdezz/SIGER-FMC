@@ -105,19 +105,50 @@ export const TicketTermico = ({
         minute: '2-digit'
       });
 
-  // Cálculo financiero
-  const costo = parseFloat(data.costo_previsto) || 0;
-  const anticipo = parseFloat(data.monto_anticipo) || 0;
-  const saldo = Math.max(0, costo - anticipo);
+  // Cálculo financiero normalizado según el esquema real
+  const costo = Number(data.costo_previsto ?? data.costo_estimado ?? 0);
+  const anticipo = Number(data.monto_anticipo ?? data.anticipo ?? 0);
+  const descuento = Number(data.monto_descuento ?? data.descuento ?? 0);
+  const saldo = Math.max(0, costo - anticipo - descuento);
 
   // Cliente info
   const clienteNombre = data.cliente_nombre || data.nombre_cliente || (data.cliente ? `${data.cliente.nombre || ''} ${data.cliente.apellido || ''}`.trim() : '');
   const clienteTel = data.telefono_cliente || data.telefono_cliente_libre || data.cliente?.telefono || '';
   const clienteCedula = data.cedula_cliente || data.cedula_cliente_libre || data.cliente?.cedula_rnc || '';
 
-  // Checklist
-  const checklist = data.checklist_entrada && typeof data.checklist_entrada === 'object' ? data.checklist_entrada : {};
-  const checklistEntries = Object.entries(checklist);
+  // Checklist normalizado (soporta JSON string, array u objeto de claves booleanas)
+  const rawChecklist = data.checklist_recepcion ?? data.checklist_entrada ?? data.checklist;
+  let parsedChecklist = rawChecklist;
+  if (typeof rawChecklist === 'string') {
+    try {
+      parsedChecklist = JSON.parse(rawChecklist);
+    } catch {
+      parsedChecklist = {};
+    }
+  }
+
+  const checklistItems = [];
+  if (Array.isArray(parsedChecklist)) {
+    parsedChecklist.forEach((item) => {
+      if (typeof item === 'string') {
+        checklistItems.push({ key: item, label: item, checked: true, valStr: 'Sí' });
+      } else if (typeof item === 'object' && item !== null) {
+        const name = item.nombre || item.item || item.label || Object.keys(item)[0] || 'Item';
+        const isOk = item.estado === 'bueno' || item.checked === true || item.valor === true || item.status === 'ok';
+        checklistItems.push({ key: name, label: name, checked: isOk, valStr: isOk ? 'Sí' : 'No' });
+      }
+    });
+  } else if (typeof parsedChecklist === 'object' && parsedChecklist !== null) {
+    Object.entries(parsedChecklist).forEach(([key, val]) => {
+      const isOk = val === true || val === 'ok' || val === 'si' || val === 'bueno';
+      checklistItems.push({
+        key,
+        label: key,
+        checked: isOk,
+        valStr: val === true ? 'Sí' : val === false ? 'No' : String(val)
+      });
+    });
+  }
 
   const containerStyles = isPrintable
     ? {
@@ -252,23 +283,23 @@ export const TicketTermico = ({
               </div>
             )}
 
-            {normConfig.mostrar_observaciones && data.observaciones_recepcion && (
+            {normConfig.mostrar_observaciones && (data.observaciones_recepcion || data.observaciones) && (
               <div className="text-[9px] text-neutral-600 italic break-words">
-                Obs: {data.observaciones_recepcion}
+                Obs: {data.observaciones_recepcion || data.observaciones}
               </div>
             )}
           </div>
         )}
 
         {/* Checklist de Entrada */}
-        {normConfig.mostrar_checklist_recepcion && checklistEntries.length > 0 && (
+        {(normConfig.mostrar_checklist_recepcion || normConfig.mostrar_checklist) && checklistItems.length > 0 && (
           <div className="border-b border-dashed border-neutral-400 pb-2 mb-2 text-[10px] space-y-1 text-neutral-900">
             <div className="font-bold text-[10.5px] uppercase">Checklist Entrada:</div>
             <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 font-mono text-[9.5px]">
-              {checklistEntries.map(([key, val]) => (
-                <div key={key} className="flex items-center gap-1 truncate">
-                  <span>{val === true || val === 'ok' || val === 'si' ? '[✓]' : '[!]'}</span>
-                  <span className="capitalize">{key}: {val === true ? 'Sí' : val === false ? 'No' : String(val)}</span>
+              {checklistItems.map((item) => (
+                <div key={item.key} className="flex items-center gap-1 truncate">
+                  <span>{item.checked ? '[✓]' : '[!]'}</span>
+                  <span className="capitalize">{item.label}: {item.valStr}</span>
                 </div>
               ))}
             </div>
@@ -282,6 +313,12 @@ export const TicketTermico = ({
               <span>Costo Estimado:</span>
               <span className="font-mono">RD$ {costo.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
             </div>
+            {descuento > 0 && (
+              <div className="flex justify-between text-neutral-700">
+                <span>Descuento:</span>
+                <span className="font-mono">- RD$ {descuento.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
+              </div>
+            )}
             <div className="flex justify-between text-neutral-900 font-semibold">
               <span>Anticipo Recibido:</span>
               <span className="font-mono">- RD$ {anticipo.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>

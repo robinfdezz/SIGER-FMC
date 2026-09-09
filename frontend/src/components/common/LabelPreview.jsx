@@ -9,13 +9,20 @@ const DEFAULT_MOCK_DATA = {
   nombre_empresa: 'FRANYER MOBILE',
   nombre_sucursal: 'Sucursal SFM',
   nombre_cliente: 'Carlos Mendoza',
+  cliente_nombre: 'Carlos Mendoza',
   telefono_cliente: '829-555-0149',
+  cliente_telefono: '829-555-0149',
   marca_equipo: 'Samsung',
   modelo_equipo: 'Galaxy S23 Ultra',
   falla_reportada: 'Cambio de pantalla y revisión táctil',
   fecha_ingreso: '05/09/2026',
-  tecnico_asignado: 'Técnico Taller 01',
-  datos_acceso: { tipo: 'patron', valor: '1-2-5-8-9' }
+  tecnico_asignado: 'Carlos Técnico',
+  datos_acceso: {
+    tipo: 'patron',
+    metodo: 'patron',
+    patron: [0, 1, 4, 7, 8],
+    valor: '1-2-5-8-9'
+  }
 };
 
 /**
@@ -103,7 +110,24 @@ export const LabelPreview = ({
   isPrintable = false,
   className = ''
 }) => {
-  const mergedData = { ...DEFAULT_MOCK_DATA, ...data };
+  const accessData = data?.datos_acceso !== undefined
+    ? data.datos_acceso
+    : (data?.datos_acceso_equipo !== undefined ? data.datos_acceso_equipo : DEFAULT_MOCK_DATA.datos_acceso);
+
+  const hasRealData = Boolean(data && Object.keys(data).length > 0 && (data.id || data.codigo_ticket));
+  const fallbackNombre = hasRealData ? '' : DEFAULT_MOCK_DATA.nombre_cliente;
+  const fallbackTel = hasRealData ? '' : DEFAULT_MOCK_DATA.telefono_cliente;
+
+  const mergedData = {
+    ...DEFAULT_MOCK_DATA,
+    ...data,
+    datos_acceso: accessData,
+    nombre_cliente: data?.nombre_cliente || data?.cliente_nombre || fallbackNombre,
+    cliente_nombre: data?.cliente_nombre || data?.nombre_cliente || fallbackNombre,
+    telefono_cliente: data?.telefono_cliente || data?.cliente_telefono || fallbackTel,
+    cliente_telefono: data?.cliente_telefono || data?.telefono_cliente || fallbackTel,
+    tecnico_asignado: data?.tecnico_asignado ?? data?.tecnico_nombre ?? data?.tecnico ?? data?.tecnicos?.[0]?.nombre_completo ?? data?.tecnicos?.[0]?.nombre ?? (hasRealData ? 'Sin asignar' : DEFAULT_MOCK_DATA.tecnico_asignado)
+  };
 
   const {
     ancho_mm = 50,
@@ -204,6 +228,10 @@ export const LabelPreview = ({
   const showUnlock = Boolean(incluir_metodo_desbloqueo);
   const unlockSize = isPrintable ? (isCompact ? 34 : (effectiveHeightMm <= 30 ? 38 : 46)) : qrSize;
 
+  const nombre = (incluir_cliente ? (mergedData.cliente_nombre || mergedData.nombre_cliente || '') : '').trim();
+  const tel = (incluir_telefono ? (mergedData.cliente_telefono || mergedData.telefono_cliente || '') : '').trim();
+  const textoCliente = [nombre, tel].filter(Boolean).join(' · ');
+
   return (
     <div
       className={`relative select-none ${isPrintable ? 'w-full h-full p-0' : 'transition-all flex items-center justify-center'} ${className}`}
@@ -275,28 +303,24 @@ export const LabelPreview = ({
         </div>
 
         {/* Cuerpo del Sticker: Info del Cliente, Dispositivo y Método de Desbloqueo */}
-        <div className="flex items-center justify-between gap-2 sm:gap-3 flex-1 min-h-0">
-          {/* Datos descriptivos sin recortar */}
-          <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2 overflow-hidden flex-1 min-h-0">
+          {/* Columna Izquierda: Datos del cliente, equipo, falla y técnico */}
+          <div className="flex-1 min-w-0 flex flex-col justify-between h-full space-y-0.5">
             {/* Cliente y Teléfono */}
-            {(incluir_cliente || incluir_telefono) && (
-              <div className="flex items-start gap-1 min-w-0">
-                <User size={isPrintable ? 9 : 11} className="text-neutral-700 shrink-0 mt-0.5" />
-                <span className={`font-bold text-black break-words leading-tight line-clamp-2 ${fontSizeClasses.body}`}>
-                  {incluir_cliente ? mergedData.nombre_cliente : ''}
-                  {incluir_cliente && incluir_telefono && ' · '}
-                  {incluir_telefono ? (
-                    <span className="font-mono font-semibold text-neutral-800">{mergedData.telefono_cliente}</span>
-                  ) : ''}
+            {Boolean(textoCliente) && (
+              <div className="flex items-center gap-1 min-w-0 truncate">
+                <User size={isPrintable ? 8.5 : 10} className="text-neutral-700 shrink-0" />
+                <span className="text-[10px] font-bold text-neutral-800 truncate leading-tight">
+                  {textoCliente}
                 </span>
               </div>
             )}
 
             {/* Equipo / Modelo */}
             {incluir_equipo && (
-              <div className="flex items-start gap-1 min-w-0">
-                <Smartphone size={isPrintable ? 9 : 11} className="text-neutral-700 shrink-0 mt-0.5" />
-                <span className={`font-semibold text-black break-words leading-tight line-clamp-2 ${fontSizeClasses.body}`}>
+              <div className="flex items-center gap-1 min-w-0 truncate">
+                <Smartphone size={isPrintable ? 8.5 : 10} className="text-neutral-700 shrink-0" />
+                <span className="text-[10px] font-bold text-neutral-900 truncate leading-tight">
                   {deviceText || 'Dispositivo sin especificar'}
                 </span>
               </div>
@@ -305,8 +329,8 @@ export const LabelPreview = ({
             {/* Falla Reportada */}
             {incluir_falla && (
               <div className="flex items-start gap-1 min-w-0">
-                <AlertCircle size={isPrintable ? 9 : 11} className="text-neutral-700 shrink-0 mt-0.5" />
-                <p className={`text-neutral-900 break-words leading-tight line-clamp-1 sm:line-clamp-2 font-medium ${fontSizeClasses.body}`}>
+                <AlertCircle size={isPrintable ? 8.5 : 10} className="text-neutral-600 shrink-0 mt-0.5" />
+                <p className="text-[9px] text-neutral-600 line-clamp-2 leading-tight font-medium">
                   {mergedData.falla_reportada}
                 </p>
               </div>
@@ -314,19 +338,22 @@ export const LabelPreview = ({
 
             {/* Técnico Asignado */}
             {incluir_tecnico && (
-              <div className={`text-neutral-700 font-medium break-words leading-tight pt-0.5 ${fontSizeClasses.sub}`}>
-                Téc: <span className="font-semibold text-black">{mergedData.tecnico_asignado}</span>
+              <div className="text-[8.5px] font-semibold text-neutral-700 truncate leading-tight pt-0.5">
+                Téc: <span className="font-semibold text-neutral-900">{mergedData.tecnico_asignado}</span>
               </div>
             )}
           </div>
 
-          {/* Renderizado del Método de Desbloqueo */}
+          {/* Renderizado del Método de Desbloqueo (Alineado a la derecha, shrink-0) */}
           {showUnlock && (
-            <UnlockMethodView
-              datosAcceso={mergedData.datos_acceso}
-              size={unlockSize}
-              className={isPrintable ? 'shadow-none border-neutral-300' : ''}
-            />
+            <div className="shrink-0 flex items-center justify-end">
+              <UnlockMethodView
+                datosAcceso={mergedData.datos_acceso}
+                size={unlockSize}
+                isPrintable={isPrintable}
+                className={isPrintable ? 'shadow-none border-neutral-300' : ''}
+              />
+            </div>
           )}
         </div>
       </div>

@@ -61,3 +61,12 @@ export const validarGarantiaTicket = async (codigoTicket) => {
     return { ok: false, error: err.message || 'Error de conexión al validar ticket' };
   }
 };
+
+/**
+ * Obtener detalle completo de una orden por ID
+ * @param {number|string} id
+ */
+export const getServicioById = async (id) => {
+  const response = await api.get(`/servicios/${id}`);
+  return response.data;
+};
