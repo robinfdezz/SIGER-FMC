@@ -9,6 +9,7 @@ const workersRoutes = require('./routes/workers.routes');
 const clientsRoutes = require('./routes/clients.routes');
 const catalogsRoutes = require('./routes/catalogs.routes');
 const configuracionRoutes = require('./routes/configuracion.routes');
+const serviciosRoutes = require('./routes/servicios.routes');
 
 const app = express();
 
@@ -74,6 +75,10 @@ app.use('/api/catalogos', catalogsRoutes);
 app.use('/api/sucursales', catalogsRoutes);
 app.use('/api/roles', catalogsRoutes);
 app.use('/api/configuracion', configuracionRoutes);
+app.use('/api/servicios', serviciosRoutes);
+
+// Alias directo para el selector de categorias en el modulo de recepcion
+app.use('/api/categorias-dispositivos', catalogsRoutes);
 
 // Manejador de rutas no encontradas (404)
 app.use((req, res) => {

@@ -5,9 +5,11 @@ import ConfirmModal from '../components/common/ConfirmModal';
 import Select from '../components/common/Select';
 import Badge from '../components/common/Badge';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
+import AnimatedIconButton from '../components/common/AnimatedIconButton';
 import { useAuth } from '../context/AuthContext';
 import { getClients, toggleClientStatus } from '../services/clients.service';
 import { sileo } from 'sileo';
+import { RotateCcw } from 'lucide';
 import {
   UserPlus,
   Search,
@@ -35,6 +37,8 @@ export const ClientsPage = () => {
 
   const [clients, setClients] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
 
@@ -78,6 +82,18 @@ export const ClientsPage = () => {
   useEffect(() => {
     fetchClients();
   }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchClients();
+      setRefreshSuccess(true);
+    } catch {
+      // error handled in fetchClients
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Filtrado de clientes en cliente para búsqueda reactiva
   const filteredClients = useMemo(() => {
@@ -208,14 +224,15 @@ export const ClientsPage = () => {
             </div>
 
             <div className="flex items-center gap-2.5 shrink-0">
-              <button
-                onClick={fetchClients}
-                disabled={isLoading}
+              <AnimatedIconButton
+                icon={RotateCcw}
+                loading={isRefreshing}
+                success={refreshSuccess}
+                onSuccessEnd={() => setRefreshSuccess(false)}
+                onClick={handleRefresh}
                 title="Refrescar lista"
-                className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                <RefreshCw size={17} className={isLoading ? 'animate-spin' : ''} />
-              </button>
+                ariaLabel="Refrescar lista de clientes"
+              />
               {canCreateEdit && (
                 <button
                   onClick={handleOpenCreateModal}

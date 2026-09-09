@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS servicios_recepcion (
     monto_anticipo NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     monto_descuento NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     costo_final_confirmado NUMERIC(10,2) NOT NULL DEFAULT 0.00,
-    tiempo_garantia VARCHAR(50) NULL DEFAULT '30 días',
+    tiempo_garantia integer DEFAULT 30,
     condiciones_garantia TEXT NULL,
     fecha_entrega_estimada DATE NULL,
     fecha_entrega_real TIMESTAMPTZ NULL,

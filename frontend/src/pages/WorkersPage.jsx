@@ -5,10 +5,12 @@ import ConfirmModal from '../components/common/ConfirmModal';
 import Select from '../components/common/Select';
 import Badge from '../components/common/Badge';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
+import AnimatedIconButton from '../components/common/AnimatedIconButton';
 import { getWorkers, toggleWorkerStatus } from '../services/workers.service';
 import { getRoles, getSucursales } from '../services/catalogs.service';
 import { useAuth } from '../context/AuthContext';
 import { sileo } from 'sileo';
+import { RotateCcw } from 'lucide';
 import {
   UserPlus,
   Search,
@@ -73,6 +75,8 @@ const WorkersPage = () => {
   const [roles, setRoles] = useState([]);
   const [sucursales, setSucursales] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -131,6 +135,18 @@ const WorkersPage = () => {
   useEffect(() => {
     fetchInitialData();
   }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchInitialData();
+      setRefreshSuccess(true);
+    } catch {
+      // error handled in fetchInitialData
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleOpenCreateModal = () => {
     setEditingWorker(null);
@@ -307,14 +323,15 @@ const WorkersPage = () => {
             </div>
 
             <div className="flex items-center gap-2.5 shrink-0">
-              <button
-                onClick={fetchInitialData}
-                disabled={isLoading}
+              <AnimatedIconButton
+                icon={RotateCcw}
+                loading={isRefreshing}
+                success={refreshSuccess}
+                onSuccessEnd={() => setRefreshSuccess(false)}
+                onClick={handleRefresh}
                 title="Refrescar lista"
-                className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                <RefreshCw size={17} className={isLoading ? 'animate-spin' : ''} />
-              </button>
+                ariaLabel="Refrescar lista de usuarios"
+              />
               <button
                 onClick={handleOpenCreateModal}
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl shadow-xs hover:shadow-md transition-all font-inter cursor-pointer"

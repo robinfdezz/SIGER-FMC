@@ -176,6 +176,7 @@ const getWorkers = async (req, res) => {
         t.usuario,
         t.nombre,
         t.apellido,
+        TRIM(CONCAT(t.nombre, ' ', t.apellido)) AS nombre_completo,
         t.cedula,
         t.telefono,
         t.correo,
@@ -193,14 +194,33 @@ const getWorkers = async (req, res) => {
       LEFT JOIN datos_sucursales s ON t.sucursal_id = s.id
     `;
 
-    // Aislamiento por sucursal: Admin_Sucursal solo ve trabajadores de su sede
+    const conditions = [];
+
+    // Aislamiento por sucursal: Admin_Sucursal ve trabajadores de su sede o técnicos globales (sucursal_id IS NULL)
     if (!req.isSuperAdmin && req.filterSucursalId) {
       queryParams.push(req.filterSucursalId);
-      query += ` WHERE t.sucursal_id = $${queryParams.length}`;
+      conditions.push(`(t.sucursal_id = $${queryParams.length} OR t.sucursal_id IS NULL)`);
     } else if (req.query.sucursal_id) {
       // Filtro opcional para SuperAdmin
       queryParams.push(parseInt(req.query.sucursal_id, 10));
-      query += ` WHERE t.sucursal_id = $${queryParams.length}`;
+      conditions.push(`(t.sucursal_id = $${queryParams.length} OR t.sucursal_id IS NULL)`);
+    }
+
+    // Filtro por activo si se especifica
+    if (req.query.activo !== undefined) {
+      const isActivo = req.query.activo === 'true' || req.query.activo === true || req.query.activo === '1';
+      queryParams.push(isActivo);
+      conditions.push(`t.activo = $${queryParams.length}`);
+    }
+
+    // Filtro por rol si se solicita
+    if (req.query.rol) {
+      queryParams.push(req.query.rol.toLowerCase());
+      conditions.push(`LOWER(r.nombre_rol) = $${queryParams.length}`);
+    }
+
+    if (conditions.length > 0) {
+      query += ` WHERE ${conditions.join(' AND ')}`;
     }
 
     query += ` ORDER BY t.id ASC`;
@@ -208,6 +228,7 @@ const getWorkers = async (req, res) => {
     const result = await pool.query(query, queryParams);
 
     return res.status(200).json({
+      success: true,
       ok: true,
       message: 'Listado de trabajadores obtenido con éxito.',
       data: result.rows,
@@ -246,6 +267,7 @@ const getWorkerById = async (req, res) => {
         t.usuario,
         t.nombre,
         t.apellido,
+        TRIM(CONCAT(t.nombre, ' ', t.apellido)) AS nombre_completo,
         t.cedula,
         t.telefono,
         t.correo,

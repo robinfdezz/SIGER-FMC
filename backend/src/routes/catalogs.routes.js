@@ -14,7 +14,9 @@ router.get('/roles', getRoles);
 router.get('/sucursales', getSucursales);
 router.get('/categorias', getCategorias);
 router.get('/estados', getEstados);
+router.get('/estados-servicio', getEstados);
 router.get('/', (req, res, next) => {
+  if (req.baseUrl.includes('categoria')) return getCategorias(req, res, next);
   if (req.baseUrl.includes('sucursal')) return getSucursales(req, res, next);
   if (req.baseUrl.includes('rol')) return getRoles(req, res, next);
   return getSucursales(req, res, next);

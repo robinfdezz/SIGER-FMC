@@ -173,7 +173,7 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | `monto_anticipo` | NUMERIC(10,2)| NO | Abono o pago inicial dejado por el cliente (Default: 0.00) |
 | `monto_descuento`| NUMERIC(10,2)| NO | Descuento aplicado (Default: 0.00) |
 | `costo_final_confirmado`| NUMERIC(10,2)| NO | Monto final a facturar (Default: 0.00) |
-| `tiempo_garantia`| VARCHAR(50) | SÍ | Periodo de garantía (Default: '30 días') |
+| `tiempo_garantia`| INTEGER | NO | Periodo de garantía en cantidad de días de cobertura (Default: 30) |
 | `condiciones_garantia`| TEXT | SÍ | Términos y exclusiones de garantía |
 | `fecha_entrega_estimada`| DATE | SÍ | Fecha estimada de entrega |
 | `fecha_entrega_real`| TIMESTAMPTZ | SÍ | Fecha y hora en que se entregó el equipo |

@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MorphIcon } from 'morphicons/react';
 import { Check, X } from 'lucide';
+import AnimatedIconButton from './AnimatedIconButton';
 
 /**
  * Componente modular de botón de reset / limpieza de filtros con MorphIcon interactivo.
+ * Utiliza AnimatedIconButton como base para mantener la coherencia y modularidad institucional.
  *
  * @param {Function} onClick / onReset - Función que ejecuta el reseteo de filtros.
  * @param {boolean} hasActiveFilters - Indica si hay filtros activos para habilitar el botón.
@@ -23,7 +25,8 @@ const ResetFiltersButton = ({
   ariaLabel = 'Limpiar filtros',
   durationMs = 1200,
   className = '',
-  size = 16
+  size = 16,
+  ...props
 }) => {
   const [isResetting, setIsResetting] = useState(false);
   const timeoutRef = useRef(null);
@@ -58,26 +61,28 @@ const ResetFiltersButton = ({
   const isButtonDisabled = disabled || (!hasActiveFilters && !isResetting);
 
   return (
-    <button
-      type="button"
+    <AnimatedIconButton
       onClick={handleClick}
       disabled={isButtonDisabled}
-      aria-label={ariaLabel}
+      isAnimating={isResetting}
       title={title}
-      className={`p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 transition-all flex items-center justify-center shrink-0 active:scale-95 ${
+      ariaLabel={ariaLabel}
+      variant="custom"
+      className={`border border-neutral-200 dark:border-neutral-800 transition-all ${
         isResetting
           ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60'
           : hasActiveFilters
           ? 'bg-neutral-50 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-red-500 dark:hover:text-red-400 cursor-pointer shadow-xs'
           : 'bg-neutral-50/50 dark:bg-neutral-900/30 text-neutral-300 dark:text-neutral-600 opacity-40 cursor-not-allowed pointer-events-none'
       } ${className}`}
+      {...props}
     >
       <MorphIcon
         icon={isResetting ? Check : X}
         size={size}
         spring="smooth"
       />
-    </button>
+    </AnimatedIconButton>
   );
 };
 

@@ -8,6 +8,8 @@ import DashboardPage from './pages/Dashboard/DashboardPage';
 import WorkersPage from './pages/WorkersPage';
 import ClientsPage from './pages/ClientsPage';
 import ConfigurationPage from './pages/ConfigurationPage';
+import ServiciosPage from './pages/ServiciosPage';
+import NuevaOrdenPage from './pages/NuevaOrdenPage';
 import { useTheme } from './context/ThemeContext';
 import { Toaster } from 'sileo';
 import 'sileo/styles.css';
@@ -33,6 +35,42 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/tickets"
+              element={
+                <ProtectedRoute>
+                  <ServiciosPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/tickets/nueva"
+              element={
+                <ProtectedRoute>
+                  <NuevaOrdenPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/servicios"
+              element={
+                <ProtectedRoute>
+                  <ServiciosPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/servicios/nueva"
+              element={
+                <ProtectedRoute>
+                  <NuevaOrdenPage />
                 </ProtectedRoute>
               }
             />

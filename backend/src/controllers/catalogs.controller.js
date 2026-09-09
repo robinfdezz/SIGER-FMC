@@ -45,14 +45,22 @@ const getSucursales = async (req, res) => {
 };
 
 /**
- * Obtener categorías de dispositivos
+ * Obtener categorías de dispositivos activas, ordenadas alfabéticamente
  * GET /api/catalogos/categorias
+ * GET /api/categorias-dispositivos
  */
 const getCategorias = async (req, res) => {
   try {
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, nombre_categoria, descripcion, activo FROM categorias_dispositivos WHERE activo = TRUE ORDER BY id ASC'
+      `SELECT
+         id,
+         nombre_categoria AS nombre,
+         descripcion,
+         activo
+       FROM categorias_dispositivos
+       WHERE activo = TRUE
+       ORDER BY nombre_categoria ASC`
     );
     return res.status(200).json({
       ok: true,
@@ -75,15 +83,17 @@ const getEstados = async (req, res) => {
   try {
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, codigo_estado, nombre_estado, descripcion, color_badge, orden_flujo, activo FROM estados_servicio WHERE activo = TRUE ORDER BY orden_flujo ASC'
+      'SELECT id, codigo_estado, nombre_estado, color_badge, orden_flujo FROM estados_servicio ORDER BY orden_flujo ASC'
     );
     return res.status(200).json({
+      success: true,
       ok: true,
       data: result.rows
     });
   } catch (error) {
     console.error('❌ Error en getEstados:', error);
     return res.status(500).json({
+      success: false,
       ok: false,
       message: 'Error al consultar catálogo de estados.'
     });
