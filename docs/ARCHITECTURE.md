@@ -242,3 +242,73 @@ Para garantizar alta disponibilidad, velocidad de carga y mínimo consumo de alm
 
 - **Timeout Extendido a 120s:** La función [uploadAvatar](file:///c:/Users/pc/Desktop/SIGER-FMC/frontend/src/services/workers.service.js) sobreescribe el timeout estándar de Axios con `timeout: 120000` para garantizar la subida en conexiones celulares o de baja velocidad.
 - **Dropzone Interactivo ([WorkerModal.jsx](file:///c:/Users/pc/Desktop/SIGER-FMC/frontend/src/components/workers/WorkerModal.jsx)):** Permite arrastrar y soltar archivos o hacer clic sobre toda la tarjeta, proporcionando preview local inmediato (`URL.createObjectURL`), feedback visual de progreso (*"Subiendo y optimizando imagen..."*) y botón dedicado para desvincular fotos.
+
+---
+
+## 6. Arquitectura de Impresión Térmica y Etiquetas Adhesivas (On-Demand DOM)
+
+SIGER-FMC cuenta con un subsistema de impresión física de alta fidelidad diseñado para operar con impresoras térmicas de tickets y rotuladoras térmicas de etiquetas adhesivas de taller sin depender de drivers propietarios ni ventanas emergentes intrusivas.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Disparador de Impresión                         │
+│            (Apertura de Orden / Reimpresión en ServiciosPage)          │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│         Resolución Asíncrona de Datos Frescos (`getServicioById`)      │
+│  - Proyección completa: checklist, desglose financiero, cliente/técnico│
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                Montaje On-Demand en `#print-mount-point`                │
+│    - Renderizado aislado fuera del árbol visual interactivo            │
+│    - Inmunidad a estilos de tema oscuro (fondo blanco, texto negro)    │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                  ┌─────────────────┴─────────────────┐
+                  ▼                                   ▼
+    ┌───────────────────────────┐       ┌───────────────────────────┐
+    │  Comprobante Térmico POS  │       │  Sticker Adhesivo Taller  │
+    │  - Presets: 80mm / 58mm   │       │  - Presets: 50x30 / 60x40 │
+    │  - QR de seguimiento      │       │  - SVG Patrón Android 3x3 │
+    │  - Cláusula de garantía   │       │  - PIN / Clave legible    │
+    └─────────────┬─────────────┘       └─────────────┬─────────────┘
+                  │                                   │
+                  └─────────────────┬─────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│              Ejecución `window.print()` y Desmontaje Automático        │
+│    - Control vía directivas `@media print`                             │
+│    - Limpieza de memoria y retorno al estado previo de la aplicación   │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.1 Punto de Montaje On-Demand (`#print-mount-point`)
+Para evitar distorsiones causadas por el modo oscuro (`dark mode`), capas fijas (`z-index`), barras de scroll o fugas de estilos globales:
+1. El componente impreso no reside de forma estática en el DOM principal.
+2. Durante la solicitud de impresión, se monta dinámicamente un portal en un contenedor `#print-mount-point` dedicado.
+3. Se inyectan reglas CSS específicas de impresión (`@media print`) que ocultan el resto de la interfaz (`display: none !important`) y fuerzan visualización limpia a color verdadero o escala de grises sobre fondo blanco puro.
+4. Tras disparar `window.print()`, los listeners de ciclo de vida (`onafterprint`) desmontan el componente y devuelven el foco al operador.
+
+### 6.2 Resolución de Datos Frescos al Reimprimir
+Al reimprimir comprobantes o stickers desde tablas operativas (`ServiciosPage.jsx`):
+- Los listados paginados suelen cargar proyecciones optimizadas y ligeras.
+- Para garantizar que el ticket incluya todos los campos requeridos (`costo_previsto`, `monto_anticipo`, `monto_descuento`, `checklist_entrada`, `observaciones_recepcion`, `datos_acceso_equipo`, resolución compuesta `COALESCE` de cliente y asignación técnica), la acción de impresión invoca en segundo plano `getServicioById(servicio.id)` antes de armar la plantilla.
+- Esto previene discrepancias de datos o campos `undefined` en tickets reimpresos.
+
+### 6.3 Presets Físicos y Formatos Soportados
+
+#### 1. Comprobantes Térmicos POS (Rollo Continuo)
+- **Preset 80 mm:** Ancho imprimible estándar para impresoras térmicas de mostrador (Epson TM-T20, Star Micronics, Xprinter). Dispone de cabecera institucional completa, RNC, teléfonos de sucursal, datos de cliente y equipo, desglose financiero tabular, checklist de recepción con casillas de verificación, código QR optimizado (`w-40 h-40`) y condiciones legales de garantía.
+- **Preset 58 mm:** Versión compacta adaptada para impresoras térmicas portátiles o de 2 pulgadas, optimizando interlineados y reduciendo márgenes laterales.
+
+#### 2. Etiquetas Adhesivas de Taller (Stickers de Dispositivo)
+- **Presets Soportados:** **`50x30 mm`** (estándar preferido) y **`60x40 mm`** (alta resolución).
+- **Integración de Seguridad del Dispositivo:**
+  - **Patrón de Desbloqueo Android:** Dibuja la figura real en un SVG vectorial 3x3 normalizado a partir de las coordenadas base 0 (`[0..8]`), e imprime debajo la secuencia legible separada por guiones (ej. `"7-4-1-5-3-6-9"`).
+  - **PIN o Contraseña:** Imprime la clave en tipografía monoespaciada de alta visibilidad (`text-sm font-mono font-black tracking-widest text-neutral-900`) con encabezado `"PIN"` o `"CLAVE"`, omitiendo cualquier cuadrícula vacía.
+  - **Sin Bloqueo:** Indica claramente `"LIBRE / SIN CLAVE"`.

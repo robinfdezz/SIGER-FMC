@@ -187,6 +187,104 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 > - `chk_servicio_no_autoreferencia`: `CHECK (id != servicio_origen_id)`
 > - `fk_servicio_garantia_origen`: `FOREIGN KEY (servicio_origen_id) REFERENCES servicios_recepcion(id) ON UPDATE CASCADE ON DELETE RESTRICT`
 
+#### Esquema JSONB: `datos_acceso_equipo` (Credenciales y Seguridad del Equipo)
+Estructura persistida para resguardar el método de desbloqueo configurado en `DeviceSecurityPicker.jsx` y renderizado en comprobantes / stickers:
+
+1. **Método Patrón (`'patron'`):**
+   ```json
+   {
+     "tipo": "patron",
+     "metodo": "patron",
+     "patron": [6, 3, 0, 4, 2, 5, 8],
+     "valor": "7-4-1-5-3-6-9"
+   }
+   ```
+   * **Array numérico `patron`:** Representación en coordenadas base 0 (`0..8`) correspondientes a una cuadrícula matricial 3x3:
+     ```
+     0 (x=0, y=0) | 1 (x=1, y=0) | 2 (x=2, y=0)
+     3 (x=0, y=1) | 4 (x=1, y=1) | 5 (x=2, y=1)
+     6 (x=0, y=2) | 7 (x=1, y=2) | 8 (x=2, y=2)
+     ```
+     Utilizado para el trazado vectorial SVG de líneas y nodos en `LabelPreview.jsx` y `PatternLock.jsx`.
+   * **String `valor`:** Secuencia legible proyectada al estándar Android del 1 al 9 separada por guiones (ej. `"7-4-1-5-3-6-9"`), facilitando la lectura humana en tickets térmicos y stickers adhesivos.
+
+2. **Método PIN / Contraseña (`'pin'`, `'contrasena'`, `'password'`):**
+   ```json
+   {
+     "tipo": "pin",
+     "metodo": "pin",
+     "valor": "7645",
+     "patron": []
+   }
+   ```
+   * El código alfanumérico o numérico se almacena directamente en la propiedad `valor`.
+   * Se inicializa `patron: []` para evitar errores de renderizado. En la impresión de stickers (`UnlockMethodView`), el sistema prioriza la clave en texto legible en lugar de intentar dibujar trazos vacíos.
+
+3. **Sin Bloqueo (`'ninguno'`):**
+   ```json
+   {
+     "tipo": "ninguno",
+     "metodo": "ninguno",
+     "valor": "",
+     "patron": []
+   }
+   ```
+
+#### Esquema JSONB: `checklist_entrada` (Inspección Inicial de Recepción)
+Inspección ocular y funcional realizada durante la apertura de la orden:
+```json
+{
+  "enciende": true,
+  "pantalla_tactil": true,
+  "camara_trasera": true,
+  "camara_frontal": true,
+  "puerto_carga": true,
+  "altavoz": true,
+  "auricular": true,
+  "microfono": true,
+  "wifi_bluetooth": true,
+  "botones_fisicos": true,
+  "face_touch_id": false,
+  "sensores": true,
+  "bandeja_sim": true,
+  "golpes_rayones": true
+}
+```
+
+#### Resolución de Clientes y Técnicos en Consultas SQL
+
+1. **Resolución Unificada de Cliente (`COALESCE`):**
+   Para garantizar compatibilidad dual entre clientes frecuentes (registrados en la tabla `clientes`) y clientes rápidos de mostrador (datos embebidos en `servicios_recepcion`), las consultas del backend implementan:
+   ```sql
+   COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS nombre_cliente,
+   COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS cliente_nombre,
+   COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,
+   COALESCE(sr.telefono_cliente, c.telefono) AS cliente_telefono
+   ```
+   Esto asegura que tanto el comprobante térmico como el sticker y las vistas de tabla reciban siempre valores válidos sin depender exclusivamente de una relación de clave foránea.
+
+2. **Resolución de Técnicos Asignados:**
+   - **Técnico Principal:** Obtenido mediante subconsulta con orden por ID de asignación:
+     ```sql
+     COALESCE((
+       SELECT TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido))
+       FROM tecnicos_asignados ta
+       JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+       WHERE ta.servicio_id = sr.id
+       ORDER BY ta.id ASC
+       LIMIT 1
+     ), 'Sin asignar') AS tecnico_nombre
+     ```
+   - **Colección Completa de Técnicos:** Agregada como array JSON para soporte multi-técnico:
+     ```sql
+     COALESCE((
+       SELECT json_agg(json_build_object('id', dt_tec.id, 'nombre_completo', TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido))))
+       FROM tecnicos_asignados ta
+       JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+       WHERE ta.servicio_id = sr.id
+     ), '[]'::json) AS tecnicos
+     ```
+
 ### `tecnicos_asignados` (Asignación Técnica)
 | Campo | Tipo | Nulo | Descripción |
 | :--- | :--- | :--- | :--- |

@@ -11,9 +11,8 @@ const {
   updateBranch
 } = require('../controllers/configuracion.controller');
 
-// Todas las rutas de configuración requieren autenticación y rol de administración
+// Todas las rutas de configuración requieren autenticación
 router.use(authMiddleware);
-router.use(checkRole(['SuperAdmin', 'Admin_Sucursal']));
 
 // ============================================================================
 // RUTAS: PERFIL DE EMPRESA MATRIZ (datos_companhia)
@@ -22,9 +21,9 @@ router.use(checkRole(['SuperAdmin', 'Admin_Sucursal']));
 /**
  * @route   GET /api/configuracion/companhia
  * @desc    Obtener el perfil de la empresa matriz
- * @access  Privado (SuperAdmin, Admin_Sucursal)
+ * @access  Privado (SuperAdmin, Admin_Sucursal, Secretaria)
  */
-router.get('/companhia', getCompanyProfile);
+router.get('/companhia', checkRole(['SuperAdmin', 'Admin_Sucursal', 'Secretaria']), getCompanyProfile);
 
 /**
  * @route   POST /api/configuracion/companhia/upload-logo
@@ -52,15 +51,15 @@ router.put('/companhia', checkRole(['SuperAdmin']), updateCompanyProfile);
 /**
  * @route   GET /api/configuracion/sucursales
  * @desc    Listar todas las sucursales del sistema
- * @access  Privado (SuperAdmin, Admin_Sucursal)
+ * @access  Privado (SuperAdmin, Admin_Sucursal, Secretaria)
  */
-router.get('/sucursales', getBranches);
+router.get('/sucursales', checkRole(['SuperAdmin', 'Admin_Sucursal', 'Secretaria']), getBranches);
 
 /**
  * @route   PUT /api/configuracion/sucursales/:id
  * @desc    Actualizar datos informativos de una sucursal existente
  * @access  Privado (SuperAdmin, Admin_Sucursal - restringido a su propia sucursal)
  */
-router.put('/sucursales/:id', updateBranch);
+router.put('/sucursales/:id', checkRole(['SuperAdmin', 'Admin_Sucursal']), updateBranch);
 
 module.exports = router;

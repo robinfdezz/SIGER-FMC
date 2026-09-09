@@ -27,6 +27,41 @@ function isBlank(str) {
 // POST /api/servicios  — Crear orden de servicio
 // ============================================================
 const createServicio = async (req, res) => {
+  // ── 1. Control de acceso por rol y aislamiento por sucursal ────
+  const userRole = String(req.user?.rol_nombre || req.user?.rol || '').toLowerCase();
+  if (userRole === 'tecnico') {
+    return res.status(403).json({
+      ok: false,
+      message: 'Los técnicos no tienen permisos para crear órdenes de servicio.'
+    });
+  }
+
+  const isSuperAdmin = userRole === 'superadmin';
+
+  // Si no es superadmin, forzar estrictamente sucursal_id del usuario logueado
+  let finalSucursalId;
+  if (!isSuperAdmin) {
+    finalSucursalId = req.user?.sucursal_id;
+    if (!finalSucursalId) {
+      return res.status(403).json({
+        ok: false,
+        message: 'El usuario no tiene una sucursal asignada.'
+      });
+    }
+  } else {
+    // SuperAdmin puede especificar sucursal o usar la suya
+    finalSucursalId = req.body.sucursal_id || req.user?.sucursal_id;
+    if (!finalSucursalId) {
+      return res.status(400).json({ ok: false, message: 'La sucursal es obligatoria.' });
+    }
+  }
+
+  // El recepcionista es SIEMPRE el usuario autenticado (sin permitir sobreescritura)
+  const usuario_recepcion_id = req.user?.id;
+  if (!usuario_recepcion_id) {
+    return res.status(401).json({ ok: false, message: 'No se pudo identificar al recepcionista. Sesión inválida.' });
+  }
+
   const pool = getPool();
   const client = await pool.connect();
 
@@ -40,7 +75,6 @@ const createServicio = async (req, res) => {
       correo_cliente,
       email_cliente,
       // Servicio
-      sucursal_id,
       categoria_id,
       prioridad,
       // Equipo
@@ -70,9 +104,6 @@ const createServicio = async (req, res) => {
     } = req.body;
 
     // ── Validaciones de negocio ──────────────────────────────
-    if (!sucursal_id) {
-      return res.status(400).json({ ok: false, message: 'La sucursal es obligatoria.' });
-    }
     if (!categoria_id) {
       return res.status(400).json({ ok: false, message: 'La categoria del dispositivo es obligatoria.' });
     }
@@ -151,12 +182,6 @@ const createServicio = async (req, res) => {
     // Tiempo de garantía en días (entero >= 0, default 30)
     const tiempoGarantia = Number.isInteger(Number(tiempo_garantia)) ? Math.max(0, parseInt(tiempo_garantia, 10)) : 30;
 
-    // El recepcionista es el usuario autenticado (inyectado por authMiddleware)
-    var usuario_recepcion_id = req.user && req.user.id;
-    if (!usuario_recepcion_id) {
-      return res.status(401).json({ ok: false, message: 'No se pudo identificar al recepcionista. Sesion invalida.' });
-    }
-
     await client.query('BEGIN');
 
     // Validación estricta de reingreso por garantía
@@ -220,7 +245,7 @@ const createServicio = async (req, res) => {
       ') RETURNING *',
       [
         codigo_ticket,
-        sucursal_id,
+        finalSucursalId,
         categoria_id,
         cliente_id || null,
         sanitizedNombre,
@@ -357,7 +382,16 @@ const getServicios = async (req, res) => {
     var params = [];
     var idx = 1;
 
-    if (sucursal_id && sucursal_id !== 'all') {
+    // ── Aislamiento estricto por sucursal según rol ──────────
+    const userRole = String(req.user?.rol_nombre || req.user?.rol || '').toLowerCase();
+    const isSuperAdmin = userRole === 'superadmin';
+
+    if (!isSuperAdmin) {
+      // Todo rol que no sea superadmin sólo puede consultar órdenes de su propia sucursal
+      conditions.push('sr.sucursal_id = $' + idx++);
+      params.push(Number(req.user?.sucursal_id || 0));
+    } else if (sucursal_id && sucursal_id !== 'all') {
+      // SuperAdmin puede filtrar por una sucursal específica si lo desea
       conditions.push('sr.sucursal_id = $' + idx++);
       params.push(Number(sucursal_id));
     }
@@ -480,6 +514,16 @@ const getServicioById = async (req, res) => {
       return res.status(400).json({ ok: false, message: 'ID de orden invalido.' });
     }
 
+    const userRole = String(req.user?.rol_nombre || req.user?.rol || '').toLowerCase();
+    const isSuperAdmin = userRole === 'superadmin';
+
+    let branchCondition = '';
+    const queryParams = [id];
+    if (!isSuperAdmin && req.user?.sucursal_id) {
+      branchCondition = ' AND sr.sucursal_id = $2';
+      queryParams.push(Number(req.user.sucursal_id));
+    }
+
     var result = await pool.query(
       'SELECT\n' +
       '  sr.*,\n' +
@@ -504,8 +548,8 @@ const getServicioById = async (req, res) => {
       'LEFT JOIN datos_sucursales ds ON ds.id = sr.sucursal_id\n' +
       'LEFT JOIN datos_trabajadores dt ON dt.id = sr.usuario_recepcion_id\n' +
       'LEFT JOIN clientes c ON c.id = sr.cliente_id\n' +
-      'WHERE sr.id = $1 AND sr.activo = TRUE',
-      [id]
+      'WHERE sr.id = $1 AND sr.activo = TRUE' + branchCondition,
+      queryParams
     );
 
     if (result.rowCount === 0) {

@@ -40,7 +40,26 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 - `401 Unauthorized`: Token ausente, expirado o credenciales inválidas.
 - `403 Forbidden`: Acceso denegado por rol o por aislamiento de sucursal.
 - `404 Not Found`: Recurso no encontrado.
+- `409 Conflict`: Conflicto de unicidad (cédula, usuario, correo duplicado).
 - `500 Internal Server Error`: Error no controlado en el servidor.
+
+---
+
+### 1.1 Matriz de Roles y Control de Acceso (RBAC)
+
+La arquitectura de seguridad de SIGER-FMC implementa control de acceso basado en roles (RBAC) combinado con aislamiento de datos por sucursal (`requireBranchAccess`):
+
+| Rol | Alcance de Datos (Sucursal) | Órdenes de Servicio (`/servicios`) | Personal (`/trabajadores`) | Configuración (`/configuracion`) | Clientes (`/clientes`) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`SuperAdmin`** | **Omnicanal Global** (ve todas las sedes) | Control total (Crear, Listar, Detalle, Modificar) | CRUD Total y gestión de avatares | Edición global de Empresa y Sucursales | CRUD Total |
+| **`Admin_Sucursal`** | **Sede Asignada Fija** (`sucursal_id`) | Control total en su sucursal (Crear, Listar, Detalle) | CRUD de Técnicos/Secretarias de su sede | Edición exclusiva de su sucursal asignada | CRUD Total |
+| **`Secretaria`** | **Sede Asignada Fija** (`sucursal_id`) | Control operativo (Crear órdenes, Listar, Detalle, Imprimir) | **Lectura** (`GET /`, `GET /:id`) de personal de su sede | **Lectura** (`GET`) de Empresa y Sucursales | CRUD de Clientes |
+| **`Tecnico`** | **Sede Asignada Fija** (`sucursal_id`) | **SOLO LECTURA** (`GET /`, `GET /:id`). **Bloqueo 403** en creación | **Lectura** (`GET /`, `GET /:id`) de personal de su sede | Sin acceso (`403 Forbidden`) | Lectura (`GET`) |
+
+#### Políticas Estrictas de Seguridad:
+1. **`SuperAdmin`:** Acceso omnicanal y selección global de sucursales en filtros y creaciones.
+2. **`Admin_Sucursal` y `Secretaria`:** Control total de recepción confinado a su `sucursal_id` fija. Permisos de lectura habilitados en `/configuracion/sucursales`, `/configuracion/companhia` y `/trabajadores` para alimentar selectores y plantillas de comprobantes de su sede.
+3. **`Tecnico`:** Modo **SOLO LECTURA** en recepción de órdenes. Cualquier intento de `POST /api/servicios` es rechazado con `403 Forbidden` (*"Los técnicos no tienen permisos para crear órdenes de servicio"*). Confinado a su sucursal y lectura autorizada en `GET /api/trabajadores` para filtros operativos de asignación en taller.
 
 ---
 
@@ -134,8 +153,12 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ### 3.1 Listar Trabajadores
 - **Ruta:** `GET /api/trabajadores`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
-- **Query Params (Opcionales):** `sucursal_id` (solo SuperAdmin)
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Aislamiento:** Filtrado automático por `requireBranchAccess` según `sucursal_id` del token (excepto `SuperAdmin` que tiene visión global).
+- **Query Params (Opcionales):**
+  - `sucursal_id` (solo `SuperAdmin`): Filtrar por ID de sucursal.
+  - `activo` (`true`/`false`): Filtrar trabajadores activos.
+  - `rol` (string): Filtrar por nombre de rol (ej. `tecnico`).
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
@@ -168,7 +191,7 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ### 3.2 Obtener Detalle de un Trabajador
 - **Ruta:** `GET /api/trabajadores/:id`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
@@ -528,42 +551,75 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ## 5. Módulo de Servicios y Tickets (`/api/servicios`)
 
-### 3.1 Listar Órdenes de Servicio
+Control integral de recepción de equipos, apertura de órdenes de trabajo, seguimiento técnico, comprobantes térmicos y stickers adhesivos de taller.
+
+### 5.1 Listar Órdenes de Servicio
 - **Ruta:** `GET /api/servicios`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Aislamiento por Sede:**
+  - Si el usuario no es `SuperAdmin`, la consulta fuerza automáticamente:
+    `WHERE sr.sucursal_id = req.user.sucursal_id`
+  - Si es `SuperAdmin`, puede consultar globalmente o filtrar por una sede específica (`?sucursal_id=X`).
 - **Query Params (Opcionales):**
-  - `sucursal_id`: Filtrar por sede (ignorado si no es SuperAdmin).
-  - `estado_id` o `codigo_estado`: Filtrar por estado actual.
-  - `search`: Búsqueda por código de ticket, nombre de cliente o modelo.
-  - `tecnico_id`: Filtrar servicios asignados a un técnico.
-  - `page` (default: 1), `limit` (default: 20).
+  - `page` (INT, default: 1): Número de página.
+  - `limit` (INT, default: 20): Registros por página.
+  - `sucursal_id` (INT | 'all'): Filtro por sucursal (solo `SuperAdmin`).
+  - `estado_id` (INT | 'all'): Filtro por estado del flujo.
+  - `prioridad` (STRING | 'all'): `'baja'`, `'media'`, `'alta'`, `'urgente'`.
+  - `tecnico_id` (INT | 'all'): Filtra servicios donde el técnico participe en `tecnicos_asignados`.
+  - `q` o `busqueda` (STRING): Búsqueda por `codigo_ticket`, nombre de cliente, modelo, marca, IMEI o teléfono.
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
-    "success": true,
+    "ok": true,
     "data": [
       {
         "id": 1,
-        "codigo_ticket": "TKT-2026-0001",
-        "sucursal_id": 1,
-        "sucursal_nombre": "Franyer Mobile Center - SFM",
-        "nombre_cliente": "Juan Pérez",
-        "telefono_cliente": "809-555-1234",
-        "marca_equipo": "Apple",
-        "modelo_equipo": "iPhone 13",
-        "falla_reportada": "Pantalla rota sin táctil",
-        "codigo_estado": "EN_REPARACION",
-        "nombre_estado": "En Proceso de Reparación",
-        "color_badge": "#8B5CF6",
-        "costo_previsto": "4500.00",
-        "costo_final_confirmado": "4500.00",
-        "fecha_entrega_estimada": "2026-08-28",
-        "created_at": "2026-08-25T14:30:00.000Z"
+        "codigo_ticket": "FMC-2026-0001",
+        "prioridad": "media",
+        "marca_equipo": "Samsung",
+        "modelo_equipo": "Galaxy S23 Ultra",
+        "num_serie_imei": "358921000123456",
+        "datos_acceso_equipo": {
+          "tipo": "patron",
+          "metodo": "patron",
+          "patron": [6, 3, 0, 4, 2, 5, 8],
+          "valor": "7-4-1-5-3-6-9"
+        },
+        "falla_reportada": "Pantalla estrellada y no responde al tacto",
+        "observaciones_recepcion": "Bordes con desgaste cosmético leve",
+        "observaciones": "Bordes con desgaste cosmético leve",
+        "checklist_entrada": { "enciende": true, "pantalla_tactil": false, "camaras": true },
+        "checklist_recepcion": { "enciende": true, "pantalla_tactil": false, "camaras": true },
+        "costo_previsto": "5500.00",
+        "monto_anticipo": "2000.00",
+        "monto_descuento": "0.00",
+        "costo_final_confirmado": "0.00",
+        "es_garantia": false,
+        "nombre_cliente": "Carlos Mendoza",
+        "cliente_nombre": "Carlos Mendoza",
+        "telefono_cliente": "829-555-0149",
+        "cliente_telefono": "829-555-0149",
+        "fecha_entrega_estimada": "2026-09-12",
+        "tiempo_garantia": 30,
+        "condiciones_garantia": "Garantía cubre exclusivamente defectos en la pantalla instalada.",
+        "created_at": "2026-09-09T16:00:00.000Z",
+        "updated_at": "2026-09-09T16:00:00.000Z",
+        "estado": "Recibido en Taller",
+        "estado_color": "#6B7280",
+        "categoria": "Smartphone",
+        "sucursal": "Franyer Mobile Center - Castillo",
+        "recepcionista": "secre secre",
+        "tecnico_nombre": "ronall franco",
+        "tecnicos": [
+          { "id": 5, "nombre_completo": "ronall franco" }
+        ]
       }
     ],
     "pagination": {
       "total": 1,
       "page": 1,
+      "limit": 20,
       "totalPages": 1
     }
   }
@@ -571,151 +627,204 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ---
 
-### 3.2 Obtener Detalle Completo de una Orden
+### 5.2 Obtener Detalle Completo de una Orden por ID
 - **Ruta:** `GET /api/servicios/:id`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Aislamiento:** Un usuario de sucursal solo puede consultar órdenes de su misma sede (`AND sr.sucursal_id = req.user.sucursal_id`).
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
-    "success": true,
+    "ok": true,
     "data": {
       "id": 1,
-      "codigo_ticket": "TKT-2026-0001",
-      "sucursal_id": 1,
+      "codigo_ticket": "FMC-2026-0001",
+      "sucursal_id": 2,
       "categoria_id": 1,
-      "nombre_categoria": "Smartphone",
-      "usuario_recepcion_id": 3,
-      "recepcionista_nombre": "Laura Secretaria",
-      "estado_actual_id": 4,
-      "codigo_estado": "EN_REPARACION",
-      "nombre_estado": "En Proceso de Reparación",
-      "color_badge": "#8B5CF6",
-      "nombre_cliente": "Juan Pérez",
-      "telefono_cliente": "809-555-1234",
-      "cedula_cliente": "056-1111111-2",
-      "correo_cliente": "juan.perez@email.com",
-      "marca_equipo": "Apple",
-      "modelo_equipo": "iPhone 13",
-      "num_serie_imei": "356789012345678",
-      "datos_acceso_equipo": "PIN: 1234",
-      "falla_reportada": "Pantalla rota sin táctil",
-      "observaciones_recepcion": "Bordes con golpes leves, sin cámara rota",
-      "checklist_entrada": "{\"enciende\":true,\"camaras\":true,\"wifi\":true,\"carga\":true}",
-      "costo_previsto": "4500.00",
+      "cliente_id": 3,
+      "servicio_origen_id": null,
+      "es_garantia": false,
+      "nombre_cliente": "Carlos Mendoza",
+      "cliente_nombre": "Carlos Mendoza",
+      "telefono_cliente": "829-555-0149",
+      "cliente_telefono": "829-555-0149",
+      "cedula_cliente": "056-0012345-6",
+      "correo_cliente": "carlos.mendoza@email.com",
+      "usuario_recepcion_id": 6,
+      "estado_actual_id": 1,
+      "prioridad": "media",
+      "marca_equipo": "Samsung",
+      "modelo_equipo": "Galaxy S23 Ultra",
+      "num_serie_imei": "358921000123456",
+      "datos_acceso_equipo": {
+        "tipo": "patron",
+        "metodo": "patron",
+        "patron": [6, 3, 0, 4, 2, 5, 8],
+        "valor": "7-4-1-5-3-6-9"
+      },
+      "falla_reportada": "Pantalla estrellada y no responde al tacto",
+      "observaciones_recepcion": "Bordes con desgaste cosmético leve",
+      "observaciones": "Bordes con desgaste cosmético leve",
+      "checklist_entrada": { "enciende": true, "pantalla_tactil": false },
+      "checklist_recepcion": { "enciende": true, "pantalla_tactil": false },
+      "costo_previsto": "5500.00",
+      "monto_anticipo": "2000.00",
       "monto_descuento": "0.00",
-      "costo_final_confirmado": "4500.00",
-      "tiempo_garantia": "30 días",
-      "fecha_entrega_estimada": "2026-08-28",
-      "tecnicos_asignados": [
-        { "id": 1, "tecnico_id": 4, "nombre": "Manuel Tecnico", "es_principal": true }
-      ],
-      "historial_estados": [
-        { "id": 1, "codigo_estado": "RECIBIDO", "nota_cambio": "Recepción en mostrador", "fecha_registro": "2026-08-25T14:30:00.000Z", "usuario_nombre": "Laura Secretaria" },
-        { "id": 2, "codigo_estado": "EN_DIAGNOSTICO", "nota_cambio": "Iniciando pruebas de pantalla", "fecha_registro": "2026-08-25T15:00:00.000Z", "usuario_nombre": "Manuel Tecnico" }
-      ],
-      "incidencias": [],
-      "evidencias": []
+      "costo_final_confirmado": "0.00",
+      "tiempo_garantia": 30,
+      "condiciones_garantia": "Garantía estándar de 30 días.",
+      "fecha_entrega_estimada": "2026-09-12",
+      "fecha_entrega_real": null,
+      "created_at": "2026-09-09T16:00:00.000Z",
+      "updated_at": "2026-09-09T16:00:00.000Z",
+      "activo": true,
+      "estado": "Recibido en Taller",
+      "estado_color": "#6B7280",
+      "categoria": "Smartphone",
+      "sucursal": "Franyer Mobile Center - Castillo",
+      "recepcionista": "secre secre",
+      "nombre_cliente_reg": "Carlos Mendoza",
+      "telefono_cliente_reg": "829-555-0149",
+      "tecnico_nombre": "ronall franco",
+      "tecnicos": [
+        { "id": 5, "nombre_completo": "ronall franco" }
+      ]
     }
   }
   ```
+- **Errores:**
+  - `400 Bad Request`: ID inválido.
+  - `404 Not Found`: Orden no encontrada o no pertenece a la sucursal del usuario.
 
 ---
 
-### 3.3 Crear Nueva Orden de Servicio (Ticket)
+### 5.3 Crear Nueva Orden de Servicio (Apertura de Ticket)
 - **Ruta:** `POST /api/servicios`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`)
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`). **Bloqueado para `Tecnico` con `403 Forbidden`**.
+- **Reglas RBAC y Blindaje de Sucursal:**
+  - Si el usuario logueado tiene rol `Tecnico`, se rechaza inmediatamente:
+    `{ "ok": false, "message": "Los técnicos no tienen permisos para crear órdenes de servicio." }`
+  - Si el usuario no es `SuperAdmin`, se fuerza estrictamente:
+    `sucursal_id = req.user.sucursal_id`
+    `usuario_recepcion_id = req.user.id` (sin admitir sobreescritura desde el body).
+  - El código de ticket generado es único e inmutable en formato estándar `FMC-YYYY-XXXX`.
 - **Body (JSON):**
   ```json
   {
-    "sucursal_id": 1,
+    "cliente_id": 3,
+    "nombre_cliente": "Carlos Mendoza",
+    "telefono_cliente": "829-555-0149",
+    "cedula_cliente": "056-0012345-6",
+    "correo_cliente": "carlos.mendoza@email.com",
     "categoria_id": 1,
-    "nombre_cliente": "Juan Pérez",
-    "telefono_cliente": "809-555-1234",
-    "cedula_cliente": "056-1111111-2",
-    "correo_cliente": "juan.perez@email.com",
-    "marca_equipo": "Apple",
-    "modelo_equipo": "iPhone 13",
-    "num_serie_imei": "356789012345678",
-    "datos_acceso_equipo": "PIN: 1234",
-    "falla_reportada": "Pantalla rota sin táctil",
-    "observaciones_recepcion": "Bordes con golpes leves",
-    "checklist_entrada": "{\"enciende\":true,\"camaras\":true,\"wifi\":true,\"carga\":true}",
-    "costo_previsto": 4500.00,
+    "prioridad": "media",
+    "marca_equipo": "Samsung",
+    "modelo_equipo": "Galaxy S23 Ultra",
+    "num_serie_imei": "358921000123456",
+    "datos_acceso_equipo": {
+      "tipo": "patron",
+      "metodo": "patron",
+      "patron": [6, 3, 0, 4, 2, 5, 8],
+      "valor": "7-4-1-5-3-6-9"
+    },
+    "falla_reportada": "Pantalla estrellada y no responde al tacto",
+    "observaciones_recepcion": "Bordes con desgaste cosmético leve",
+    "checklist_entrada": {
+      "enciende": true,
+      "pantalla_tactil": false,
+      "camara_trasera": true,
+      "camara_frontal": true,
+      "puerto_carga": true,
+      "wifi_bluetooth": true
+    },
+    "costo_previsto": 5500.00,
+    "monto_anticipo": 2000.00,
     "monto_descuento": 0.00,
-    "tiempo_garantia": "30 días",
-    "condiciones_garantia": "No cubre daños por humedad ni golpes posteriores.",
-    "fecha_entrega_estimada": "2026-08-28"
+    "tiempo_garantia": 30,
+    "condiciones_garantia": "Garantía estándar de 30 días.",
+    "fecha_entrega_estimada": "2026-09-12",
+    "es_garantia": false,
+    "servicio_origen_id": null,
+    "fotos_recepcion": [],
+    "tecnicos_ids": [5]
   }
   ```
 - **Respuesta Exitosa (`201 Created`):**
   ```json
   {
-    "success": true,
+    "ok": true,
     "message": "Orden de servicio creada exitosamente.",
     "data": {
       "id": 1,
-      "codigo_ticket": "TKT-2026-0001",
-      "estado_actual": "RECIBIDO"
+      "codigo_ticket": "FMC-2026-0001",
+      "sucursal_id": 2,
+      "categoria_id": 1,
+      "cliente_id": 3,
+      "nombre_cliente": "Carlos Mendoza",
+      "telefono_cliente": "829-555-0149",
+      "marca_equipo": "Samsung",
+      "modelo_equipo": "Galaxy S23 Ultra",
+      "falla_reportada": "Pantalla estrellada y no responde al tacto",
+      "costo_previsto": "5500.00",
+      "monto_anticipo": "2000.00",
+      "costo_final_confirmado": "0.00",
+      "estado_actual_id": 1,
+      "created_at": "2026-09-09T16:00:00.000Z"
     }
   }
   ```
+- **Errores:**
+  - `400 Bad Request`: Falta de campos obligatorios (`categoria_id`, `falla_reportada`, `marca_equipo`, etc.).
+  - `403 Forbidden`: Usuario con rol `Tecnico` o usuario sin sucursal asignada.
 
 ---
 
-### 3.4 Cambiar Estado de Servicio (Transición de Flujo)
-- **Ruta:** `PATCH /api/servicios/:id/estado`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`, `Secretaria`)
-- **Body (JSON):**
-  ```json
-  {
-    "nuevo_estado_id": 2,
-    "nota_cambio": "Equipo diagnosticado. Se confirma cambio de módulo de pantalla."
-  }
-  ```
+### 5.4 Consultar por Código de Ticket
+- **Ruta:** `GET /api/servicios/ticket/:codigo`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Parámetros:** `codigo` (ej. `FMC-2026-0001`).
+- **Respuesta Exitosa (`200 OK`):** Devuelve la orden con sus datos descriptivos y estado.
+
+---
+
+### 5.5 Validar Vigencia de Garantía
+- **Ruta:** `GET /api/servicios/validar-garantia/:codigoTicket`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Descripción:** Comprueba si un ticket previo existe, si fue entregado y calcula si la fecha actual está dentro del periodo cubierto por `tiempo_garantia`.
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
-    "success": true,
-    "message": "Estado del servicio actualizado correctamente.",
+    "ok": true,
     "data": {
       "servicio_id": 1,
-      "codigo_estado": "EN_DIAGNOSTICO",
-      "nombre_estado": "En Diagnóstico"
+      "codigo_ticket": "FMC-2026-0001",
+      "en_garantia": true,
+      "dias_restantes": 18,
+      "fecha_entrega": "2026-08-28T18:00:00.000Z",
+      "tiempo_garantia_dias": 30
     }
   }
   ```
 
 ---
 
-### 3.5 Consulta Pública de Ticket (Tracking de Clientes)
-- **Ruta:** `GET /api/servicios/publico/:codigo_ticket`
-- **Acceso:** Público (Sin token)
-- **Parámetros:** `codigo_ticket` (ej. `TKT-2026-0001`)
+### 5.6 Subir Fotografías de Recepción
+- **Ruta:** `POST /api/servicios/upload-foto`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Headers:** `multipart/form-data` con campo `fotos` (hasta 5 imágenes).
+- **Procesamiento:** Streaming a Cloudinary en carpeta `siger-fmc/evidencias-tickets` en formato optimizado WebP.
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
-    "success": true,
-    "data": {
-      "codigo_ticket": "TKT-2026-0001",
-      "marca_equipo": "Apple",
-      "modelo_equipo": "iPhone 13",
-      "codigo_estado": "EN_REPARACION",
-      "nombre_estado": "En Proceso de Reparación",
-      "color_badge": "#8B5CF6",
-      "orden_flujo": 4,
-      "fecha_entrega_estimada": "2026-08-28",
-      "historial": [
-        { "nombre_estado": "Recibido en Taller", "fecha_registro": "2026-08-25T14:30:00.000Z" },
-        { "nombre_estado": "En Diagnóstico", "fecha_registro": "2026-08-25T15:00:00.000Z" },
-        { "nombre_estado": "En Proceso de Reparación", "fecha_registro": "2026-08-25T16:20:00.000Z" }
-      ]
-    }
+    "ok": true,
+    "message": "2 foto(s) subida(s) exitosamente.",
+    "data": [
+      {
+        "url": "https://res.cloudinary.com/.../siger-fmc/evidencias-tickets/foto1.webp",
+        "public_id": "siger-fmc/evidencias-tickets/foto1"
+      }
+    ]
   }
   ```
-
----
-
-## 4. Módulo de Incidencias y Evidencias (`/api/incidencias`, `/api/evidencias`)
 
 ### 4.1 Registrar Incidencia / Repuesto Adicional
 - **Ruta:** `POST /api/incidencias`
@@ -811,9 +920,12 @@ Gestión integral de los usuarios y empleados del sistema con control de acceso 
 
 ### 6.2 Obtener Listado de Trabajadores
 - **Ruta:** `GET /api/trabajadores`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Aislamiento:** Restringido por `requireBranchAccess` a la sucursal del usuario logueado (los técnicos y secretarias reciben los trabajadores de su propia sede para los filtros operativos).
 - **Query Params:**
   - `sucursal_id` (opcional, solo `SuperAdmin`): Filtrar por ID de sucursal.
+  - `activo` (opcional, boolean): Filtrar por estado activo.
+  - `rol` (opcional, string): Filtrar por nombre de rol.
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
@@ -849,7 +961,7 @@ Gestión integral de los usuarios y empleados del sistema con control de acceso 
 
 ### 6.3 Obtener Detalle de un Trabajador
 - **Ruta:** `GET /api/trabajadores/:id`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {

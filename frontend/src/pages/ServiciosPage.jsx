@@ -63,31 +63,42 @@ const FALLBACK_ESTADOS = [
 export const ServiciosPage = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
-  const isSuperAdmin = currentUser?.rol_nombre === 'SuperAdmin';
+  const userRole = String(currentUser?.rol_nombre || currentUser?.rol || '').toLowerCase();
+  const isSuperAdmin = userRole === 'superadmin';
+  const isTecnico = userRole === 'tecnico';
 
   // Datos de empresa y sucursal para reimpresión
   const [companyData, setCompanyData] = useState(null);
-  const [branchData, setBranchData]   = useState(null);
+  const [branchData, setBranchData] = useState(() => {
+    if (currentUser?.sucursal_id || currentUser?.sucursal_nombre) {
+      return {
+        id: currentUser.sucursal_id,
+        nombre_sucursal: currentUser.sucursal_nombre,
+        codigo_sucursal: currentUser.sucursal_codigo
+      };
+    }
+    return null;
+  });
 
   // Catálogos para filtros
-  const [estados, setEstados]         = useState([]);
-  const [sucursales, setSucursales]   = useState([]);
-  const [tecnicos, setTecnicos]       = useState([]);
+  const [estados, setEstados] = useState([]);
+  const [sucursales, setSucursales] = useState([]);
+  const [tecnicos, setTecnicos] = useState([]);
 
   // Estado de la tabla y paginación
-  const [ordenes, setOrdenes]         = useState([]);
-  const [isLoading, setIsLoading]     = useState(true);
+  const [ordenes, setOrdenes] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshSuccess, setRefreshSuccess] = useState(false);
-  const [pagination, setPagination]   = useState({ total: 0, page: 1, limit: 20, totalPages: 1 });
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 20, totalPages: 1 });
 
   // Filtros interactivos
-  const [searchTerm, setSearchTerm]             = useState('');
-  const [debouncedSearch, setDebouncedSearch]   = useState('');
-  const [selectedEstado, setSelectedEstado]     = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [selectedEstado, setSelectedEstado] = useState('');
   const [selectedPrioridad, setSelectedPrioridad] = useState('all');
-  const [selectedBranch, setSelectedBranch]     = useState('all');
-  const [selectedTecnico, setSelectedTecnico]   = useState('all');
+  const [selectedBranch, setSelectedBranch] = useState('all');
+  const [selectedTecnico, setSelectedTecnico] = useState('all');
 
   // Modal de reimpresión
   const [ordenAImprimir, setOrdenAImprimir] = useState(null);
@@ -131,13 +142,17 @@ export const ServiciosPage = () => {
 
   // Carga de datos de empresa y sucursal del usuario
   useEffect(() => {
-    getCompanyProfile().then((r) => r.ok && setCompanyData(r.data)).catch(() => {});
+    getCompanyProfile().then((r) => r.ok && setCompanyData(r.data)).catch(() => { });
     getBranches().then((r) => {
       if (!r.ok) return;
       const branches = r.data || [];
-      const userBranch = branches.find((b) => b.id === currentUser?.sucursal_id) || branches[0];
-      setBranchData(userBranch || null);
-    }).catch(() => {});
+      const userBranch = branches.find((b) => b.id === currentUser?.sucursal_id) ||
+        (currentUser?.sucursal_nombre ? branches.find((b) => b.nombre_sucursal === currentUser.sucursal_nombre) : null) ||
+        branches[0];
+      if (userBranch) {
+        setBranchData(userBranch);
+      }
+    }).catch(() => { });
   }, [currentUser?.sucursal_id]);
 
   // Consulta de órdenes con filtros activos
@@ -278,14 +293,16 @@ export const ServiciosPage = () => {
                 title="Refrescar lista"
                 ariaLabel="Refrescar lista de órdenes"
               />
-              <button
-                type="button"
-                onClick={() => navigate('/tickets/nueva')}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl shadow-xs hover:shadow-md transition-all font-inter cursor-pointer"
-              >
-                <Plus size={17} />
-                <span>Nueva Orden</span>
-              </button>
+              {!isTecnico && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/tickets/nueva')}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl shadow-xs hover:shadow-md transition-all font-inter cursor-pointer"
+                >
+                  <Plus size={17} />
+                  <span>Nueva Orden</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -369,17 +386,17 @@ export const ServiciosPage = () => {
 
         {/* Tabla de Órdenes de Servicio */}
         <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
-                  <th className="py-3.5 px-4 sm:px-6">Ticket</th>
-                  <th className="py-3.5 px-4 sm:px-6">Cliente</th>
-                  <th className="py-3.5 px-4 sm:px-6 hidden md:table-cell">Equipo</th>
-                  <th className="py-3.5 px-4 sm:px-6 hidden sm:table-cell">Estado</th>
-                  <th className="py-3.5 px-4 sm:px-6 hidden lg:table-cell">Prioridad</th>
-                  <th className="py-3.5 px-4 sm:px-6 hidden xl:table-cell">Fecha</th>
-                  <th className="py-3.5 px-4 sm:px-6 text-right">Acciones</th>
+                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap w-[14%] min-w-[115px]">Ticket</th>
+                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap w-[22%] min-w-[140px]">Cliente</th>
+                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap w-[22%] min-w-[150px]">Equipo</th>
+                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap w-[16%] min-w-[130px]">Estado</th>
+                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap w-[12%] min-w-[100px]">Prioridad</th>
+                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap w-[10%] min-w-[90px]">Fecha</th>
+                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap text-right w-[4%] min-w-[60px]">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
@@ -413,7 +430,7 @@ export const ServiciosPage = () => {
                       className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all"
                     >
                       {/* Columna 1: Ticket */}
-                      <td className="py-3.5 px-4 sm:px-6">
+                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap">
                         <div className="font-mono font-bold text-neutral-900 dark:text-neutral-100 tracking-wider text-sm">
                           {orden.codigo_ticket}
                         </div>
@@ -425,10 +442,10 @@ export const ServiciosPage = () => {
                       </td>
 
                       {/* Columna 2: Cliente */}
-                      <td className="py-3.5 px-4 sm:px-6">
+                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <User size={14} className="text-neutral-400 shrink-0" />
-                          <span className="text-neutral-800 dark:text-neutral-200 font-medium truncate max-w-[150px]">
+                          <span className="text-neutral-800 dark:text-neutral-200 font-medium">
                             {orden.nombre_cliente || '—'}
                           </span>
                         </div>
@@ -440,30 +457,30 @@ export const ServiciosPage = () => {
                       </td>
 
                       {/* Columna 3: Equipo */}
-                      <td className="py-3.5 px-4 sm:px-6 hidden md:table-cell">
+                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <Smartphone size={14} className="text-neutral-400 shrink-0" />
-                          <span className="text-neutral-700 dark:text-neutral-300 font-medium truncate max-w-[160px]">
+                          <span className="text-neutral-700 dark:text-neutral-300 font-medium">
                             {orden.marca_equipo} {orden.modelo_equipo}
                           </span>
                         </div>
                         {Array.isArray(orden.tecnicos) && orden.tecnicos.length > 0 ? (
                           <p
-                            className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter truncate mt-0.5 flex items-center gap-1"
+                            className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter truncate mt-0.5 flex items-center gap-1 max-w-[200px]"
                             title={orden.tecnicos.map((t) => t.nombre_completo).join(', ')}
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                             {orden.tecnicos.map((t) => t.nombre_completo).join(', ')}
                           </p>
                         ) : (
-                          <p className="text-[11px] text-neutral-400 dark:text-neutral-500 font-inter truncate mt-0.5">
+                          <p className="text-[11px] text-neutral-400 dark:text-neutral-500 font-inter mt-0.5">
                             Bolsa general
                           </p>
                         )}
                       </td>
 
                       {/* Columna 4: Estado con Badge oficial */}
-                      <td className="py-3.5 px-4 sm:px-6 hidden sm:table-cell">
+                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap">
                         {orden.estado ? (
                           <Badge
                             size="sm"
@@ -489,7 +506,7 @@ export const ServiciosPage = () => {
                       </td>
 
                       {/* Columna 5: Prioridad con Badge institucional */}
-                      <td className="py-3.5 px-4 sm:px-6 hidden lg:table-cell">
+                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap">
                         {orden.prioridad ? (
                           <Badge
                             variant={getPrioridadVariant(orden.prioridad)}
@@ -504,28 +521,28 @@ export const ServiciosPage = () => {
                       </td>
 
                       {/* Columna 6: Fecha */}
-                      <td className="py-3.5 px-4 sm:px-6 hidden xl:table-cell">
+                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400">
                           <Calendar size={13} className="shrink-0" />
                           <span className="text-xs font-inter">
                             {orden.created_at
                               ? new Date(orden.created_at).toLocaleDateString('es-DO', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric'
-                                })
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric'
+                              })
                               : '—'}
                           </span>
                         </div>
                       </td>
 
                       {/* Columna 7: Acciones */}
-                      <td className="py-3.5 px-4 sm:px-6 text-right">
+                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleImprimirClick(orden)}
-                            className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer border border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
+                            className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                             title="Imprimir comprobante o etiqueta"
                           >
                             <Printer size={16} />

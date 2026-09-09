@@ -11,9 +11,10 @@ const checkRole = (allowedRoles = []) => {
       });
     }
 
-    const userRole = req.user.rol_nombre;
+    const userRole = String(req.user.rol_nombre || req.user.rol || '').toLowerCase();
+    const normalizedAllowed = allowedRoles.map(r => String(r).toLowerCase());
 
-    if (!allowedRoles.includes(userRole)) {
+    if (!normalizedAllowed.includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: `Acceso denegado. Se requiere uno de los siguientes roles: ${allowedRoles.join(', ')}.`
@@ -38,7 +39,8 @@ const requireBranchAccess = (req, res, next) => {
   }
 
   // SuperAdmin tiene acceso omnicanal
-  if (req.user.rol_nombre === 'SuperAdmin') {
+  const userRole = String(req.user.rol_nombre || req.user.rol || '').toLowerCase();
+  if (userRole === 'superadmin') {
     req.isSuperAdmin = true;
     return next();
   }

@@ -22,9 +22,10 @@ El acceso y las capacidades dentro de la plataforma se rigen por cuatro roles es
 2. **Admin_Sucursal (`rol_id: 2`):**
    * Gestión administrativa y operativa local de una sucursal específica. Supervisión del equipo de trabajo, asignación de órdenes y métricas de su sede.
 3. **Secretaria / Recepción (`rol_id: 3`):**
-   * Atención al cliente en mostrador, búsqueda y registro de clientes, creación formal de tickets de entrada, emisión de comprobantes y gestión de entregas finales.
+   * Atención al cliente en mostrador, búsqueda y registro de clientes, creación formal de tickets de entrada (`FMC-YYYY-XXXX`), emisión de comprobantes térmicos y stickers adhesivos, cobro de anticipos y gestión de entregas finales. Confinada a su sucursal asignada.
 4. **Tecnico (`rol_id: 4`):**
-   * Acceso al módulo técnico: diagnóstico, actualización de estados de reparación, reporte de repuestos/incidencias y carga de evidencias fotográficas.
+   * Acceso al banco de trabajo técnico: diagnóstico, actualización de estados de reparación, reporte de repuestos/incidencias y carga de evidencias fotográficas.
+   * **Modo Solo Lectura en Recepción:** No posee permisos para crear órdenes de servicio (bloqueo estricto `403 Forbidden`). Confinado a su sucursal y con lectura habilitada en trabajadores (`GET /api/trabajadores`) para filtros operativos.
 
 ---
 

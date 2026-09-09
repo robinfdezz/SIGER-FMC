@@ -9,13 +9,37 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 ## [Unreleased]
 
 ### Planned
-- Módulo de Recepción de Tickets (Fase 2: apertura y gestión de órdenes de servicio).
 - Módulo de Banco de Trabajo y Diagnóstico Técnico.
 - Portal público de seguimiento de tickets para clientes (`/tracking/:codigo_ticket`).
 
 ---
 
-## [0.5.0] - 2026-09-02
+## [0.6.0] - 2026-09-09
+
+### Added
+- **Módulo de Recepción y Apertura de Órdenes de Servicio (`NuevaOrdenPage.jsx`, `ServiciosPage.jsx`):**
+  - Generación de código único de ticket en formato estándar corporativo `FMC-YYYY-XXXX`.
+  - Captura y persistencia JSONB de `checklist_entrada`, `observaciones_recepcion` y especificaciones completas del dispositivo.
+  - Selector de método de seguridad del equipo (`DeviceSecurityPicker.jsx`): Soporte para patrón Android 3x3 normalizado en coordenadas base 0 (`[0..8]`) con secuencia numérica proyectada 1..9 (ej. `"7-4-1-5-3-6-9"`), código PIN, contraseña y sin bloqueo (`datos_acceso_equipo`).
+  - Desglose presupuestario y financiero: `costo_previsto`, `monto_anticipo`, `monto_descuento` y balance pendiente calculado en tiempo real.
+  - Asignación técnica inicial en `tecnicos_asignados` y registro automático de apertura en `historial_estados` con estado `RECIBIDO`.
+- **Arquitectura de Impresión Térmica y Stickers de Taller (`#print-mount-point`):**
+  - Punto de montaje On-Demand aislado del DOM interactivo para evitar distorsiones por modo oscuro, scrolls o estilos globales.
+  - Resolución asíncrona de datos frescos (`getServicioById`) al reimprimir desde listas (`ServiciosPage.jsx`), garantizando la proyección de todas las columnas DDL de `init.sql`.
+  - Presets físicos soportados:
+    * Comprobantes térmicos POS de rollo continuo: **80 mm** y **58 mm** con logotipo monocromático de alto contraste, desglose financiero, checklist y código QR de seguimiento.
+    * Stickers adhesivos de taller: **50x30 mm** y **60x40 mm** con trazado vectorial SVG de patrón Android o valor alfanumérico destacado para PIN/Contraseña.
+- **Control de Acceso por Roles (RBAC) y Blindaje Multi-Sucursal:**
+  - `Tecnico`: Configurado en modo **SOLO LECTURA** en órdenes de servicio. Bloqueo estricto con `403 Forbidden` en `POST /api/servicios`. Confinado a su sucursal (`requireBranchAccess`) y acceso de lectura habilitado en `GET /api/trabajadores` para filtros operativos de la sucursal.
+  - `Admin_Sucursal` y `Secretaria`: Control total de apertura en mostrador confinado a su sucursal fija (`req.user.sucursal_id`), forzando `usuario_recepcion_id` en backend sin admitir sobreescritura manual. Habilitado acceso de lectura en `/configuracion/sucursales`, `/configuracion/companhia` y `/trabajadores`.
+  - `SuperAdmin`: Visión omnicanal global y selección opcional de cualquier sucursal.
+
+### Fixed
+- Corrección de discrepancia de datos al reimprimir tickets térmicos desde `ServiciosPage.jsx` mediante la proyección unificada con `COALESCE` de clientes y subconsultas de técnicos.
+- Corrección en renderizado de stickers adhesivos (`LabelPreview.jsx`) para mostrar el valor legible en PIN/Contraseña en lugar de `"[]"`.
+- Normalización del dibujo vectorial del patrón de desbloqueo Android y texto inferior legible ordenado.
+- Corrección en subtítulo contextual de `NuevaOrdenPage.jsx` para mostrar el nombre de la sucursal asignada a la Secretaria en lugar del fallback estático.
+- Corrección de formato de fecha en cabeceras a minúsculas ("del" en lugar de "de").
 
 ### Added
 - **Módulo de Gestión de Clientes y Control RBAC Granular:**

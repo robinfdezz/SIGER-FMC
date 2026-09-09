@@ -116,6 +116,18 @@ const INITIAL_FORM = {
 export const NuevaOrdenPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const userRole = String(user?.rol_nombre || user?.rol || '').toLowerCase();
+  const isTecnico = userRole === 'tecnico';
+
+  useEffect(() => {
+    if (isTecnico) {
+      sileo.error({
+        title: 'Acceso no autorizado',
+        description: 'Los técnicos no tienen permisos para crear órdenes de servicio.'
+      });
+      navigate('/servicios', { replace: true });
+    }
+  }, [isTecnico, navigate]);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState(INITIAL_FORM);
@@ -134,9 +146,29 @@ export const NuevaOrdenPage = () => {
 
   // Datos para el comprobante de impresion
   const [companyData, setCompanyData] = useState(null);
-  const [branchData, setBranchData] = useState(null);
+  const [branchData, setBranchData] = useState(() => {
+    if (user?.sucursal_id || user?.sucursal_nombre) {
+      return {
+        id: user.sucursal_id,
+        nombre_sucursal: user.sucursal_nombre,
+        codigo_sucursal: user.sucursal_codigo
+      };
+    }
+    return null;
+  });
   const [ordenCreada, setOrdenCreada] = useState(null);
   const [showPostModal, setShowPostModal] = useState(false);
+
+  useEffect(() => {
+    if (user?.sucursal_id && (!branchData || branchData.id !== user.sucursal_id || !branchData.nombre_sucursal)) {
+      setBranchData(prev => ({
+        ...prev,
+        id: user.sucursal_id,
+        nombre_sucursal: user.sucursal_nombre || prev?.nombre_sucursal,
+        codigo_sucursal: user.sucursal_codigo || prev?.codigo_sucursal
+      }));
+    }
+  }, [user]);
 
   useEffect(() => {
     getCategorias().then(res => {
@@ -147,8 +179,12 @@ export const NuevaOrdenPage = () => {
     getBranches().then(r => {
       if (!r.ok) return;
       const branches = r.data || [];
-      const userBranch = branches.find(b => b.id === user?.sucursal_id) || branches[0];
-      setBranchData(userBranch || null);
+      const userBranch = branches.find(b => b.id === user?.sucursal_id) ||
+        (user?.sucursal_nombre ? branches.find(b => b.nombre_sucursal === user.sucursal_nombre) : null) ||
+        branches[0];
+      if (userBranch) {
+        setBranchData(userBranch);
+      }
     }).catch(() => { });
 
     getWorkers({ activo: true }).then(res => {
@@ -562,6 +598,15 @@ export const NuevaOrdenPage = () => {
 
   const categoriaNombreDisplay = categorias.find(c => c.id === Number(form.categoria_id))?.nombre || 'Sin categoría';
 
+  const fechaHoyFormateada = useMemo(() => {
+    const raw = new Date().toLocaleDateString('es-DO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    return raw.replace(/\sde\s(\d{4})$/, ' del $1');
+  }, []);
+
+  if (isTecnico) {
+    return null;
+  }
+
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
@@ -582,7 +627,7 @@ export const NuevaOrdenPage = () => {
                 Apertura de Orden de Servicio
               </h1>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 font-inter mt-0.5">
-                {branchData?.nombre_sucursal || 'Sucursal Principal'} &bull; {new Date().toLocaleDateString('es-DO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                {branchData?.nombre_sucursal || user?.sucursal_nombre || 'Sucursal Principal'} &bull; {fechaHoyFormateada}
               </p>
             </div>
           </div>
