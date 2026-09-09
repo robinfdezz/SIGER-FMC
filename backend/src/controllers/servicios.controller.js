@@ -546,33 +546,46 @@ const uploadFotosServicio = async (req, res) => {
 const validarGarantiaTicket = async (req, res) => {
   try {
     const pool = getPool();
-    const codigoTicket = String(req.params.codigoTicket || '').trim().toUpperCase();
+    const { codigoTicket } = req.params;
+    const cleanCode = String(codigoTicket || '').trim();
 
-    if (!codigoTicket) {
+    if (!cleanCode) {
       return res.status(400).json({ ok: false, error: 'Código de ticket no proporcionado.' });
     }
 
     const query = `
-      SELECT
+      SELECT 
         sr.id,
         sr.codigo_ticket,
+        sr.cliente_id,
+        COALESCE(sr.nombre_cliente, TRIM(CONCAT(c.nombre, ' ', c.apellido))) AS nombre_cliente,
+        COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,
+        COALESCE(sr.cedula_cliente, c.cedula_rnc) AS cedula_cliente,
+        COALESCE(sr.correo_cliente, c.correo) AS correo_cliente,
+        sr.categoria_id,
         sr.marca_equipo,
         sr.modelo_equipo,
         sr.num_serie_imei,
-        sr.tiempo_garantia,
+        sr.datos_acceso_equipo,
         sr.fecha_entrega_real,
-        sr.created_at,
-        COALESCE(sr.nombre_cliente, TRIM(CONCAT(c.nombre, ' ', c.apellido))) AS cliente,
-        COALESCE(sr.telefono_cliente, c.telefono) AS telefono,
-        es.nombre_estado AS estado_actual
+        COALESCE(sr.tiempo_garantia, 30) AS tiempo_garantia,
+        CASE 
+          WHEN sr.fecha_entrega_real IS NOT NULL 
+          THEN (sr.fecha_entrega_real + (COALESCE(sr.tiempo_garantia, 30) || ' days')::interval)
+          ELSE NULL 
+        END AS fecha_vencimiento,
+        CASE 
+          WHEN sr.fecha_entrega_real IS NOT NULL AND (sr.fecha_entrega_real + (COALESCE(sr.tiempo_garantia, 30) || ' days')::interval) >= NOW() 
+          THEN true 
+          ELSE false 
+        END AS garantia_vigente
       FROM servicios_recepcion sr
       LEFT JOIN clientes c ON c.id = sr.cliente_id
-      LEFT JOIN estados_servicio es ON es.id = sr.estado_actual_id
-      WHERE UPPER(TRIM(sr.codigo_ticket)) = $1 AND sr.activo = TRUE
-      LIMIT 1
+      WHERE UPPER(TRIM(sr.codigo_ticket)) = UPPER(TRIM($1))
+      LIMIT 1;
     `;
 
-    const result = await pool.query(query, [codigoTicket]);
+    const result = await pool.query(query, [cleanCode]);
 
     if (result.rowCount === 0) {
       return res.status(404).json({
@@ -582,59 +595,52 @@ const validarGarantiaTicket = async (req, res) => {
       });
     }
 
-    const servicio = result.rows[0];
-    const tiempoGarantiaDias = Number.isInteger(Number(servicio.tiempo_garantia))
-      ? Number(servicio.tiempo_garantia)
-      : 30;
+    const row = result.rows[0];
 
-    // Si aún no tiene fecha de entrega real
-    if (!servicio.fecha_entrega_real) {
-      return res.status(200).json({
-        ok: true,
-        vigente: false,
-        entregado: false,
-        diasRestantes: 0,
-        mensaje: 'El equipo correspondiente a esta orden aún no figura como entregado.',
-        servicio: {
-          id: servicio.id,
-          codigo_ticket: servicio.codigo_ticket,
-          cliente: servicio.cliente || 'Cliente no registrado',
-          marca_equipo: servicio.marca_equipo,
-          modelo_equipo: servicio.modelo_equipo,
-          fecha_entrega_real: null,
-          tiempo_garantia: tiempoGarantiaDias
-        }
-      });
+    let datosAcceso = row.datos_acceso_equipo;
+    if (typeof datosAcceso === 'string') {
+      try {
+        datosAcceso = JSON.parse(datosAcceso);
+      } catch (e) {
+        datosAcceso = null;
+      }
     }
 
-    // Calcular vigencia respecto a fecha_entrega_real
-    const fechaEntrega = new Date(servicio.fecha_entrega_real);
-    const fechaVencimiento = new Date(fechaEntrega.getTime() + (tiempoGarantiaDias * 24 * 60 * 60 * 1000));
-    const now = new Date();
+    let diasRestantes = 0;
+    if (row.fecha_vencimiento) {
+      const diffMs = new Date(row.fecha_vencimiento).getTime() - Date.now();
+      diasRestantes = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+    }
 
-    const diffMs = fechaVencimiento.getTime() - now.getTime();
-    const diasRestantes = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
-    const vigente = diffMs >= 0 && tiempoGarantiaDias > 0;
+    const servicioData = {
+      id: row.id,
+      codigo_ticket: row.codigo_ticket,
+      cliente_id: row.cliente_id || null,
+      cliente: row.nombre_cliente || 'Cliente no registrado',
+      nombre_cliente: row.nombre_cliente || '',
+      telefono_cliente: row.telefono_cliente || '',
+      cedula_cliente: row.cedula_cliente || '',
+      correo_cliente: row.correo_cliente || '',
+      categoria_id: row.categoria_id,
+      marca_equipo: row.marca_equipo,
+      modelo_equipo: row.modelo_equipo,
+      num_serie_imei: row.num_serie_imei || '',
+      datos_acceso_equipo: datosAcceso,
+      fecha_entrega_real: row.fecha_entrega_real,
+      tiempo_garantia: Number(row.tiempo_garantia) || 30
+    };
 
     return res.status(200).json({
       ok: true,
-      vigente: vigente,
-      entregado: true,
+      vigente: Boolean(row.garantia_vigente),
+      entregado: Boolean(row.fecha_entrega_real),
       diasRestantes: diasRestantes,
-      fechaVencimiento: fechaVencimiento.toISOString(),
-      servicio: {
-        id: servicio.id,
-        codigo_ticket: servicio.codigo_ticket,
-        cliente: servicio.cliente || 'Cliente no registrado',
-        marca_equipo: servicio.marca_equipo,
-        modelo_equipo: servicio.modelo_equipo,
-        fecha_entrega_real: servicio.fecha_entrega_real,
-        tiempo_garantia: tiempoGarantiaDias
-      }
+      fechaVencimiento: row.fecha_vencimiento ? new Date(row.fecha_vencimiento).toISOString() : null,
+      servicio: servicioData
     });
 
   } catch (error) {
-    console.error('Error en validarGarantiaTicket:', error);
+    console.error('[validarGarantiaTicket Error]:', error);
     return res.status(500).json({
       ok: false,
       error: 'Error interno al validar garantía del ticket.',

@@ -79,9 +79,15 @@ const SectionHeader = ({ icon: Icon, title, subtitle }) => (
 
 const INITIAL_FORM = {
   cliente: null,
+  cliente_id: null,
+  cliente_seleccionado: null,
+  nombre_cliente: '',
   nombre_cliente_libre: '',
+  telefono_cliente: '',
   telefono_cliente_libre: '',
+  cedula_cliente: '',
   cedula_cliente_libre: '',
+  correo_cliente: '',
   correo_cliente_libre: '',
   categoria_id: '',
   marca_equipo: '',
@@ -90,7 +96,7 @@ const INITIAL_FORM = {
   falla_reportada: '',
   observaciones_recepcion: '',
   fotos_recepcion: [],
-  datos_acceso_equipo: { metodo: 'ninguno', valor: null },
+  datos_acceso_equipo: { metodo: 'ninguno', tipo: 'ninguno', valor: '', patron: [] },
   checklist_entrada: {},
   costo_previsto: '',
   monto_anticipo: '',
@@ -102,7 +108,9 @@ const INITIAL_FORM = {
   es_garantia: false,
   servicio_origen_id: null,
   servicio_origen_codigo: '',
+  codigo_ticket_origen: '',
   tecnicos_ids: [],
+  tecnicos_asignados: [],
 };
 
 export const NuevaOrdenPage = () => {
@@ -191,18 +199,76 @@ export const NuevaOrdenPage = () => {
     setErrors(prev => ({ ...prev, [key]: undefined }));
   }, []);
 
+  // Limpieza centralizada y total del formulario cuando se cancela o desvincula la garantía
+  const resetGarantiaState = useCallback((preserveInputCode = false) => {
+    // 1. Limpiar feedback y estado de validación
+    setTicketValidation({
+      loading: false,
+      checked: false,
+      error: null,
+      data: null
+    });
+
+    // 2. Limpiar errores de validación de garantía
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next.servicio_origen_codigo;
+      delete next.codigo_ticket_origen;
+      return next;
+    });
+
+    // 3. Restablecer campos del formulario rigurosamente a sus valores iniciales limpios
+    setForm(prev => ({
+      ...prev,
+      servicio_origen_id: null,
+      servicio_origen_codigo: preserveInputCode ? prev.servicio_origen_codigo : '',
+      codigo_ticket_origen: preserveInputCode ? (prev.codigo_ticket_origen || prev.servicio_origen_codigo) : '',
+      cliente: null,
+      cliente_id: null,
+      cliente_seleccionado: null,
+      nombre_cliente: '',
+      nombre_cliente_libre: '',
+      telefono_cliente: '',
+      telefono_cliente_libre: '',
+      cedula_cliente: '',
+      cedula_cliente_libre: '',
+      correo_cliente: '',
+      correo_cliente_libre: '',
+      categoria_id: '',
+      marca_equipo: '',
+      modelo_equipo: '',
+      num_serie_imei: '',
+      datos_acceso_equipo: { metodo: 'ninguno', tipo: 'ninguno', valor: '', patron: [] },
+      costo_previsto: '',
+      monto_anticipo: '',
+      monto_descuento: '',
+      tecnicos_ids: [],
+      tecnicos_asignados: [],
+    }));
+  }, []);
+
+  const handleToggleGarantia = useCallback(() => {
+    const nextVal = !form.es_garantia;
+    if (!nextVal) {
+      resetGarantiaState(false);
+    }
+    set('es_garantia', nextVal);
+  }, [form.es_garantia, resetGarantiaState, set]);
+
   // Validación con debounce (300ms) del código de ticket original en caso de reingreso por garantía
   useEffect(() => {
     if (!form.es_garantia) {
-      setTicketValidation({ loading: false, checked: false, error: null, data: null });
-      setForm(prev => prev.servicio_origen_id ? { ...prev, servicio_origen_id: null } : prev);
+      if (ticketValidation.checked || ticketValidation.loading || form.servicio_origen_id || form.servicio_origen_codigo) {
+        resetGarantiaState(false);
+      }
       return;
     }
 
-    const code = (form.servicio_origen_codigo || '').trim();
+    const code = (form.servicio_origen_codigo || form.codigo_ticket_origen || '').trim();
     if (code.length < 3) {
-      setTicketValidation({ loading: false, checked: false, error: null, data: null });
-      setForm(prev => prev.servicio_origen_id ? { ...prev, servicio_origen_id: null } : prev);
+      if (form.servicio_origen_id || ticketValidation.checked || ticketValidation.error || ticketValidation.data) {
+        resetGarantiaState(true);
+      }
       return;
     }
 
@@ -214,16 +280,50 @@ export const NuevaOrdenPage = () => {
         const res = await validarGarantiaTicket(code);
         if (isCancelled) return;
 
-        if (res && res.ok) {
+        if (res && res.ok && res.servicio) {
+          const serv = res.servicio;
+          const clienteObj = serv.cliente_id ? {
+            id: serv.cliente_id,
+            nombre: serv.nombre_cliente || serv.cliente || '',
+            apellido: '',
+            telefono: serv.telefono_cliente || '',
+            cedula_rnc: serv.cedula_cliente || '',
+            cedula: serv.cedula_cliente || '',
+            correo: serv.correo_cliente || '',
+            email: serv.correo_cliente || ''
+          } : null;
+
           setTicketValidation({
             loading: false,
             checked: true,
             error: null,
             data: res
           });
+
           setForm(prev => ({
             ...prev,
-            servicio_origen_id: res.servicio?.id || null
+            cliente: clienteObj,
+            cliente_id: serv.cliente_id || null,
+            cliente_seleccionado: clienteObj,
+            nombre_cliente: serv.nombre_cliente || serv.cliente || '',
+            nombre_cliente_libre: serv.nombre_cliente || serv.cliente || '',
+            telefono_cliente: serv.telefono_cliente || '',
+            telefono_cliente_libre: serv.telefono_cliente || '',
+            cedula_cliente: serv.cedula_cliente || '',
+            cedula_cliente_libre: serv.cedula_cliente || '',
+            correo_cliente: serv.correo_cliente || '',
+            correo_cliente_libre: serv.correo_cliente || '',
+            categoria_id: serv.categoria_id ? String(serv.categoria_id) : prev.categoria_id,
+            marca_equipo: serv.marca_equipo || '',
+            modelo_equipo: serv.modelo_equipo || '',
+            num_serie_imei: serv.num_serie_imei || '',
+            datos_acceso_equipo: serv.datos_acceso_equipo || { metodo: 'ninguno', tipo: 'ninguno', valor: '', patron: [] },
+            servicio_origen_id: serv.id,
+            servicio_origen_codigo: serv.codigo_ticket || code,
+            codigo_ticket_origen: serv.codigo_ticket || code,
+            costo_previsto: 0,
+            monto_anticipo: 0,
+            monto_descuento: 0
           }));
         } else {
           setTicketValidation({
@@ -232,10 +332,9 @@ export const NuevaOrdenPage = () => {
             error: res?.error || res?.message || 'Ticket no encontrado en el sistema.',
             data: null
           });
-          setForm(prev => ({
-            ...prev,
-            servicio_origen_id: null
-          }));
+          if (form.servicio_origen_id) {
+            resetGarantiaState(true);
+          }
         }
       } catch (err) {
         if (isCancelled) return;
@@ -245,10 +344,9 @@ export const NuevaOrdenPage = () => {
           error: err.message || 'Error al validar el ticket.',
           data: null
         });
-        setForm(prev => ({
-          ...prev,
-          servicio_origen_id: null
-        }));
+        if (form.servicio_origen_id) {
+          resetGarantiaState(true);
+        }
       }
     }, 300);
 
@@ -256,7 +354,9 @@ export const NuevaOrdenPage = () => {
       isCancelled = true;
       clearTimeout(timer);
     };
-  }, [form.es_garantia, form.servicio_origen_codigo]);
+  }, [form.es_garantia, form.servicio_origen_codigo, form.codigo_ticket_origen, form.servicio_origen_id, resetGarantiaState]);
+
+  const isGarantiaLocked = Boolean(form.es_garantia && form.servicio_origen_id);
 
   const categoriaOptions = useMemo(() => {
     if (categorias && categorias.length > 0) {
@@ -273,6 +373,15 @@ export const NuevaOrdenPage = () => {
   const validateStep = (step) => {
     const errs = {};
     if (step === 1) {
+      if (form.es_garantia) {
+        const codigoTicket = (form.servicio_origen_codigo || '').trim();
+        if (!codigoTicket) {
+          errs.servicio_origen_codigo = 'El código del ticket original es obligatorio';
+        } else if (!form.servicio_origen_id) {
+          errs.servicio_origen_codigo = ticketValidation.error || 'Debes ingresar y verificar un ticket original válido en el sistema';
+        }
+      }
+
       if (!form.cliente) {
         const nombre = (form.nombre_cliente_libre || '').trim();
         if (!nombre) {
@@ -340,15 +449,6 @@ export const NuevaOrdenPage = () => {
       } else if (isNaN(Number(form.costo_previsto)) || Number(form.costo_previsto) < 0) {
         errs.costo_previsto = 'Ingresa un monto válido';
       }
-
-      if (form.es_garantia) {
-        const codigoTicket = (form.servicio_origen_codigo || '').trim();
-        if (!codigoTicket) {
-          errs.servicio_origen_codigo = 'El código del ticket original es obligatorio';
-        } else if (!form.servicio_origen_id) {
-          errs.servicio_origen_codigo = ticketValidation.error || 'Debes ingresar y validar un ticket previo existente en el sistema';
-        }
-      }
     }
     return errs;
   };
@@ -379,11 +479,11 @@ export const NuevaOrdenPage = () => {
 
     if (Object.keys(allErrors).length > 0) {
       setErrors(allErrors);
-      if (errsStep1.categoria_id || errsStep1.marca_equipo || errsStep1.modelo_equipo || errsStep1.nombre_cliente_libre) {
+      if (errsStep1.servicio_origen_codigo || errsStep1.categoria_id || errsStep1.marca_equipo || errsStep1.modelo_equipo || errsStep1.nombre_cliente_libre) {
         setCurrentStep(1);
       } else if (errsStep2.falla_reportada) {
         setCurrentStep(2);
-      } else if (errsStep4.costo_previsto || errsStep4.servicio_origen_codigo) {
+      } else if (errsStep4.costo_previsto) {
         setCurrentStep(4);
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -508,19 +608,191 @@ export const NuevaOrdenPage = () => {
               PASO 1: CLIENTE Y EQUIPO
           ═══════════════════════════════════════════════════ */}
           {currentStep === 1 && (
-            <div className="p-5 sm:p-7 animate-fade-in">
+            <div className="p-5 sm:p-7 animate-fade-in space-y-6">
+              {/* Bloque Superior: Reingreso por Garantía de Servicio Previo (Cuadrícula 2 Columnas) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs mb-6">
+                {/* Columna Izquierda: Identificación y Switch */}
+                <div>
+                  <SectionHeader
+                    icon={ShieldAlert}
+                    title="REINGRESO POR GARANTÍA DE SERVICIO PREVIO"
+                    subtitle="Activa si el equipo regresa al taller debido a una orden anterior para autocompletar cliente y dispositivo."
+                  />
+
+                  <label
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleToggleGarantia();
+                    }}
+                    className="inline-flex items-center gap-3 cursor-pointer select-none mt-4"
+                  >
+                    <div
+                      className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 ${
+                        form.es_garantia ? 'bg-red-600' : 'bg-neutral-300 dark:bg-neutral-700'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-xs transition-transform duration-200 ${
+                          form.es_garantia ? 'translate-x-5' : ''
+                        }`}
+                      />
+                    </div>
+                    <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200 font-inter">
+                      Es reingreso por garantía de servicio anterior
+                    </span>
+                  </label>
+                </div>
+
+                {/* Columna Derecha: Búsqueda y Feedback */}
+                <div>
+                  {form.es_garantia ? (
+                    <div className="space-y-3 animate-fade-in">
+                      <div className="flex items-center justify-between">
+                        <label className={`${labelClass} mb-0`}>
+                          CÓDIGO DEL TICKET ORIGINAL <span className="text-red-500 font-bold">*</span>
+                        </label>
+                        {ticketValidation.loading && (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] text-neutral-400 font-medium">
+                            <Loader2 className="w-3 h-3 animate-spin text-red-600" /> Verificando...
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={form.servicio_origen_codigo}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase().trim();
+                            set('servicio_origen_codigo', val);
+                            set('codigo_ticket_origen', val);
+                            if (!val) {
+                              resetGarantiaState(true);
+                            }
+                          }}
+                          placeholder="Ej: ABC-1234"
+                          className={`${inputClass} font-mono tracking-widest uppercase pr-10 ${
+                            errors.servicio_origen_codigo || (ticketValidation.checked && ticketValidation.error)
+                              ? 'border-red-400 focus:border-red-500 focus:ring-red-500/20'
+                              : ticketValidation.checked && ticketValidation.data?.vigente
+                              ? 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-500/20'
+                              : ticketValidation.checked && ticketValidation.data && !ticketValidation.data.vigente
+                              ? 'border-red-400 dark:border-red-600 focus:border-red-500 focus:ring-red-500/20'
+                              : ''
+                          }`}
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center">
+                          {ticketValidation.loading ? (
+                            <Loader2 className="w-4 h-4 text-neutral-400 animate-spin" />
+                          ) : ticketValidation.checked && ticketValidation.data?.vigente ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ) : ticketValidation.checked && ticketValidation.data && !ticketValidation.data.vigente ? (
+                            <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-500" />
+                          ) : ticketValidation.checked && ticketValidation.error ? (
+                            <AlertCircle className="w-4 h-4 text-red-500" />
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Error de validación o no encontrado */}
+                      {(errors.servicio_origen_codigo || (ticketValidation.checked && ticketValidation.error)) && (
+                        <div className="flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400 font-medium pt-0.5 animate-fade-in">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <span>{errors.servicio_origen_codigo || ticketValidation.error}</span>
+                        </div>
+                      )}
+
+                      {/* Válido y vigente */}
+                      {ticketValidation.checked && ticketValidation.data?.vigente && (
+                        <div className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/60 space-y-1.5 animate-fade-in">
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              Garantía Vigente ({ticketValidation.data.diasRestantes} {ticketValidation.data.diasRestantes === 1 ? 'día restante' : 'días restantes'})
+                            </span>
+                            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-medium">
+                              #{ticketValidation.data.servicio?.codigo_ticket}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1.5 border-t border-emerald-200/60 dark:border-emerald-800/40 text-[11px] text-emerald-900/90 dark:text-emerald-200/90">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <User className="w-3 h-3 shrink-0 opacity-70" />
+                              <span className="truncate">Cliente: <strong className="font-semibold">{ticketValidation.data.servicio?.cliente}</strong></span>
+                            </div>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <Smartphone className="w-3 h-3 shrink-0 opacity-70" />
+                              <span className="truncate">Equipo: <strong className="font-semibold">{[ticketValidation.data.servicio?.marca_equipo, ticketValidation.data.servicio?.modelo_equipo].filter(Boolean).join(' ')}</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Válido pero vencido o no entregado */}
+                      {ticketValidation.checked && ticketValidation.data && !ticketValidation.data.vigente && (
+                        <div className="bg-red-50/60 dark:bg-red-950/20 border border-red-200/80 dark:border-red-900/40 rounded-xl p-3.5 space-y-1.5 animate-fade-in">
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-700 dark:text-red-400">
+                              <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+                              {ticketValidation.data.entregado ? 'Garantía Vencida' : 'Equipo aún no entregado'}
+                            </span>
+                            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 font-medium">
+                              #{ticketValidation.data.servicio?.codigo_ticket}
+                            </span>
+                          </div>
+                          <p className="text-xs text-red-600/90 dark:text-red-300/80 leading-relaxed">
+                            {ticketValidation.data.entregado
+                              ? `La garantía de este servicio venció el ${ticketValidation.data.fechaVencimiento ? new Date(ticketValidation.data.fechaVencimiento).toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' }) : 'recientemente'}.`
+                              : 'La orden existe pero aún no registra una fecha de entrega formal al cliente.'}
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1.5 border-t border-red-100 dark:border-red-900/30 text-xs text-red-700/80 dark:text-red-300/70">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <User className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                              <span className="truncate">Cliente: <strong className="font-medium text-red-900 dark:text-red-200">{ticketValidation.data.servicio?.cliente}</strong></span>
+                            </div>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <Smartphone className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                              <span className="truncate">Equipo: <strong className="font-medium text-red-900 dark:text-red-200">{[ticketValidation.data.servicio?.marca_equipo, ticketValidation.data.servicio?.modelo_equipo].filter(Boolean).join(' ')}</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter">
+                        Indica el código del ticket previo para vincular el historial técnico y autocompletar los datos del cliente y dispositivo.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="hidden lg:flex flex-col items-center justify-center p-6 rounded-xl border border-dashed border-neutral-200 dark:border-neutral-800 text-center select-none min-h-[110px]">
+                      <ShieldAlert className="w-5 h-5 text-neutral-300 dark:text-neutral-600 mb-1" />
+                      <p className="text-xs text-neutral-400 dark:text-neutral-500 font-inter">
+                        Activa el interruptor para buscar una orden anterior y autocompletar
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Grid 2 Columnas: Cliente y Equipo */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 {/* Bloque Cliente */}
                 <div className="p-5 rounded-2xl bg-neutral-50/70 dark:bg-neutral-800/30 border border-neutral-200/70 dark:border-neutral-800 space-y-4">
-                  <SectionHeader
-                    icon={User}
-                    title="Identificación del Cliente"
-                    subtitle="Selecciona un cliente de la cartera o ingresa los datos directamente para recepción rápida"
-                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <SectionHeader
+                      icon={User}
+                      title="Identificación del Cliente"
+                      subtitle="Selecciona un cliente de la cartera o ingresa los datos directamente para recepción rápida"
+                    />
+                    {isGarantiaLocked && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded-md border border-red-200/60 dark:border-red-900/30 shrink-0">
+                        Bloqueado por garantía
+                      </span>
+                    )}
+                  </div>
 
                   <ClientQuickSelect
                     value={form.cliente}
                     onChange={(c) => set('cliente', c)}
+                    disabled={isGarantiaLocked}
                   />
 
                   {!form.cliente && (
@@ -532,8 +804,9 @@ export const NuevaOrdenPage = () => {
                           maxLength={100}
                           value={form.nombre_cliente_libre}
                           onChange={(e) => set('nombre_cliente_libre', e.target.value)}
+                          disabled={isGarantiaLocked}
                           placeholder="Nombre completo del cliente..."
-                          className={`${inputClass} ${errors.nombre_cliente_libre ? 'border-red-500 dark:border-red-500' : ''}`}
+                          className={`${inputClass} ${isGarantiaLocked ? 'bg-neutral-100 dark:bg-neutral-800/50 cursor-not-allowed opacity-80' : ''} ${errors.nombre_cliente_libre ? 'border-red-500 dark:border-red-500' : ''}`}
                         />
                         {errors.nombre_cliente_libre && (
                           <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.nombre_cliente_libre}</p>
@@ -547,12 +820,13 @@ export const NuevaOrdenPage = () => {
                             type="tel"
                             maxLength={15}
                             value={form.telefono_cliente_libre}
+                            disabled={isGarantiaLocked}
                             onChange={(e) => {
                               const val = e.target.value.replace(/\D/g, '');
                               if (val.length <= 15) set('telefono_cliente_libre', val);
                             }}
                             placeholder="8090000000 (solo números)"
-                            className={`${inputClass} ${errors.telefono_cliente_libre ? 'border-red-500 dark:border-red-500' : ''}`}
+                            className={`${inputClass} ${isGarantiaLocked ? 'bg-neutral-100 dark:bg-neutral-800/50 cursor-not-allowed opacity-80' : ''} ${errors.telefono_cliente_libre ? 'border-red-500 dark:border-red-500' : ''}`}
                           />
                           {errors.telefono_cliente_libre && (
                             <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.telefono_cliente_libre}</p>
@@ -565,12 +839,13 @@ export const NuevaOrdenPage = () => {
                             type="text"
                             maxLength={13}
                             value={form.cedula_cliente_libre}
+                            disabled={isGarantiaLocked}
                             onChange={(e) => {
                               const val = e.target.value.replace(/[^0-9\-]/g, '');
                               if (val.length <= 13) set('cedula_cliente_libre', val);
                             }}
                             placeholder="000-0000000-0"
-                            className={`${inputClass} ${errors.cedula_cliente_libre ? 'border-red-500 dark:border-red-500' : ''}`}
+                            className={`${inputClass} ${isGarantiaLocked ? 'bg-neutral-100 dark:bg-neutral-800/50 cursor-not-allowed opacity-80' : ''} ${errors.cedula_cliente_libre ? 'border-red-500 dark:border-red-500' : ''}`}
                           />
                           {errors.cedula_cliente_libre && (
                             <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.cedula_cliente_libre}</p>
@@ -583,9 +858,10 @@ export const NuevaOrdenPage = () => {
                             type="email"
                             maxLength={100}
                             value={form.correo_cliente_libre}
+                            disabled={isGarantiaLocked}
                             onChange={(e) => set('correo_cliente_libre', e.target.value.trimStart())}
                             placeholder="cliente@ejemplo.com"
-                            className={`${inputClass} ${errors.correo_cliente_libre ? 'border-red-500 dark:border-red-500' : ''}`}
+                            className={`${inputClass} ${isGarantiaLocked ? 'bg-neutral-100 dark:bg-neutral-800/50 cursor-not-allowed opacity-80' : ''} ${errors.correo_cliente_libre ? 'border-red-500 dark:border-red-500' : ''}`}
                           />
                           {errors.correo_cliente_libre && (
                             <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.correo_cliente_libre}</p>
@@ -598,11 +874,18 @@ export const NuevaOrdenPage = () => {
 
                 {/* Bloque Equipo */}
                 <div className="p-5 rounded-2xl bg-neutral-50/70 dark:bg-neutral-800/30 border border-neutral-200/70 dark:border-neutral-800 space-y-4">
-                  <SectionHeader
-                    icon={Smartphone}
-                    title="Datos del Dispositivo"
-                    subtitle="Categoría técnica y características del equipo entregado"
-                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <SectionHeader
+                      icon={Smartphone}
+                      title="Datos del Dispositivo"
+                      subtitle="Categoría técnica y características del equipo entregado"
+                    />
+                    {isGarantiaLocked && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded-md border border-red-200/60 dark:border-red-900/30 shrink-0">
+                        Bloqueado por garantía
+                      </span>
+                    )}
+                  </div>
 
                   {/* Categoría y Prioridad en la misma fila */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -610,6 +893,7 @@ export const NuevaOrdenPage = () => {
                       <Select
                         label="Categoría de Dispositivo"
                         isRequired={true}
+                        disabled={isGarantiaLocked}
                         items={categoriaOptions}
                         value={form.categoria_id ? String(form.categoria_id) : ''}
                         onChange={(val) => set('categoria_id', val)}
@@ -636,9 +920,10 @@ export const NuevaOrdenPage = () => {
                         type="text"
                         maxLength={50}
                         value={form.marca_equipo}
+                        disabled={isGarantiaLocked}
                         onChange={(e) => set('marca_equipo', e.target.value)}
                         placeholder="Apple, Samsung, Xiaomi..."
-                        className={`${inputClass} ${errors.marca_equipo ? 'border-red-500 dark:border-red-500' : ''}`}
+                        className={`${inputClass} ${isGarantiaLocked ? 'bg-neutral-100 dark:bg-neutral-800/50 cursor-not-allowed opacity-80' : ''} ${errors.marca_equipo ? 'border-red-500 dark:border-red-500' : ''}`}
                       />
                       {errors.marca_equipo && (
                         <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.marca_equipo}</p>
@@ -650,9 +935,10 @@ export const NuevaOrdenPage = () => {
                         type="text"
                         maxLength={50}
                         value={form.modelo_equipo}
+                        disabled={isGarantiaLocked}
                         onChange={(e) => set('modelo_equipo', e.target.value)}
                         placeholder="iPhone 14 Pro, Galaxy S23..."
-                        className={`${inputClass} ${errors.modelo_equipo ? 'border-red-500 dark:border-red-500' : ''}`}
+                        className={`${inputClass} ${isGarantiaLocked ? 'bg-neutral-100 dark:bg-neutral-800/50 cursor-not-allowed opacity-80' : ''} ${errors.modelo_equipo ? 'border-red-500 dark:border-red-500' : ''}`}
                       />
                       {errors.modelo_equipo && (
                         <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.modelo_equipo}</p>
@@ -667,9 +953,10 @@ export const NuevaOrdenPage = () => {
                       type="text"
                       maxLength={50}
                       value={form.num_serie_imei}
+                      disabled={isGarantiaLocked}
                       onChange={(e) => set('num_serie_imei', e.target.value)}
                       placeholder="352099001761481"
-                      className={`${inputClass} ${errors.num_serie_imei ? 'border-red-500 dark:border-red-500' : ''}`}
+                      className={`${inputClass} ${isGarantiaLocked ? 'bg-neutral-100 dark:bg-neutral-800/50 cursor-not-allowed opacity-80' : ''} ${errors.num_serie_imei ? 'border-red-500 dark:border-red-500' : ''}`}
                     />
                     {errors.num_serie_imei && (
                       <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.num_serie_imei}</p>
@@ -882,213 +1169,68 @@ export const NuevaOrdenPage = () => {
                 </div>
               </div>
 
-              {/* 3. Bloques Inferiores: Técnicos Asignados y Reingreso por Garantía */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-                {/* Bloque Izquierdo: Asignación Técnica */}
-                <div className="p-5 rounded-2xl bg-neutral-50/70 dark:bg-neutral-800/30 border border-neutral-200/70 dark:border-neutral-800 flex flex-col justify-between h-full space-y-4">
-                  <div className="space-y-4">
-                    <SectionHeader
-                      icon={Wrench}
-                      title="Técnicos Asignados (Opcional)"
-                      subtitle="Asigna directamente a especialistas responsables de esta orden"
-                    />
+              {/* 3. Bloque Inferior: Técnicos Asignados */}
+              <div className="p-5 rounded-2xl bg-neutral-50/70 dark:bg-neutral-800/30 border border-neutral-200/70 dark:border-neutral-800 space-y-4">
+                <SectionHeader
+                  icon={Wrench}
+                  title="Técnicos Asignados (Opcional)"
+                  subtitle="Asigna directamente a especialistas responsables de esta orden"
+                />
 
-                    {tecnicosDisponibles.length === 0 ? (
-                      <p className="text-xs text-neutral-400 font-inter py-2">No hay técnicos disponibles en este momento.</p>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        {tecnicosDisponibles.map((tec) => {
-                          const isSelected = form.tecnicos_ids.includes(tec.id);
-                          const fullName = tec.nombre_completo || `${tec.nombre} ${tec.apellido}`;
-                          return (
-                            <div
-                              key={tec.id}
-                              onClick={() => toggleTecnico(tec.id)}
-                              className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
-                                isSelected
-                                  ? 'border-red-500 dark:border-red-500 bg-red-50/60 dark:bg-red-950/30 shadow-2xs ring-1 ring-red-500/20'
-                                  : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-neutral-300 dark:hover:border-neutral-700'
-                              }`}
-                            >
-                              <div
-                                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                                  isSelected
-                                    ? 'bg-red-600 text-white'
-                                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300'
-                                }`}
-                              >
-                                {fullName.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 truncate font-outfit">
-                                  {fullName}
-                                </p>
-                                <p className="text-[10px] text-neutral-400 dark:text-neutral-500 font-inter truncate">
-                                  {(tec.rol_nombre || tec.nombre_rol || 'Técnico').replace('_', ' ')}
-                                </p>
-                              </div>
-                              <div
-                                className={`w-4 h-4 rounded-md flex items-center justify-center border transition-colors shrink-0 ${
-                                  isSelected
-                                    ? 'bg-red-600 border-red-600 text-white'
-                                    : 'border-neutral-300 dark:border-neutral-700'
-                                }`}
-                              >
-                                {isSelected && <Check size={10} strokeWidth={3} />}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {form.tecnicos_ids.length === 0 && (
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter italic pt-2">
-                      * Si no seleccionas técnicos, la orden quedará en la bolsa general de trabajo de la sucursal.
-                    </p>
-                  )}
-                </div>
-
-                {/* Bloque Derecho: Garantía de Reingreso */}
-                <div className="p-5 rounded-2xl bg-neutral-50/70 dark:bg-neutral-800/30 border border-neutral-200/70 dark:border-neutral-800 flex flex-col justify-between h-full space-y-4">
-                  <div className="space-y-4">
-                    <SectionHeader
-                      icon={ShieldAlert}
-                      title="Reingreso por Garantía de Servicio Previo"
-                      subtitle="Activa si el equipo regresa al taller debido a una orden anterior"
-                    />
-
-                    <label className="inline-flex items-center gap-3 cursor-pointer select-none py-1">
-                      <div
-                        onClick={() => set('es_garantia', !form.es_garantia)}
-                        className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 ${
-                          form.es_garantia ? 'bg-red-600' : 'bg-neutral-300 dark:bg-neutral-700'
-                        }`}
-                      >
+                {tecnicosDisponibles.length === 0 ? (
+                  <p className="text-xs text-neutral-400 font-inter py-2">No hay técnicos disponibles en este momento.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
+                    {tecnicosDisponibles.map((tec) => {
+                      const isSelected = form.tecnicos_ids.includes(tec.id);
+                      const fullName = tec.nombre_completo || `${tec.nombre} ${tec.apellido}`;
+                      return (
                         <div
-                          className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-xs transition-transform duration-200 ${
-                            form.es_garantia ? 'translate-x-5' : ''
+                          key={tec.id}
+                          onClick={() => toggleTecnico(tec.id)}
+                          className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
+                            isSelected
+                              ? 'border-red-500 dark:border-red-500 bg-red-50/60 dark:bg-red-950/30 shadow-2xs ring-1 ring-red-500/20'
+                              : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-neutral-300 dark:hover:border-neutral-700'
                           }`}
-                        />
-                      </div>
-                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200 font-inter">
-                        Es reingreso por garantía de servicio anterior
-                      </span>
-                    </label>
-
-                    {form.es_garantia && (
-                      <div className="p-4 rounded-xl bg-white dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800 space-y-3 animate-fade-in">
-                        <div className="flex items-center justify-between">
-                          <label className={`${labelClass} mb-0`}>
-                            Código del Ticket Original <span className="text-red-500 font-bold">*</span>
-                          </label>
-                          {ticketValidation.loading && (
-                            <span className="inline-flex items-center gap-1.5 text-[11px] text-neutral-400 font-medium">
-                              <Loader2 className="w-3 h-3 animate-spin text-red-600" /> Verificando...
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={form.servicio_origen_codigo}
-                            onChange={(e) => set('servicio_origen_codigo', e.target.value.toUpperCase().trim())}
-                            placeholder="Ej: ABC-1234"
-                            className={`${inputClass} font-mono tracking-widest uppercase pr-10 ${
-                              errors.servicio_origen_codigo || (ticketValidation.checked && ticketValidation.error)
-                                ? 'border-red-400 focus:border-red-500 focus:ring-red-500/20'
-                                : ticketValidation.checked && ticketValidation.data?.vigente
-                                ? 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-500/20'
-                                : ticketValidation.checked && ticketValidation.data && !ticketValidation.data.vigente
-                                ? 'border-red-400 dark:border-red-600 focus:border-red-500 focus:ring-red-500/20'
-                                : ''
+                        >
+                          <div
+                            className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                              isSelected
+                                ? 'bg-red-600 text-white'
+                                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300'
                             }`}
-                          />
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center">
-                            {ticketValidation.loading ? (
-                              <Loader2 className="w-4 h-4 text-neutral-400 animate-spin" />
-                            ) : ticketValidation.checked && ticketValidation.data?.vigente ? (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                            ) : ticketValidation.checked && ticketValidation.data && !ticketValidation.data.vigente ? (
-                              <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-500" />
-                            ) : ticketValidation.checked && ticketValidation.error ? (
-                              <AlertCircle className="w-4 h-4 text-red-500" />
-                            ) : null}
+                          >
+                            {fullName.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 truncate font-outfit">
+                              {fullName}
+                            </p>
+                            <p className="text-[10px] text-neutral-400 dark:text-neutral-500 font-inter truncate">
+                              {(tec.rol_nombre || tec.nombre_rol || 'Técnico').replace('_', ' ')}
+                            </p>
+                          </div>
+                          <div
+                            className={`w-4 h-4 rounded-md flex items-center justify-center border transition-colors shrink-0 ${
+                              isSelected
+                                ? 'bg-red-600 border-red-600 text-white'
+                                : 'border-neutral-300 dark:border-neutral-700'
+                            }`}
+                          >
+                            {isSelected && <Check size={10} strokeWidth={3} />}
                           </div>
                         </div>
-
-                        {/* Error de validación o no encontrado */}
-                        {(errors.servicio_origen_codigo || (ticketValidation.checked && ticketValidation.error)) && (
-                          <div className="flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400 font-medium pt-0.5 animate-fade-in">
-                            <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                            <span>{errors.servicio_origen_codigo || ticketValidation.error}</span>
-                          </div>
-                        )}
-
-                        {/* Válido y vigente */}
-                        {ticketValidation.checked && ticketValidation.data?.vigente && (
-                          <div className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/60 space-y-1.5 animate-fade-in">
-                            <div className="flex items-center justify-between">
-                              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                                Garantía Vigente ({ticketValidation.data.diasRestantes} {ticketValidation.data.diasRestantes === 1 ? 'día restante' : 'días restantes'})
-                              </span>
-                              <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-medium">
-                                #{ticketValidation.data.servicio?.codigo_ticket}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1.5 border-t border-emerald-200/60 dark:border-emerald-800/40 text-[11px] text-emerald-900/90 dark:text-emerald-200/90">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <User className="w-3 h-3 shrink-0 opacity-70" />
-                                <span className="truncate">Cliente: <strong className="font-semibold">{ticketValidation.data.servicio?.cliente}</strong></span>
-                              </div>
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <Smartphone className="w-3 h-3 shrink-0 opacity-70" />
-                                <span className="truncate">Equipo: <strong className="font-semibold">{[ticketValidation.data.servicio?.marca_equipo, ticketValidation.data.servicio?.modelo_equipo].filter(Boolean).join(' ')}</strong></span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Válido pero vencido o no entregado */}
-                        {ticketValidation.checked && ticketValidation.data && !ticketValidation.data.vigente && (
-                          <div className="bg-red-50/60 dark:bg-red-950/20 border border-red-200/80 dark:border-red-900/40 rounded-xl p-3.5 space-y-1.5 animate-fade-in">
-                            <div className="flex items-center justify-between">
-                              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-700 dark:text-red-400">
-                                <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
-                                {ticketValidation.data.entregado ? 'Garantía Vencida' : 'Equipo aún no entregado'}
-                              </span>
-                              <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 font-medium">
-                                #{ticketValidation.data.servicio?.codigo_ticket}
-                              </span>
-                            </div>
-                            <p className="text-xs text-red-600/90 dark:text-red-300/80 leading-relaxed">
-                              {ticketValidation.data.entregado
-                                ? `La garantía de este servicio venció el ${ticketValidation.data.fechaVencimiento ? new Date(ticketValidation.data.fechaVencimiento).toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' }) : 'recientemente'}.`
-                                : 'La orden existe pero aún no registra una fecha de entrega formal al cliente.'}
-                            </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1.5 border-t border-red-100 dark:border-red-900/30 text-xs text-red-700/80 dark:text-red-300/70">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <User className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                                <span className="truncate">Cliente: <strong className="font-medium text-red-900 dark:text-red-200">{ticketValidation.data.servicio?.cliente}</strong></span>
-                              </div>
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <Smartphone className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                                <span className="truncate">Equipo: <strong className="font-medium text-red-900 dark:text-red-200">{[ticketValidation.data.servicio?.marca_equipo, ticketValidation.data.servicio?.modelo_equipo].filter(Boolean).join(' ')}</strong></span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter">
-                          Indica el código del ticket previo para vincular el historial técnico y la orden original.
-                        </p>
-                      </div>
-                    )}
+                      );
+                    })}
                   </div>
-                </div>
+                )}
+
+                {form.tecnicos_ids.length === 0 && (
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter italic pt-2">
+                    * Si no seleccionas técnicos, la orden quedará en la bolsa general de trabajo de la sucursal.
+                  </p>
+                )}
               </div>
             </div>
           )}

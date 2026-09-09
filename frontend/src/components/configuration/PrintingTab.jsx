@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../../context/AuthContext';
 import { updateBranch } from '../../services/configuracion.service';
-import LabelPreview, { SvgQRCode } from '../common/LabelPreview';
 import Select from '../common/Select';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
@@ -27,66 +27,9 @@ import {
   RotateCw,
   Maximize2
 } from 'lucide-react';
-
-const DEFAULT_CONFIG_TICKETS = {
-  ancho_papel_mm: 80, // 80 | 58
-  copias_impresion: 1, // 1 | 2
-  imprimir_logo: true,
-  mostrar_rnc: true,
-  mostrar_contacto_sucursal: true,
-  mostrar_cliente: true,
-  mostrar_equipo: true,
-  mostrar_falla: true,
-  mostrar_observaciones: true,
-  mostrar_costo_y_anticipo: true,
-  mostrar_checklist_recepcion: true,
-  incluir_qr_tracking: true,
-  imprimir_garantia: true,
-  clausula_garantia_defecto: 'Garantía válida únicamente presentando este comprobante. No cubre caídas, humedad, sellos rotos ni manipulación por terceros.',
-  mostrar_mensaje_cortesia: true,
-  mensaje_cortesia: '¡Gracias por su preferencia! Su equipo está en manos de profesionales certificados.'
-};
-
-/**
- * Normaliza y sanea el objeto config_tickets eliminando claves redundantes o heredadas
- */
-const normalizeTicketsConfig = (raw = {}) => {
-  return {
-    ancho_papel_mm: Number(raw.ancho_papel_mm) === 58 ? 58 : 80,
-    copias_impresion: Number(raw.copias_impresion) === 2 ? 2 : 1,
-    imprimir_logo: raw.imprimir_logo !== undefined ? Boolean(raw.imprimir_logo) : (raw.mostrar_logo !== undefined ? Boolean(raw.mostrar_logo) : DEFAULT_CONFIG_TICKETS.imprimir_logo),
-    mostrar_rnc: raw.mostrar_rnc !== undefined ? Boolean(raw.mostrar_rnc) : (raw.mostrar_datos_empresa !== undefined ? Boolean(raw.mostrar_datos_empresa) : DEFAULT_CONFIG_TICKETS.mostrar_rnc),
-    mostrar_contacto_sucursal: raw.mostrar_contacto_sucursal !== undefined ? Boolean(raw.mostrar_contacto_sucursal) : (raw.mostrar_datos_sucursal !== undefined ? Boolean(raw.mostrar_datos_sucursal) : DEFAULT_CONFIG_TICKETS.mostrar_contacto_sucursal),
-    mostrar_cliente: raw.mostrar_cliente !== undefined ? Boolean(raw.mostrar_cliente) : DEFAULT_CONFIG_TICKETS.mostrar_cliente,
-    mostrar_equipo: raw.mostrar_equipo !== undefined ? Boolean(raw.mostrar_equipo) : DEFAULT_CONFIG_TICKETS.mostrar_equipo,
-    mostrar_falla: raw.mostrar_falla !== undefined ? Boolean(raw.mostrar_falla) : DEFAULT_CONFIG_TICKETS.mostrar_falla,
-    mostrar_observaciones: raw.mostrar_observaciones !== undefined ? Boolean(raw.mostrar_observaciones) : DEFAULT_CONFIG_TICKETS.mostrar_observaciones,
-    mostrar_costo_y_anticipo: raw.mostrar_costo_y_anticipo !== undefined ? Boolean(raw.mostrar_costo_y_anticipo) : (raw.mostrar_desglose_costos !== undefined ? Boolean(raw.mostrar_desglose_costos) : DEFAULT_CONFIG_TICKETS.mostrar_costo_y_anticipo),
-    mostrar_checklist_recepcion: raw.mostrar_checklist_recepcion !== undefined ? Boolean(raw.mostrar_checklist_recepcion) : DEFAULT_CONFIG_TICKETS.mostrar_checklist_recepcion,
-    incluir_qr_tracking: raw.incluir_qr_tracking !== undefined ? Boolean(raw.incluir_qr_tracking) : (raw.mostrar_qr_consulta !== undefined ? Boolean(raw.mostrar_qr_consulta) : DEFAULT_CONFIG_TICKETS.incluir_qr_tracking),
-    imprimir_garantia: raw.imprimir_garantia !== undefined ? Boolean(raw.imprimir_garantia) : (raw.mostrar_garantia !== undefined ? Boolean(raw.mostrar_garantia) : DEFAULT_CONFIG_TICKETS.imprimir_garantia),
-    clausula_garantia_defecto: raw.clausula_garantia_defecto || raw.terminos_garantia || DEFAULT_CONFIG_TICKETS.clausula_garantia_defecto,
-    mostrar_mensaje_cortesia: raw.mostrar_mensaje_cortesia !== undefined ? Boolean(raw.mostrar_mensaje_cortesia) : DEFAULT_CONFIG_TICKETS.mostrar_mensaje_cortesia,
-    mensaje_cortesia: raw.mensaje_cortesia || raw.mensaje_despedida || DEFAULT_CONFIG_TICKETS.mensaje_cortesia
-  };
-};
-
-const DEFAULT_CONFIG_ETIQUETAS = {
-  preset: '50x30', // '50x30' | '40x25' | '60x40' | 'manual'
-  ancho_mm: 50,
-  alto_mm: 30,
-  orientacion: 'horizontal', // 'horizontal' | 'vertical'
-  incluir_nombre_empresa: true,
-  incluir_codigo_ticket: true,
-  incluir_cliente: true,
-  incluir_telefono: true,
-  incluir_equipo: true,
-  incluir_falla: true,
-  incluir_fecha: true,
-  incluir_tecnico: false,
-  incluir_metodo_desbloqueo: true,
-  tamano_fuente: 'md' // 'sm' | 'md' | 'lg'
-};
+import TicketTermico, { DEFAULT_CONFIG_TICKETS, normalizeTicketsConfig } from '../servicios/TicketTermico';
+import StickerTermico, { DEFAULT_CONFIG_ETIQUETAS } from '../servicios/StickerTermico';
+import { injectThermalPrintStyles } from '../../utils/printStyles';
 
 const SIZE_PRESETS = [
   { id: '50x30', label: '50 × 30 mm', ancho: 50, alto: 30 },
@@ -94,193 +37,6 @@ const SIZE_PRESETS = [
   { id: '60x40', label: '60 × 40 mm', ancho: 60, alto: 40 },
   { id: 'manual', label: 'Personalizado', ancho: 50, alto: 30 }
 ];
-
-/**
- * Componente visual de vista previa para Comprobante Térmico POS (80mm / 58mm)
- */
-const ThermalTicketPreview = ({ config, branch, companyData }) => {
-  const is58mm = Number(config.ancho_papel_mm) === 58;
-  const fontSizeClass = is58mm ? 'text-[11px]' : 'text-xs';
-
-  return (
-    <div className="flex justify-center select-none">
-      <div
-        className={`bg-white text-black px-4 pt-7 pb-8 rounded-xl shadow-md border border-neutral-300 dark:border-neutral-700 transition-all font-mono ${fontSizeClass} ${
-          is58mm ? 'w-[260px]' : 'w-[320px]'
-        }`}
-        style={{
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
-        }}
-      >
-        {/* Cabecera del Ticket */}
-        <div className="text-center space-y-1 border-b border-dashed border-neutral-400 pb-3 mb-2">
-          {config.imprimir_logo && companyData?.logo_url && (
-            <div className="flex justify-center mb-1">
-              <img
-                src={companyData.logo_url}
-                alt={companyData?.nombre_empresa || 'Logotipo'}
-                className="max-h-12 max-w-[140px] mx-auto mb-2 object-contain grayscale contrast-150"
-              />
-            </div>
-          )}
-
-          <div className="font-bold uppercase text-[13px]">
-            {companyData?.nombre_empresa || 'FRANYER MOBILE CENTER, S.R.L.'}
-          </div>
-
-          {config.mostrar_rnc && (
-            <div className="text-[10px] text-neutral-600">
-              RNC: {companyData?.rnc || '133-18964-1'}
-            </div>
-          )}
-
-          {config.mostrar_contacto_sucursal && (
-            <div className="text-[10.5px] text-neutral-700 font-sans mt-0.5">
-              <span className="font-semibold">{branch?.nombre_sucursal || 'Sucursal Principal'}</span>
-              <br />
-              <span className="text-[9.5px]">{branch?.direccion || 'San Francisco de Macorís'}</span>
-              <br />
-              <span className="text-[9.5px]">Tel: {branch?.telefono || '849-342-1998'}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Metadatos de la Orden */}
-        <div className="border-b border-dashed border-neutral-400 pb-2 mb-2 text-[10.5px] space-y-0.5">
-          <div className="flex justify-between font-bold text-xs text-neutral-900">
-            <span>TICKET:</span>
-            <span>FMC-2026-0089</span>
-          </div>
-          <div className="flex justify-between text-neutral-600">
-            <span>Fecha Recepción:</span>
-            <span>05/09/2026 10:30 AM</span>
-          </div>
-          <div className="flex justify-between text-neutral-600">
-            <span>Estado:</span>
-            <span className="font-semibold uppercase text-neutral-800">Recibido en Taller</span>
-          </div>
-          {Number(config.copias_impresion) === 2 && (
-            <div className="flex justify-between text-[9px] text-neutral-500 italic pt-0.5">
-              <span>Tipo de Impresión:</span>
-              <span>Original (Cliente)</span>
-            </div>
-          )}
-        </div>
-
-        {/* Datos del Cliente */}
-        {config.mostrar_cliente && (
-          <div className="border-b border-dashed border-neutral-400 pb-2 mb-2 text-[10px] space-y-0.5">
-            <div className="font-bold text-[10.5px] uppercase">Cliente:</div>
-            <div className="text-neutral-800 font-sans font-semibold">Carlos Manuel Mendoza</div>
-            <div className="flex justify-between text-neutral-600">
-              <span>Tel: 829-555-0149</span>
-              <span>Céd: 056-0012345-6</span>
-            </div>
-          </div>
-        )}
-
-        {/* Datos del Dispositivo y Falla */}
-        {(config.mostrar_equipo || config.mostrar_falla || config.mostrar_observaciones) && (
-          <div className="border-b border-dashed border-neutral-400 pb-2 mb-2 text-[10px] space-y-1">
-            {config.mostrar_equipo && (
-              <div>
-                <span className="font-bold">Equipo: </span>
-                <span className="font-sans font-semibold">Samsung Galaxy S23 Ultra</span>
-                <div className="text-[9px] text-neutral-500">IMEI/Serie: 354892019482019</div>
-              </div>
-            )}
-
-            {config.mostrar_falla && (
-              <div>
-                <span className="font-bold">Falla: </span>
-                <span className="text-neutral-700">Pantalla rota sin imagen tras fuerte impacto.</span>
-              </div>
-            )}
-
-            {config.mostrar_observaciones && (
-              <div className="text-[9px] text-neutral-600 italic">
-                Obs: Rayones menores en bisel, protector de cámara puesto.
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Checklist de Recepción (Monocromático Térmico) */}
-        {config.mostrar_checklist_recepcion && (
-          <div className="border-b border-dashed border-neutral-400 pb-2 mb-2 text-[10px] space-y-1 text-neutral-900">
-            <div className="font-bold text-[10.5px] uppercase">Checklist Entrada:</div>
-            <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 font-mono text-[9.5px]">
-              <div className="flex items-center gap-1"><span>[✓]</span> <span>Enciende: Sí</span></div>
-              <div className="flex items-center gap-1"><span>[✓]</span> <span>Táctil: OK</span></div>
-              <div className="flex items-center gap-1"><span>[✓]</span> <span>Carga: Sí</span></div>
-              <div className="flex items-center gap-1"><span>[!]</span> <span>Cámara: Rayada</span></div>
-            </div>
-          </div>
-        )}
-
-        {/* Desglose Financiero */}
-        {config.mostrar_costo_y_anticipo && (
-          <div className="border-b border-dashed border-neutral-400 pb-2 mb-2 text-[10.5px] space-y-1">
-            <div className="flex justify-between">
-              <span>Costo Estimado:</span>
-              <span>RD$ 4,500.00</span>
-            </div>
-            <div className="flex justify-between text-neutral-900 font-semibold">
-              <span>Anticipo Recibido:</span>
-              <span>- RD$ 1,500.00</span>
-            </div>
-            <div className="flex justify-between font-bold text-xs pt-1 border-t border-dotted border-neutral-300">
-              <span>SALDO PENDIENTE:</span>
-              <span>RD$ 3,000.00</span>
-            </div>
-          </div>
-        )}
-
-        {/* Código QR de Consulta Web */}
-        {config.incluir_qr_tracking && (
-          <div className="text-center my-3 flex flex-col items-center">
-            <div className="p-2 border border-neutral-300 rounded-lg bg-white w-40 h-40 flex items-center justify-center mx-auto shrink-0">
-              <SvgQRCode className="w-full h-full text-black" />
-            </div>
-            <div className="mt-3 text-center space-y-0.5">
-              <span className="block text-[9px] text-neutral-600 font-sans">
-                Escanea para consultar el estado en vivo
-              </span>
-              <div className="font-mono font-bold text-[10px] text-neutral-900">
-                Código: FMC-2026-0089
-              </div>
-              <div className="font-mono text-[10px] text-neutral-700 tracking-tight">
-                www.franyermobile.com/status
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Cláusula de Garantía */}
-        {config.imprimir_garantia && config.clausula_garantia_defecto && (
-          <div className="border-t border-dashed border-neutral-400 pt-2 mb-2 text-[8.5px] text-neutral-600 text-center leading-tight font-sans">
-            <div className="font-bold uppercase text-[9px] text-neutral-800 mb-0.5">
-              Condiciones de Garantía
-            </div>
-            {config.clausula_garantia_defecto}
-          </div>
-        )}
-
-        {/* Mensaje de Cortesía */}
-        {config.mostrar_mensaje_cortesia && config.mensaje_cortesia && (
-          <div className="text-center text-[9.5px] font-sans font-semibold text-neutral-800 pt-1">
-            {config.mensaje_cortesia}
-          </div>
-        )}
-
-        {/* Simulación de Corte de Papel */}
-        <div className="mt-3 pt-2 border-t-2 border-dotted border-neutral-400 text-center text-[8px] text-neutral-400 uppercase tracking-widest font-mono">
-          - - - CORTE DE TICKET - - -
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
   const { user } = useAuth();
@@ -402,17 +158,37 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
     }
   };
 
-  // Impresión de prueba
+  const [isTestPrinting, setIsTestPrinting] = useState(false);
+
+  useEffect(() => {
+    const handleAfterPrint = () => setIsTestPrinting(false);
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
+  }, []);
+
+  // Impresión de prueba directa con aislamiento en #print-mount-point
   const handleTestPrint = () => {
     sileo.info({
       title: 'Impresión de prueba',
       description: `Generando documento de prueba para ${previewMode === 'etiqueta' ? 'Sticker adhesivo' : 'Comprobante térmico'}...`
     });
 
-    // Abrir diálogo de impresión nativo del navegador
+    if (previewMode === 'ticket') {
+      const ancho = Number(ticketsConfig.ancho_papel_mm) === 58 ? 58 : 80;
+      injectThermalPrintStyles('ticket', { ancho });
+    } else {
+      const isVertical = etiquetasConfig.orientacion === 'vertical';
+      const anchoMm = Number(etiquetasConfig.ancho_mm) || 50;
+      const altoMm = Number(etiquetasConfig.alto_mm) || 30;
+      const effectiveWidthMm = isVertical ? Math.min(anchoMm, altoMm) : Math.max(anchoMm, altoMm);
+      const effectiveHeightMm = isVertical ? Math.max(anchoMm, altoMm) : Math.min(anchoMm, altoMm);
+      injectThermalPrintStyles('sticker', { ancho: effectiveWidthMm, alto: effectiveHeightMm });
+    }
+
+    setIsTestPrinting(true);
     setTimeout(() => {
       window.print();
-    }, 400);
+    }, 150);
   };
 
   const branchOptions = branches.map((b) => ({
@@ -787,20 +563,20 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
             <div className="p-4 sm:p-6 rounded-xl bg-neutral-100/80 dark:bg-neutral-950/60 border border-neutral-200/60 dark:border-neutral-800/80 flex items-center justify-center min-h-[290px] overflow-hidden">
               {previewMode === 'etiqueta' ? (
                 <div className="w-full flex justify-center">
-                  <LabelPreview
+                  <StickerTermico
                     config={etiquetasConfig}
-                    data={{
-                      nombre_sucursal: activeBranch?.nombre_sucursal || 'Sucursal SFM',
-                      nombre_empresa: companyData?.nombre_empresa || 'FRANYER MOBILE'
-                    }}
+                    branch={activeBranch}
+                    companyData={companyData}
+                    isPrintable={false}
                   />
                 </div>
               ) : (
                 <div className="w-full flex justify-center">
-                  <ThermalTicketPreview
+                  <TicketTermico
                     config={ticketsConfig}
                     branch={activeBranch}
                     companyData={companyData}
+                    isPrintable={false}
                   />
                 </div>
               )}
@@ -845,6 +621,29 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
           </div>
         </div>
       </div>
+
+      {/* Portal de Impresión Directa para Pruebas en document.body */}
+      {isTestPrinting && typeof document !== 'undefined' && createPortal(
+        <div id="print-mount-point" className="print-only">
+          {previewMode === 'etiqueta' ? (
+            <StickerTermico
+              config={etiquetasConfig}
+              branch={activeBranch}
+              companyData={companyData}
+              isPrintable={true}
+            />
+          ) : (
+            <TicketTermico
+              config={ticketsConfig}
+              branch={activeBranch}
+              companyData={companyData}
+              isPrintable={true}
+              copiaTipo={Number(ticketsConfig.copias_impresion) === 2 ? 'Prueba (Original)' : null}
+            />
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

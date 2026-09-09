@@ -209,36 +209,57 @@ const PatternGrid = ({ pattern, onChange }) => {
  * @param {Function} onChange Callback con el nuevo objeto { metodo, valor }
  */
 const DeviceSecurityPicker = ({ value = {}, onChange }) => {
-  const metodo = value.metodo || 'ninguno';
+  const metodo = value?.metodo || value?.tipo || 'ninguno';
   const [showSecret, setShowSecret] = useState(false);
-  const [pattern, setPattern] = useState(Array.isArray(value.valor) ? value.valor : []);
+  const [pattern, setPattern] = useState(
+    Array.isArray(value?.valor) ? value.valor : Array.isArray(value?.patron) ? value.patron : []
+  );
 
   // Mantiene el estado del PIN o Contraseña para el input
   const [inputVal, setInputVal] = useState(
-    typeof value.valor === 'string' ? value.valor : ''
+    typeof value?.valor === 'string' ? value.valor : (typeof value?.valor === 'number' ? String(value.valor) : '')
   );
+
+  // Sincronizar estado interno ante reseteos o cambios externos del prop value
+  useEffect(() => {
+    const rawVal = value?.valor ?? value?.patron;
+    const currentMetodo = value?.metodo || value?.tipo || 'ninguno';
+
+    if (currentMetodo === 'patron' && Array.isArray(rawVal)) {
+      setPattern(rawVal);
+      setInputVal('');
+    } else if (currentMetodo === 'pin' || currentMetodo === 'contrasena') {
+      setInputVal(typeof rawVal === 'string' ? rawVal : (typeof rawVal === 'number' ? String(rawVal) : ''));
+      setPattern([]);
+    } else {
+      // ninguno
+      setPattern([]);
+      setInputVal('');
+      setShowSecret(false);
+    }
+  }, [value?.metodo, value?.tipo, value?.valor, value?.patron]);
 
   const handleMetodoChange = (id) => {
     setPattern([]);
     setInputVal('');
     setShowSecret(false);
     if (id === 'ninguno') {
-      onChange({ metodo: 'ninguno', valor: null });
+      onChange({ metodo: 'ninguno', tipo: 'ninguno', valor: null, patron: [] });
     } else {
-      onChange({ metodo: id, valor: id === 'patron' ? [] : '' });
+      onChange({ metodo: id, tipo: id, valor: id === 'patron' ? [] : '', patron: [] });
     }
   };
 
   const handlePatternChange = (newPattern) => {
     setPattern(newPattern);
-    onChange({ metodo: 'patron', valor: newPattern });
+    onChange({ metodo: 'patron', tipo: 'patron', valor: newPattern, patron: newPattern });
   };
 
   const handlePinChange = (e) => {
     const v = e.target.value.replace(/[^0-9]/g, '');
     if (v.length <= 12) {
       setInputVal(v);
-      onChange({ metodo: 'pin', valor: v });
+      onChange({ metodo: 'pin', tipo: 'pin', valor: v, patron: [] });
     }
   };
 
@@ -246,7 +267,7 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
     const v = e.target.value;
     if (v.length <= 64) {
       setInputVal(v);
-      onChange({ metodo: 'contrasena', valor: v });
+      onChange({ metodo: 'contrasena', tipo: 'contrasena', valor: v, patron: [] });
     }
   };
 

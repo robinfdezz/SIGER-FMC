@@ -10,7 +10,7 @@ import { ClientModal } from '../clients/ClientModal';
  * @param {Object|null} value    - Cliente seleccionado { id, nombre, apellido, telefono, cedula_rnc }
  * @param {Function}    onChange - Callback con el cliente seleccionado o null
  */
-const ClientQuickSelect = ({ value, onChange }) => {
+const ClientQuickSelect = ({ value, onChange, disabled = false }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -110,14 +110,16 @@ const ClientQuickSelect = ({ value, onChange }) => {
             {value.cedula_rnc && <span>Céd: {value.cedula_rnc}</span>}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleClear}
-          className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors cursor-pointer shrink-0"
-          title="Quitar cliente seleccionado"
-        >
-          <X size={15} />
-        </button>
+        {!disabled && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors cursor-pointer shrink-0"
+            title="Quitar cliente seleccionado"
+          >
+            <X size={15} />
+          </button>
+        )}
       </div>
     );
   }
@@ -125,20 +127,34 @@ const ClientQuickSelect = ({ value, onChange }) => {
   return (
     <>
       <div ref={containerRef} className="relative">
-        {/* Input de busqueda */}
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
-          <input
-            type="text"
-            value={query}
-            onChange={handleQueryChange}
-            onFocus={() => results.length > 0 && setShowDropdown(true)}
-            placeholder="Buscar por nombre, telefono o cedula..."
-            className={inputClass}
-          />
-          {isSearching && (
-            <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 animate-spin" />
-          )}
+        {/* Fila interactiva: Input de búsqueda + Botón de registrar nuevo cliente */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+            <input
+              type="text"
+              value={query}
+              onChange={handleQueryChange}
+              disabled={disabled}
+              onFocus={() => !disabled && results.length > 0 && setShowDropdown(true)}
+              placeholder={disabled ? "Datos cargados desde la garantía previa" : "Buscar por nombre, teléfono o cédula..."}
+              className={`${inputClass} ${disabled ? 'bg-neutral-100 dark:bg-neutral-800/50 cursor-not-allowed opacity-80' : ''}`}
+            />
+            {isSearching && (
+              <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 animate-spin" />
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowNewClientModal(true)}
+            disabled={disabled}
+            title="Registrar nuevo cliente"
+            aria-label="Registrar nuevo cliente"
+            className="h-[42px] w-[42px] shrink-0 flex items-center justify-center rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:text-red-600 hover:border-red-300 hover:bg-red-50/50 dark:hover:bg-red-950/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-neutral-600 disabled:hover:border-neutral-200 disabled:hover:bg-neutral-50 dark:disabled:hover:bg-neutral-800/60 transition-colors cursor-pointer"
+          >
+            <UserPlus size={16} />
+          </button>
         </div>
 
         {/* Dropdown de resultados */}
@@ -185,18 +201,6 @@ const ClientQuickSelect = ({ value, onChange }) => {
               </button>
             </div>
           </div>
-        )}
-
-        {/* Boton externo de nuevo cliente (cuando no hay dropdown) */}
-        {!showDropdown && query.length === 0 && (
-          <button
-            type="button"
-            onClick={() => setShowNewClientModal(true)}
-            className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors cursor-pointer"
-          >
-            <UserPlus size={13} />
-            Registrar como cliente nuevo
-          </button>
         )}
       </div>
 
