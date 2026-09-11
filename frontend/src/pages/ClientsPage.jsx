@@ -292,17 +292,17 @@ export const ClientsPage = () => {
         </div>
 
         {/* Tabla de Clientes */}
-        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
-                  <th className="py-3.5 px-4 sm:px-6">Cliente</th>
-                  <th className="py-3.5 px-4 sm:px-6">Contacto</th>
-                  <th className="py-3.5 px-4 sm:px-6">Dirección</th>
-                  <th className="py-3.5 px-4 sm:px-6">Registro</th>
-                  <th className="py-3.5 px-4 sm:px-6 text-center">Estado</th>
-                  <th className="py-3.5 px-4 sm:px-6 text-right">Acciones</th>
+        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden flex flex-col">
+          <div className="w-full overflow-x-auto overflow-y-auto h-[560px] relative">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead className="sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs">
+                <tr className="border-b border-neutral-200 dark:border-neutral-800 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
+                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[19%] min-w-[150px]">Cliente</th>
+                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0">Contacto</th>
+                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0">Dirección</th>
+                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[145px] min-w-[135px] whitespace-nowrap">Registro</th>
+                  <th className="py-3 px-3 sm:px-4.5 text-center bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[110px]">Estado</th>
+                  <th className="py-3 px-2.5 sm:px-3 text-right w-[80px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
@@ -351,18 +351,18 @@ export const ClientsPage = () => {
                         }`}
                       >
                         {/* Columna 1: Cliente (Avatar + Nombre + Cédula) */}
-                        <td className="py-3.5 px-4 sm:px-6">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-sm shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden relative font-outfit">
+                        <td className="py-3 px-3 sm:px-4.5 align-middle">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-xs shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden relative font-outfit">
                               {initials}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm">
+                              <p className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm whitespace-normal break-words leading-snug">
                                 {fullName}
                               </p>
                               <div className="flex items-center gap-1.5 mt-0.5 text-xs text-neutral-400">
-                                <CreditCard size={12} className="shrink-0" />
-                                <span className="font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                                <CreditCard size={11} className="shrink-0" />
+                                <span className="font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
                                   {client.cedula_rnc}
                                 </span>
                               </div>
@@ -402,7 +402,7 @@ export const ClientsPage = () => {
                         </td>
 
                         {/* Columna 4: Fecha de Registro */}
-                        <td className="py-3.5 px-4 sm:px-6">
+                        <td className="py-3.5 px-3 sm:px-4.5 align-middle whitespace-nowrap">
                           <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 font-mono">
                             <Calendar size={12} className="text-neutral-400 shrink-0" />
                             <span>{formattedDate}</span>
@@ -419,25 +419,25 @@ export const ClientsPage = () => {
                           </Badge>
                         </td>
 
-                        {/* Columna 6: Acciones (Homologadas con WorkersPage.jsx) */}
-                        <td className="py-3.5 px-4 sm:px-6 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                        {/* Columna 6: Acciones */}
+                        <td className="py-3 px-2.5 sm:px-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
                             {canCreateEdit && (
                               <button
                                 onClick={() => handleOpenEditModal(client)}
                                 title="Editar cliente"
-                                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                               >
-                                <Edit2 size={16} />
+                                <Edit2 size={15} />
                               </button>
                             )}
                             {canToggleStatus && (
                               <button
                                 onClick={() => handleOpenConfirmToggle(client)}
                                 title={client.activo ? 'Desactivar cliente' : 'Activar cliente'}
-                                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                               >
-                                <Power size={16} />
+                                <Power size={15} />
                               </button>
                             )}
                             {isReadOnlyRole && (
@@ -453,6 +453,13 @@ export const ClientsPage = () => {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Barra inferior resumen */}
+          <div className="px-4 sm:px-6 py-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-inter shrink-0 bg-neutral-50/50 dark:bg-neutral-900/20">
+            <span>
+              Mostrando <strong>{filteredClients.length}</strong> {filteredClients.length === 1 ? 'cliente' : 'clientes'}{clients.length !== filteredClients.length && ` (de ${clients.length} en total)`}
+            </span>
           </div>
         </div>
       </div>

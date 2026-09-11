@@ -185,7 +185,7 @@ const createServicio = async (req, res) => {
     await client.query('BEGIN');
 
     // Validación estricta de reingreso por garantía
-    const isGarantia = es_garantia === true || es_garantia === 'true';
+    const isGarantia = es_garantia === true || es_garantia === 'true' || Boolean(servicio_origen_id);
     let validOrigenId = null;
     if (isGarantia) {
       validOrigenId = Number(servicio_origen_id);
@@ -197,7 +197,10 @@ const createServicio = async (req, res) => {
         });
       }
       const checkOrigen = await client.query(
-        'SELECT id FROM servicios_recepcion WHERE id = $1 AND activo = TRUE',
+        `SELECT sr.id, sr.fecha_entrega_real, es.codigo_estado, es.nombre_estado
+         FROM servicios_recepcion sr
+         LEFT JOIN estados_servicio es ON es.id = sr.estado_actual_id
+         WHERE sr.id = $1 AND sr.activo = TRUE`,
         [validOrigenId]
       );
       if (checkOrigen.rowCount === 0) {
@@ -205,6 +208,21 @@ const createServicio = async (req, res) => {
         return res.status(400).json({
           ok: false,
           message: 'La orden de servicio previa especificada no existe en el sistema.'
+        });
+      }
+
+      const origenRow = checkOrigen.rows[0];
+      const isOrigenEntregado = Boolean(origenRow.fecha_entrega_real) ||
+        String(origenRow.codigo_estado || '').toUpperCase() === 'ENTREGADO' ||
+        String(origenRow.nombre_estado || '').toUpperCase().includes('ENTREGADO');
+
+      if (!isOrigenEntregado) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          ok: false,
+          valido: false,
+          codigo_error: 'NO_ENTREGADO',
+          message: 'El equipo correspondiente a este ticket aún no ha sido entregado al cliente. No procede aplicar garantía.'
         });
       }
     }
@@ -670,6 +688,8 @@ const validarGarantiaTicket = async (req, res) => {
         sr.num_serie_imei,
         sr.datos_acceso_equipo,
         sr.fecha_entrega_real,
+        es.codigo_estado,
+        es.nombre_estado AS estado_nombre,
         COALESCE(sr.tiempo_garantia, 30) AS tiempo_garantia,
         CASE 
           WHEN sr.fecha_entrega_real IS NOT NULL 
@@ -683,6 +703,7 @@ const validarGarantiaTicket = async (req, res) => {
         END AS garantia_vigente
       FROM servicios_recepcion sr
       LEFT JOIN clientes c ON c.id = sr.cliente_id
+      LEFT JOIN estados_servicio es ON es.id = sr.estado_actual_id
       WHERE UPPER(TRIM(sr.codigo_ticket)) = UPPER(TRIM($1))
       LIMIT 1;
     `;
@@ -692,12 +713,32 @@ const validarGarantiaTicket = async (req, res) => {
     if (result.rowCount === 0) {
       return res.status(404).json({
         ok: false,
+        valido: false,
         error: 'Ticket no encontrado en el sistema.',
         message: 'No existe ninguna orden con ese código de ticket.'
       });
     }
 
     const row = result.rows[0];
+
+    // Verificar si el equipo fue formalmente entregado al cliente
+    const isEntregado = Boolean(row.fecha_entrega_real) ||
+      String(row.codigo_estado || '').toUpperCase() === 'ENTREGADO' ||
+      String(row.estado_nombre || '').toUpperCase().includes('ENTREGADO');
+
+    if (!isEntregado) {
+      return res.status(200).json({
+        ok: false,
+        valido: false,
+        codigo_error: 'NO_ENTREGADO',
+        message: 'El equipo correspondiente a este ticket aún no ha sido entregado al cliente. No procede aplicar garantía.',
+        servicio: {
+          id: row.id,
+          codigo_ticket: row.codigo_ticket,
+          estado_nombre: row.estado_nombre || row.codigo_estado || 'En proceso'
+        }
+      });
+    }
 
     let datosAcceso = row.datos_acceso_equipo;
     if (typeof datosAcceso === 'string') {
@@ -734,8 +775,9 @@ const validarGarantiaTicket = async (req, res) => {
 
     return res.status(200).json({
       ok: true,
+      valido: true,
       vigente: Boolean(row.garantia_vigente),
-      entregado: Boolean(row.fecha_entrega_real),
+      entregado: true,
       diasRestantes: diasRestantes,
       fechaVencimiento: row.fecha_vencimiento ? new Date(row.fecha_vencimiento).toISOString() : null,
       servicio: servicioData

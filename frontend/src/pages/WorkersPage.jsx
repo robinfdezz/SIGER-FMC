@@ -22,38 +22,52 @@ import {
   RefreshCw,
   Users,
   CheckCircle2,
-  XCircle
+  XCircle,
+  ShieldCheck,
+  Shield,
+  ClipboardList,
+  Wrench,
+  User
 } from 'lucide-react';
 
-const formatRoleName = (rolNombre) => {
-  switch (rolNombre) {
-    case 'SuperAdmin':
-      return 'Super Admin';
-    case 'Admin_Sucursal':
-      return 'Admin Sucursal';
-    case 'Secretaria':
-      return 'Secretaria';
-    case 'Tecnico':
-      return 'Técnico';
-    default:
-      return rolNombre || 'Sin Rol';
+const getRoleConfig = (rolNombre) => {
+  const normalized = (rolNombre || '').toLowerCase().replace(/[\s_-]/g, '');
+  if (normalized.includes('superadmin')) {
+    return {
+      label: 'Super Admin',
+      icon: ShieldCheck,
+      color: 'text-red-600/80 dark:text-red-400/80'
+    };
   }
+  if (normalized.includes('admin')) {
+    return {
+      label: 'Admin Sucursal',
+      icon: Shield,
+      color: 'text-amber-600/85 dark:text-amber-400/80'
+    };
+  }
+  if (normalized.includes('secretaria')) {
+    return {
+      label: 'Secretaria',
+      icon: ClipboardList,
+      color: 'text-purple-600/80 dark:text-purple-400/80'
+    };
+  }
+  if (normalized.includes('tecnic')) {
+    return {
+      label: 'Técnico',
+      icon: Wrench,
+      color: 'text-blue-600/80 dark:text-blue-400/80'
+    };
+  }
+  return {
+    label: rolNombre || 'Sin Rol',
+    icon: User,
+    color: 'text-neutral-600/80 dark:text-neutral-400/80'
+  };
 };
 
-const getRoleBadgeStyle = (rolNombre) => {
-  switch (rolNombre) {
-    case 'SuperAdmin':
-      return 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border-red-200/80 dark:border-red-800/60';
-    case 'Admin_Sucursal':
-      return 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/60';
-    case 'Tecnico':
-      return 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 border-blue-200/80 dark:border-blue-800/60';
-    case 'Secretaria':
-      return 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border-purple-200/80 dark:border-purple-800/60';
-    default:
-      return 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700';
-  }
-};
+const formatRoleName = (rolNombre) => getRoleConfig(rolNombre).label;
 
 const extractArray = (res) => {
   if (Array.isArray(res)) return res;
@@ -411,16 +425,16 @@ const WorkersPage = () => {
         </div>
 
         {/* Tabla de Usuarios */}
-        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
-                  <th className="py-3.5 px-4 sm:px-6">Usuario</th>
-                  <th className="py-3.5 px-4 sm:px-6">Cédula y Contacto</th>
-                  <th className="py-3.5 px-4 sm:px-6">Rol y Sucursal</th>
-                  <th className="py-3.5 px-4 sm:px-6 text-center">Estado</th>
-                  <th className="py-3.5 px-4 sm:px-6 text-right">Acciones</th>
+        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden flex flex-col">
+          <div className="w-full overflow-x-auto overflow-y-auto h-[560px] relative">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead className="sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs">
+                <tr className="border-b border-neutral-200 dark:border-neutral-800 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
+                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[26%]">Usuario</th>
+                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0">Cédula y Contacto</th>
+                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0">Rol y Sucursal</th>
+                  <th className="py-3 px-3 sm:px-4.5 text-center bg-neutral-50 dark:bg-[#141416] sticky top-0">Estado</th>
+                  <th className="py-3 px-2.5 sm:px-3 text-right w-[80px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
@@ -455,10 +469,10 @@ const WorkersPage = () => {
                         }`}
                     >
                       {/* Columna 1: Trabajador / Usuario */}
-                      <td className="py-3.5 px-4 sm:px-6">
-                        <div className="flex items-center gap-3">
+                      <td className="py-3 px-3 sm:px-4.5">
+                        <div className="flex items-center gap-2.5">
                           {/* Avatar / Foto de Perfil / Iniciales */}
-                          <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-sm shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden relative">
+                          <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-xs shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden relative">
                             {worker.foto_perfil_url ? (
                               <img
                                 src={worker.foto_perfil_url}
@@ -507,19 +521,22 @@ const WorkersPage = () => {
 
                       {/* Columna 3: Rol y Sucursal */}
                       <td className="py-3.5 px-4 sm:px-6">
-                        <div className="space-y-1.5">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border ${getRoleBadgeStyle(
-                              worker.rol_nombre
-                            )}`}
-                          >
-                            {formatRoleName(worker.rol_nombre)}
-                          </span>
-                          <p className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
-                            <Store size={12} className="text-neutral-400" />
-                            {worker.sucursal_nombre || 'Todas las Sucursales (Global)'}
-                          </p>
-                        </div>
+                        {(() => {
+                          const role = getRoleConfig(worker.rol_nombre);
+                          const RoleIcon = role.icon;
+                          return (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                                <RoleIcon className={`w-3.5 h-3.5 shrink-0 ${role.color}`} />
+                                <span className={role.color}>{role.label}</span>
+                              </div>
+                              <p className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
+                                <Store size={12} className="text-neutral-400 shrink-0" />
+                                <span>{worker.sucursal_nombre || 'Todas las Sucursales (Global)'}</span>
+                              </p>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Columna 4: Estado (Activo/Inactivo) */}
@@ -533,26 +550,26 @@ const WorkersPage = () => {
                       </td>
 
                       {/* Columna 5: Acciones (Protegidas por RBAC) */}
-                      <td className="py-3.5 px-4 sm:px-6 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="py-3 px-2.5 sm:px-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
                           {canManageWorker(worker) ? (
                             <>
                               {/* Botón Editar */}
                               <button
                                 onClick={() => handleOpenEditModal(worker)}
                                 title="Editar usuario"
-                                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                               >
-                                <Edit2 size={16} />
+                                <Edit2 size={15} />
                               </button>
 
                               {/* Botón Activar / Desactivar */}
                               <button
                                 onClick={() => handleRequestToggleStatus(worker)}
                                 title={worker.activo ? 'Desactivar cuenta' : 'Activar cuenta'}
-                                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                               >
-                                <Power size={16} />
+                                <Power size={15} />
                               </button>
                             </>
                           ) : (
@@ -567,6 +584,13 @@ const WorkersPage = () => {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Barra inferior resumen */}
+          <div className="px-4 sm:px-6 py-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-inter shrink-0 bg-neutral-50/50 dark:bg-neutral-900/20">
+            <span>
+              Mostrando <strong>{filteredWorkers.length}</strong> {filteredWorkers.length === 1 ? 'usuario' : 'usuarios'}{workers.length !== filteredWorkers.length && ` (de ${workers.length} en total)`}
+            </span>
           </div>
         </div>
       </div>

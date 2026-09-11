@@ -28,10 +28,19 @@
   }
 }
 
-/* Custom modern scrollbars */
+/* Custom modern scrollbars - Homologado horizontal y vertical */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #E4E4E7 transparent;
+}
+
+.dark * {
+  scrollbar-color: #27272A transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {

@@ -90,7 +90,7 @@ export const ServiciosPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshSuccess, setRefreshSuccess] = useState(false);
-  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 20, totalPages: 1 });
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 50, totalPages: 1 });
 
   // Filtros interactivos
   const [searchTerm, setSearchTerm] = useState('');
@@ -385,18 +385,18 @@ export const ServiciosPage = () => {
         </div>
 
         {/* Tabla de Órdenes de Servicio */}
-        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden">
-          <div className="w-full overflow-x-auto">
+        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden flex flex-col">
+          <div className="w-full overflow-x-auto overflow-y-auto h-[560px] relative">
             <table className="w-full min-w-[760px] text-left border-collapse">
-              <thead>
-                <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
-                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap w-[14%] min-w-[115px]">Ticket</th>
-                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap w-[22%] min-w-[140px]">Cliente</th>
-                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap w-[22%] min-w-[150px]">Equipo</th>
-                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap w-[16%] min-w-[130px]">Estado</th>
-                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap w-[12%] min-w-[100px]">Prioridad</th>
-                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap w-[10%] min-w-[90px]">Fecha</th>
-                  <th className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap text-right w-[4%] min-w-[60px]">Acciones</th>
+              <thead className="sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs">
+                <tr className="border-b border-neutral-200 dark:border-neutral-800 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
+                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap w-[11%] min-w-[105px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Ticket</th>
+                  <th className="py-3 px-3 sm:px-4 whitespace-nowrap w-[20%] min-w-[165px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Cliente</th>
+                  <th className="py-3 px-3 sm:px-4 whitespace-nowrap w-[22%] min-w-[165px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Equipo</th>
+                  <th className="py-3 px-3 sm:px-4 whitespace-nowrap w-[17%] min-w-[130px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Estado</th>
+                  <th className="py-3 px-3 sm:px-4 whitespace-nowrap w-[13%] min-w-[100px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Prioridad</th>
+                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap w-[12%] min-w-[90px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Fecha</th>
+                  <th className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-right w-[5%] min-w-[50px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
@@ -430,47 +430,47 @@ export const ServiciosPage = () => {
                       className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all"
                     >
                       {/* Columna 1: Ticket */}
-                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap">
-                        <div className="font-mono font-bold text-neutral-900 dark:text-neutral-100 tracking-wider text-sm">
+                      <td className="py-3 px-2.5 sm:px-3 whitespace-nowrap align-middle">
+                        <div className="font-mono font-bold text-neutral-900 dark:text-neutral-100 tracking-tight text-xs sm:text-[13px]">
                           {orden.codigo_ticket}
                         </div>
                         {orden.es_garantia && (
-                          <span className="text-[10px] text-rose-500 dark:text-rose-400 font-semibold font-inter">
+                          <span className="text-[10px] text-rose-500 dark:text-rose-400 font-semibold font-inter block mt-0.5">
                             GARANTÍA
                           </span>
                         )}
                       </td>
 
                       {/* Columna 2: Cliente */}
-                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <User size={14} className="text-neutral-400 shrink-0" />
-                          <span className="text-neutral-800 dark:text-neutral-200 font-medium">
+                      <td className="py-3 px-3 sm:px-4 align-middle min-w-[165px] max-w-[220px]">
+                        <div className="flex items-start gap-1.5">
+                          <User size={13} className="text-neutral-400 shrink-0 mt-0.5" />
+                          <span className="text-neutral-800 dark:text-neutral-200 font-medium text-xs leading-snug whitespace-normal break-words">
                             {orden.nombre_cliente || '—'}
                           </span>
                         </div>
                         {orden.telefono_cliente && (
-                          <p className="text-[11px] text-neutral-400 font-inter ml-5.5">
+                          <p className="text-[11px] text-neutral-400 font-inter ml-5 font-mono whitespace-nowrap mt-0.5">
                             {orden.telefono_cliente}
                           </p>
                         )}
                       </td>
 
                       {/* Columna 3: Equipo */}
-                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <Smartphone size={14} className="text-neutral-400 shrink-0" />
-                          <span className="text-neutral-700 dark:text-neutral-300 font-medium">
+                      <td className="py-3 px-3 sm:px-4 align-middle min-w-[165px] max-w-[230px]">
+                        <div className="flex items-start gap-1.5">
+                          <Smartphone size={14} className="text-neutral-400 shrink-0 mt-0.5" />
+                          <span className="text-neutral-700 dark:text-neutral-300 font-medium text-xs leading-snug whitespace-normal break-words">
                             {orden.marca_equipo} {orden.modelo_equipo}
                           </span>
                         </div>
                         {Array.isArray(orden.tecnicos) && orden.tecnicos.length > 0 ? (
                           <p
-                            className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter truncate mt-0.5 flex items-center gap-1 max-w-[200px]"
+                            className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter mt-1 flex items-start gap-1 whitespace-normal break-words leading-tight"
                             title={orden.tecnicos.map((t) => t.nombre_completo).join(', ')}
                           >
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            {orden.tecnicos.map((t) => t.nombre_completo).join(', ')}
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1" />
+                            <span>{orden.tecnicos.map((t) => t.nombre_completo).join(', ')}</span>
                           </p>
                         ) : (
                           <p className="text-[11px] text-neutral-400 dark:text-neutral-500 font-inter mt-0.5">
@@ -480,7 +480,7 @@ export const ServiciosPage = () => {
                       </td>
 
                       {/* Columna 4: Estado con Badge oficial */}
-                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap">
+                      <td className="py-3 px-3 sm:px-4 whitespace-nowrap align-middle">
                         {orden.estado ? (
                           <Badge
                             size="sm"
@@ -506,7 +506,7 @@ export const ServiciosPage = () => {
                       </td>
 
                       {/* Columna 5: Prioridad con Badge institucional */}
-                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap">
+                      <td className="py-3 px-3 sm:px-4 whitespace-nowrap align-middle">
                         {orden.prioridad ? (
                           <Badge
                             variant={getPrioridadVariant(orden.prioridad)}
@@ -521,7 +521,7 @@ export const ServiciosPage = () => {
                       </td>
 
                       {/* Columna 6: Fecha */}
-                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap">
+                      <td className="py-3 px-2.5 sm:px-3 whitespace-nowrap align-middle">
                         <div className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400">
                           <Calendar size={13} className="shrink-0" />
                           <span className="text-xs font-inter">
@@ -537,15 +537,15 @@ export const ServiciosPage = () => {
                       </td>
 
                       {/* Columna 7: Acciones */}
-                      <td className="py-3 px-3 sm:px-4 lg:px-5 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-right align-middle">
+                        <div className="flex items-center justify-end">
                           <button
                             type="button"
                             onClick={() => handleImprimirClick(orden)}
-                            className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                             title="Imprimir comprobante o etiqueta"
                           >
-                            <Printer size={16} />
+                            <Printer size={15} />
                           </button>
                         </div>
                       </td>
@@ -556,32 +556,40 @@ export const ServiciosPage = () => {
             </table>
           </div>
 
-          {/* Paginación */}
-          {pagination.totalPages > 1 && (
-            <div className="px-4 sm:px-6 py-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
-              <span className="text-xs text-neutral-500 dark:text-neutral-400 font-inter">
-                Página {pagination.page} de {pagination.totalPages} ({pagination.total} órdenes)
-              </span>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => fetchOrdenes(pagination.page - 1)}
-                  disabled={pagination.page <= 1 || isLoading}
-                  className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fetchOrdenes(pagination.page + 1)}
-                  disabled={pagination.page >= pagination.totalPages || isLoading}
-                  className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                >
-                  <ChevronRight size={16} />
-                </button>
+          {/* Barra inferior resumen y paginación */}
+          <div className="px-4 sm:px-6 py-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-inter shrink-0 bg-neutral-50/50 dark:bg-neutral-900/20">
+            <span>
+              Mostrando <strong>{ordenes.length}</strong> {ordenes.length === 1 ? 'orden' : 'órdenes'}{pagination.total > 0 && pagination.total !== ordenes.length ? ` (de ${pagination.total} en total)` : ''}
+            </span>
+
+            {pagination.totalPages > 1 && (
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                  Página {pagination.page} de {pagination.totalPages}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => fetchOrdenes(pagination.page - 1)}
+                    disabled={pagination.page <= 1 || isLoading}
+                    className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    title="Página anterior"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fetchOrdenes(pagination.page + 1)}
+                    disabled={pagination.page >= pagination.totalPages || isLoading}
+                    className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    title="Página siguiente"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 

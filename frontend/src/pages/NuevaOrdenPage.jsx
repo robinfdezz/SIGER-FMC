@@ -235,25 +235,8 @@ export const NuevaOrdenPage = () => {
     setErrors(prev => ({ ...prev, [key]: undefined }));
   }, []);
 
-  // Limpieza centralizada y total del formulario cuando se cancela o desvincula la garantía
-  const resetGarantiaState = useCallback((preserveInputCode = false) => {
-    // 1. Limpiar feedback y estado de validación
-    setTicketValidation({
-      loading: false,
-      checked: false,
-      error: null,
-      data: null
-    });
-
-    // 2. Limpiar errores de validación de garantía
-    setErrors(prev => {
-      const next = { ...prev };
-      delete next.servicio_origen_codigo;
-      delete next.codigo_ticket_origen;
-      return next;
-    });
-
-    // 3. Restablecer campos del formulario rigurosamente a sus valores iniciales limpios
+  // Limpieza de campos de orden de garantía sin tocar feedback de error
+  const clearGarantiaFields = useCallback((preserveInputCode = true) => {
     setForm(prev => ({
       ...prev,
       servicio_origen_id: null,
@@ -282,6 +265,28 @@ export const NuevaOrdenPage = () => {
       tecnicos_asignados: [],
     }));
   }, []);
+
+  // Limpieza centralizada y total del formulario cuando se cancela o desvincula la garantía
+  const resetGarantiaState = useCallback((preserveInputCode = false) => {
+    // 1. Limpiar feedback y estado de validación
+    setTicketValidation({
+      loading: false,
+      checked: false,
+      error: null,
+      data: null
+    });
+
+    // 2. Limpiar errores de validación de garantía
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next.servicio_origen_codigo;
+      delete next.codigo_ticket_origen;
+      return next;
+    });
+
+    // 3. Restablecer campos del formulario rigurosamente a sus valores iniciales limpios
+    clearGarantiaFields(preserveInputCode);
+  }, [clearGarantiaFields]);
 
   const handleToggleGarantia = useCallback(() => {
     const nextVal = !form.es_garantia;
@@ -316,7 +321,10 @@ export const NuevaOrdenPage = () => {
         const res = await validarGarantiaTicket(code);
         if (isCancelled) return;
 
-        if (res && res.ok && res.servicio) {
+        // Validar si procede: debe ser ok, valido y entregado con servicio presente
+        const isEntregaValida = res && res.ok && res.valido !== false && res.entregado !== false && res.codigo_error !== 'NO_ENTREGADO' && res.servicio;
+
+        if (isEntregaValida) {
           const serv = res.servicio;
           const clienteObj = serv.cliente_id ? {
             id: serv.cliente_id,
@@ -362,15 +370,15 @@ export const NuevaOrdenPage = () => {
             monto_descuento: 0
           }));
         } else {
+          // No procede o no entregado: marcar inválido y limpiar datos autocompletados
+          const errorMsg = res?.message || res?.error || 'El equipo correspondiente a este ticket aún no ha sido entregado al cliente.';
           setTicketValidation({
             loading: false,
             checked: true,
-            error: res?.error || res?.message || 'Ticket no encontrado en el sistema.',
-            data: null
+            error: errorMsg,
+            data: res || { ok: false, valido: false, codigo_error: 'NO_ENTREGADO' }
           });
-          if (form.servicio_origen_id) {
-            resetGarantiaState(true);
-          }
+          clearGarantiaFields(true);
         }
       } catch (err) {
         if (isCancelled) return;
@@ -380,9 +388,7 @@ export const NuevaOrdenPage = () => {
           error: err.message || 'Error al validar el ticket.',
           data: null
         });
-        if (form.servicio_origen_id) {
-          resetGarantiaState(true);
-        }
+        clearGarantiaFields(true);
       }
     }, 300);
 
@@ -390,9 +396,21 @@ export const NuevaOrdenPage = () => {
       isCancelled = true;
       clearTimeout(timer);
     };
-  }, [form.es_garantia, form.servicio_origen_codigo, form.codigo_ticket_origen, form.servicio_origen_id, resetGarantiaState]);
+  }, [form.es_garantia, form.servicio_origen_codigo, form.codigo_ticket_origen, resetGarantiaState, clearGarantiaFields]);
 
-  const isGarantiaLocked = Boolean(form.es_garantia && form.servicio_origen_id);
+  const isGarantiaValida = Boolean(
+    form.es_garantia &&
+    form.servicio_origen_id &&
+    ticketValidation.checked &&
+    !ticketValidation.loading &&
+    !ticketValidation.error &&
+    ticketValidation.data?.ok !== false &&
+    ticketValidation.data?.valido !== false &&
+    ticketValidation.data?.codigo_error !== 'NO_ENTREGADO' &&
+    ticketValidation.data?.entregado === true
+  );
+
+  const isGarantiaLocked = Boolean(form.es_garantia && isGarantiaValida && form.servicio_origen_id);
 
   const categoriaOptions = useMemo(() => {
     if (categorias && categorias.length > 0) {
@@ -413,8 +431,8 @@ export const NuevaOrdenPage = () => {
         const codigoTicket = (form.servicio_origen_codigo || '').trim();
         if (!codigoTicket) {
           errs.servicio_origen_codigo = 'El código del ticket original es obligatorio';
-        } else if (!form.servicio_origen_id) {
-          errs.servicio_origen_codigo = ticketValidation.error || 'Debes ingresar y verificar un ticket original válido en el sistema';
+        } else if (!isGarantiaValida) {
+          errs.servicio_origen_codigo = ticketValidation.error || 'El ticket original debe corresponder a un equipo entregado y con garantía válida';
         }
       }
 
@@ -490,6 +508,13 @@ export const NuevaOrdenPage = () => {
   };
 
   const handleNext = () => {
+    if (currentStep === 1 && form.es_garantia && !isGarantiaValida) {
+      setErrors(prev => ({
+        ...prev,
+        servicio_origen_codigo: ticketValidation.error || 'Debes ingresar un ticket previo válido y entregado para aplicar garantía.'
+      }));
+      return;
+    }
     const stepErrors = validateStep(currentStep);
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors);
@@ -717,38 +742,65 @@ export const NuevaOrdenPage = () => {
                           }}
                           placeholder="Ej: ABC-1234"
                           className={`${inputClass} font-mono tracking-widest uppercase pr-10 ${
-                            errors.servicio_origen_codigo || (ticketValidation.checked && ticketValidation.error)
+                            errors.servicio_origen_codigo || (ticketValidation.checked && (ticketValidation.error || !isGarantiaValida))
                               ? 'border-red-400 focus:border-red-500 focus:ring-red-500/20'
-                              : ticketValidation.checked && ticketValidation.data?.vigente
+                              : isGarantiaValida
                               ? 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-500/20'
-                              : ticketValidation.checked && ticketValidation.data && !ticketValidation.data.vigente
-                              ? 'border-red-400 dark:border-red-600 focus:border-red-500 focus:ring-red-500/20'
                               : ''
                           }`}
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center">
                           {ticketValidation.loading ? (
                             <Loader2 className="w-4 h-4 text-neutral-400 animate-spin" />
-                          ) : ticketValidation.checked && ticketValidation.data?.vigente ? (
+                          ) : isGarantiaValida ? (
                             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                          ) : ticketValidation.checked && ticketValidation.data && !ticketValidation.data.vigente ? (
-                            <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-500" />
-                          ) : ticketValidation.checked && ticketValidation.error ? (
+                          ) : ticketValidation.checked && (ticketValidation.error || ticketValidation.data?.codigo_error === 'NO_ENTREGADO' || (ticketValidation.data && !ticketValidation.data.entregado)) ? (
                             <AlertCircle className="w-4 h-4 text-red-500" />
                           ) : null}
                         </div>
                       </div>
 
-                      {/* Error de validación o no encontrado */}
-                      {(errors.servicio_origen_codigo || (ticketValidation.checked && ticketValidation.error)) && (
-                        <div className="flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400 font-medium pt-0.5 animate-fade-in">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                          <span>{errors.servicio_origen_codigo || ticketValidation.error}</span>
+                      {/* Bloqueante: Equipo aún NO entregado */}
+                      {ticketValidation.checked && (ticketValidation.data?.codigo_error === 'NO_ENTREGADO' || (ticketValidation.data && !ticketValidation.data.entregado)) && (
+                        <div className="bg-red-50/90 dark:bg-red-950/40 border-2 border-red-500/80 dark:border-red-600/80 rounded-xl p-3.5 space-y-2 animate-fade-in shadow-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex items-center gap-2 text-sm font-bold text-red-700 dark:text-red-400">
+                              <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+                              Equipo aún no entregado (Garantía no procedente)
+                            </span>
+                            {(ticketValidation.data?.servicio?.codigo_ticket || form.servicio_origen_codigo) && (
+                              <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/60 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800 font-semibold">
+                                #{ticketValidation.data?.servicio?.codigo_ticket || form.servicio_origen_codigo}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed font-medium">
+                            {ticketValidation.data?.message || 'El equipo correspondiente a este ticket aún no ha sido entregado al cliente. No procede aplicar garantía.'}
+                          </p>
+                          <div className="text-[11px] text-red-600/90 dark:text-red-400/90 flex items-center gap-1.5 pt-1.5 border-t border-red-200/60 dark:border-red-900/40">
+                            <span>Para aplicar a garantía, la orden previa debe haber concluido su ciclo y registrarse como <strong>Entregado</strong>.</span>
+                          </div>
                         </div>
                       )}
 
-                      {/* Válido y vigente */}
-                      {ticketValidation.checked && ticketValidation.data?.vigente && (
+                      {/* Error genérico o no encontrado (cuando no es NO_ENTREGADO) */}
+                      {ticketValidation.checked && ticketValidation.error && ticketValidation.data?.codigo_error !== 'NO_ENTREGADO' && (
+                        <div className="flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400 font-medium pt-0.5 animate-fade-in">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <span>{ticketValidation.error}</span>
+                        </div>
+                      )}
+
+                      {/* Error de validación de campo cuando no ha chequeado aún */}
+                      {errors.servicio_origen_codigo && !ticketValidation.checked && (
+                        <div className="flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400 font-medium pt-0.5 animate-fade-in">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <span>{errors.servicio_origen_codigo}</span>
+                        </div>
+                      )}
+
+                      {/* Procedente y vigente */}
+                      {isGarantiaValida && ticketValidation.data?.vigente && (
                         <div className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/60 space-y-1.5 animate-fade-in">
                           <div className="flex items-center justify-between">
                             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
@@ -772,31 +824,29 @@ export const NuevaOrdenPage = () => {
                         </div>
                       )}
 
-                      {/* Válido pero vencido o no entregado */}
-                      {ticketValidation.checked && ticketValidation.data && !ticketValidation.data.vigente && (
-                        <div className="bg-red-50/60 dark:bg-red-950/20 border border-red-200/80 dark:border-red-900/40 rounded-xl p-3.5 space-y-1.5 animate-fade-in">
+                      {/* Procedente pero fuera de tiempo / vencida */}
+                      {isGarantiaValida && ticketValidation.data && !ticketValidation.data.vigente && (
+                        <div className="bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/40 rounded-xl p-3.5 space-y-1.5 animate-fade-in">
                           <div className="flex items-center justify-between">
-                            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-700 dark:text-red-400">
-                              <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
-                              {ticketValidation.data.entregado ? 'Garantía Vencida' : 'Equipo aún no entregado'}
+                            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-800 dark:text-amber-400">
+                              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                              Garantía Vencida
                             </span>
-                            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 font-medium">
+                            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-medium">
                               #{ticketValidation.data.servicio?.codigo_ticket}
                             </span>
                           </div>
-                          <p className="text-xs text-red-600/90 dark:text-red-300/80 leading-relaxed">
-                            {ticketValidation.data.entregado
-                              ? `La garantía de este servicio venció el ${ticketValidation.data.fechaVencimiento ? new Date(ticketValidation.data.fechaVencimiento).toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' }) : 'recientemente'}.`
-                              : 'La orden existe pero aún no registra una fecha de entrega formal al cliente.'}
+                          <p className="text-xs text-amber-700/90 dark:text-amber-300/80 leading-relaxed">
+                            La garantía de este servicio venció el {ticketValidation.data.fechaVencimiento ? new Date(ticketValidation.data.fechaVencimiento).toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' }) : 'recientemente'}.
                           </p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1.5 border-t border-red-100 dark:border-red-900/30 text-xs text-red-700/80 dark:text-red-300/70">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1.5 border-t border-amber-100 dark:border-amber-900/30 text-xs text-amber-700/80 dark:text-amber-300/70">
                             <div className="flex items-center gap-1.5 min-w-0">
                               <User className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                              <span className="truncate">Cliente: <strong className="font-medium text-red-900 dark:text-red-200">{ticketValidation.data.servicio?.cliente}</strong></span>
+                              <span className="truncate">Cliente: <strong className="font-medium text-amber-900 dark:text-amber-200">{ticketValidation.data.servicio?.cliente}</strong></span>
                             </div>
                             <div className="flex items-center gap-1.5 min-w-0">
                               <Smartphone className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                              <span className="truncate">Equipo: <strong className="font-medium text-red-900 dark:text-red-200">{[ticketValidation.data.servicio?.marca_equipo, ticketValidation.data.servicio?.modelo_equipo].filter(Boolean).join(' ')}</strong></span>
+                              <span className="truncate">Equipo: <strong className="font-medium text-amber-900 dark:text-amber-200">{[ticketValidation.data.servicio?.marca_equipo, ticketValidation.data.servicio?.modelo_equipo].filter(Boolean).join(' ')}</strong></span>
                             </div>
                           </div>
                         </div>
@@ -843,7 +893,9 @@ export const NuevaOrdenPage = () => {
                   {!form.cliente && (
                     <div className="space-y-4 pt-2">
                       <div>
-                        <label className={labelClass}>Nombre del Cliente *</label>
+                        <label className={labelClass}>
+                          Nombre del Cliente <span className="text-red-500">*</span>
+                        </label>
                         <input
                           type="text"
                           maxLength={100}
@@ -860,7 +912,9 @@ export const NuevaOrdenPage = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <label className={labelClass}>Teléfono *</label>
+                          <label className={labelClass}>
+                            Teléfono <span className="text-red-500">*</span>
+                          </label>
                           <input
                             type="tel"
                             maxLength={15}
@@ -960,7 +1014,9 @@ export const NuevaOrdenPage = () => {
                   {/* Marca y Modelo uno al lado del otro */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
-                      <label className={labelClass}>Marca *</label>
+                      <label className={labelClass}>
+                        Marca <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="text"
                         maxLength={50}
@@ -975,7 +1031,9 @@ export const NuevaOrdenPage = () => {
                       )}
                     </div>
                     <div>
-                      <label className={labelClass}>Modelo *</label>
+                      <label className={labelClass}>
+                        Modelo <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="text"
                         maxLength={50}
@@ -1027,7 +1085,9 @@ export const NuevaOrdenPage = () => {
 
                 <div className="space-y-4">
                   <div>
-                    <label className={labelClass}>Falla Reportada *</label>
+                    <label className={labelClass}>
+                      Falla Reportada <span className="text-red-500">*</span>
+                    </label>
                     <textarea
                       value={form.falla_reportada}
                       onChange={(e) => set('falla_reportada', e.target.value)}
@@ -1312,6 +1372,7 @@ export const NuevaOrdenPage = () => {
                 icon={ArrowRight}
                 iconPosition="right"
                 onClick={handleNext}
+                disabled={Boolean(currentStep === 1 && form.es_garantia && !isGarantiaValida)}
               >
                 Siguiente
               </Button>
