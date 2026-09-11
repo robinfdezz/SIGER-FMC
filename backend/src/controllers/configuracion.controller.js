@@ -22,6 +22,7 @@ const getCompanyProfile = async (req, res) => {
         telefono_principal,
         correo_contacto,
         direccion_fiscal,
+        dominio_sistema,
         logo_url,
         logo_public_id,
         created_at,
@@ -44,6 +45,7 @@ const getCompanyProfile = async (req, res) => {
           telefono_principal: '',
           correo_contacto: '',
           direccion_fiscal: '',
+          dominio_sistema: 'https://franyermobilecenter.com',
           logo_url: null,
           logo_public_id: null,
           created_at: null,
@@ -119,6 +121,7 @@ const updateCompanyProfile = async (req, res) => {
       telefono_principal,
       correo_contacto,
       direccion_fiscal,
+      dominio_sistema,
       logo_url,
       logo_public_id
     } = req.body;
@@ -207,6 +210,26 @@ const updateCompanyProfile = async (req, res) => {
       });
     }
 
+    const cleanDominio = typeof dominio_sistema === 'string' ? dominio_sistema.trim() : '';
+    if (!cleanDominio) {
+      return res.status(400).json({
+        ok: false,
+        message: 'El dominio web del sistema es obligatorio.'
+      });
+    }
+    if (cleanDominio.length > 150) {
+      return res.status(400).json({
+        ok: false,
+        message: 'El dominio web del sistema no puede exceder los 150 caracteres.'
+      });
+    }
+    if (!/^https?:\/\/.+/i.test(cleanDominio)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'El dominio web del sistema debe ser una URL válida (iniciar con http:// o https://).'
+      });
+    }
+
     const pool = getPool();
 
     // 1. Consultar registro actual para determinar si es UPDATE o INSERT
@@ -244,10 +267,11 @@ const updateCompanyProfile = async (req, res) => {
           telefono_principal = $3,
           correo_contacto = $4,
           direccion_fiscal = $5,
-          logo_url = $6,
-          logo_public_id = $7,
+          dominio_sistema = $6,
+          logo_url = $7,
+          logo_public_id = $8,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $8
+        WHERE id = $9
         RETURNING 
           id,
           nombre_empresa,
@@ -255,6 +279,7 @@ const updateCompanyProfile = async (req, res) => {
           telefono_principal,
           correo_contacto,
           direccion_fiscal,
+          dominio_sistema,
           logo_url,
           logo_public_id,
           created_at,
@@ -263,10 +288,11 @@ const updateCompanyProfile = async (req, res) => {
 
       const updateRes = await pool.query(updateQuery, [
         nombre_empresa.trim(),
-        rnc.trim(),
-        telefono_principal.trim(),
+        cleanRnc,
+        cleanTel,
         cleanEmail,
-        direccion_fiscal.trim(),
+        cleanDireccion,
+        cleanDominio,
         cleanLogoUrl,
         cleanLogoPublicId,
         current.id
@@ -282,9 +308,10 @@ const updateCompanyProfile = async (req, res) => {
           telefono_principal,
           correo_contacto,
           direccion_fiscal,
+          dominio_sistema,
           logo_url,
           logo_public_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING 
           id,
           nombre_empresa,
@@ -292,6 +319,7 @@ const updateCompanyProfile = async (req, res) => {
           telefono_principal,
           correo_contacto,
           direccion_fiscal,
+          dominio_sistema,
           logo_url,
           logo_public_id,
           created_at,
@@ -300,10 +328,11 @@ const updateCompanyProfile = async (req, res) => {
 
       const insertRes = await pool.query(insertQuery, [
         nombre_empresa.trim(),
-        rnc.trim(),
-        telefono_principal.trim(),
+        cleanRnc,
+        cleanTel,
         cleanEmail,
-        direccion_fiscal.trim(),
+        cleanDireccion,
+        cleanDominio,
         cleanLogoUrl,
         cleanLogoPublicId
       ]);
@@ -365,6 +394,7 @@ const getBranches = async (req, res) => {
         companhia_id,
         codigo_sucursal,
         nombre_sucursal,
+        prefijo_ticket,
         telefono,
         direccion,
         config_tickets,
@@ -421,7 +451,7 @@ const updateBranch = async (req, res) => {
 
     // 1. Verificar existencia de la sucursal
     const checkRes = await pool.query(
-      'SELECT id, codigo_sucursal, nombre_sucursal, config_tickets, config_etiquetas FROM datos_sucursales WHERE id = $1',
+      'SELECT id, codigo_sucursal, nombre_sucursal, prefijo_ticket, config_tickets, config_etiquetas FROM datos_sucursales WHERE id = $1',
       [branchId]
     );
     if (checkRes.rows.length === 0) {
@@ -437,6 +467,7 @@ const updateBranch = async (req, res) => {
     const {
       codigo_sucursal,
       nombre_sucursal,
+      prefijo_ticket,
       telefono,
       direccion,
       config_tickets,
@@ -445,6 +476,7 @@ const updateBranch = async (req, res) => {
 
     let finalCode = currentBranch.codigo_sucursal;
     let finalName = currentBranch.nombre_sucursal;
+    let finalPrefix = currentBranch.prefijo_ticket || 'FMC-';
 
     // 2. Validaciones de campos específicos de SuperAdmin
     if (isSuperAdmin) {
@@ -476,6 +508,23 @@ const updateBranch = async (req, res) => {
       }
       finalName = nombre_sucursal.trim();
 
+      // Validación de prefijo_ticket (solo editable por SuperAdmin)
+      if (prefijo_ticket !== undefined) {
+        if (!prefijo_ticket || typeof prefijo_ticket !== 'string' || prefijo_ticket.trim().length === 0) {
+          return res.status(400).json({
+            ok: false,
+            message: 'El prefijo de ticket es obligatorio.'
+          });
+        }
+        finalPrefix = prefijo_ticket.trim().toUpperCase();
+        if (finalPrefix.length > 15) {
+          return res.status(400).json({
+            ok: false,
+            message: 'El prefijo de ticket no puede exceder los 15 caracteres.'
+          });
+        }
+      }
+
       // Validar unicidad del código de sucursal
       const dupRes = await pool.query(
         'SELECT id FROM datos_sucursales WHERE UPPER(codigo_sucursal) = $1 AND id != $2',
@@ -487,6 +536,9 @@ const updateBranch = async (req, res) => {
           message: `El código de sucursal "${finalCode}" ya está registrado en otra sede.`
         });
       }
+    } else {
+      // Para Admin_Sucursal se ignora cualquier intento de mutar prefijo_ticket
+      finalPrefix = currentBranch.prefijo_ticket || 'FMC-';
     }
 
     // 3. Validaciones de campos operativos (telefono y direccion)
@@ -558,17 +610,19 @@ const updateBranch = async (req, res) => {
       SET 
         codigo_sucursal = $1,
         nombre_sucursal = $2,
-        telefono = $3,
-        direccion = $4,
-        config_tickets = $5,
-        config_etiquetas = $6,
+        prefijo_ticket = $3,
+        telefono = $4,
+        direccion = $5,
+        config_tickets = $6,
+        config_etiquetas = $7,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $7
+      WHERE id = $8
       RETURNING 
         id,
         companhia_id,
         codigo_sucursal,
         nombre_sucursal,
+        prefijo_ticket,
         telefono,
         direccion,
         config_tickets,
@@ -581,6 +635,7 @@ const updateBranch = async (req, res) => {
     const updateRes = await pool.query(updateQuery, [
       finalCode,
       finalName,
+      finalPrefix,
       cleanTel,
       cleanDireccion,
       JSON.stringify(finalTickets),

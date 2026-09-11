@@ -18,6 +18,7 @@
 | `telefono_principal`| VARCHAR(20) | NO | Teléfono de contacto oficial |
 | `correo_contacto` | VARCHAR(100) | NO | Correo oficial de contacto |
 | `direccion_fiscal` | TEXT | NO | Dirección fiscal de la matriz |
+| `dominio_sistema` | VARCHAR(150) | NO | URL base/origen del sistema web para la construcción de enlaces de seguimiento QR (Default: 'https://franyermobilecenter.com') |
 | `logo_url` | TEXT | SÍ | URL del logotipo de la empresa |
 | `logo_public_id` | VARCHAR(150) | SÍ | ID único del archivo en Cloudinary para gestión y borrado del logotipo |
 | `created_at` | TIMESTAMPTZ | SÍ | Fecha de creación (CURRENT_TIMESTAMP) |
@@ -30,6 +31,7 @@
 | `companhia_id` | INT | NO | FK -> `datos_companhia(id)` ON UPDATE CASCADE ON DELETE RESTRICT |
 | `codigo_sucursal`| VARCHAR(10) | NO | Código único identificador (ej. 'SUC-01', 'SUC-02') |
 | `nombre_sucursal`| VARCHAR(100) | NO | Nombre descriptivo de la sucursal |
+| `prefijo_ticket` | VARCHAR(15) | NO | Prefijo institucional por sucursal para la nomenclatura de órdenes de servicio (Default: 'FMC-') |
 | `telefono` | VARCHAR(20) | NO | Teléfono directo de la sucursal |
 | `direccion` | VARCHAR(200) | NO | Ubicación física |
 | `config_tickets` | JSONB | NO | Configuración de formato e impresión de comprobantes térmicos POS |

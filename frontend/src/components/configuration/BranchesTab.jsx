@@ -80,10 +80,14 @@ export const BranchesTab = ({ branches = [], onRefresh }) => {
               {/* Header de la tarjeta */}
               <div>
                 <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center flex-wrap gap-2">
                     <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200/80 dark:border-neutral-700/80 tracking-wide">
                       {branch.codigo_sucursal}
                     </span>
+
+                    <Badge variant="neutral" size="sm" showDot={false} className="font-mono">
+                      Prefijo: {branch.prefijo_ticket || 'FMC-'}
+                    </Badge>
 
                     {/* Badge de Sede Asignada al usuario */}
                     {isUserOwnBranch && (

@@ -11,6 +11,7 @@ import {
   Phone,
   Mail,
   MapPin,
+  Globe,
   Loader2,
   Lock,
   Save,
@@ -30,6 +31,7 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
     telefono_principal: '',
     correo_contacto: '',
     direccion_fiscal: '',
+    dominio_sistema: '',
     logo_url: null,
     logo_public_id: null
   });
@@ -48,6 +50,7 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
         telefono_principal: companyData.telefono_principal ? String(companyData.telefono_principal).replace(/\D/g, '') : '',
         correo_contacto: companyData.correo_contacto || '',
         direccion_fiscal: companyData.direccion_fiscal || '',
+        dominio_sistema: companyData.dominio_sistema || 'https://franyermobilecenter.com',
         logo_url: companyData.logo_url || null,
         logo_public_id: companyData.logo_public_id || null
       });
@@ -66,7 +69,8 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
     formData.rnc.trim() !== (companyData?.rnc || '').trim() ||
     formData.telefono_principal.replace(/\D/g, '') !== String(companyData?.telefono_principal || '').replace(/\D/g, '') ||
     formData.correo_contacto.trim().toLowerCase() !== (companyData?.correo_contacto || '').trim().toLowerCase() ||
-    formData.direccion_fiscal.trim() !== (companyData?.direccion_fiscal || '').trim()
+    formData.direccion_fiscal.trim() !== (companyData?.direccion_fiscal || '').trim() ||
+    formData.dominio_sistema.trim() !== (companyData?.dominio_sistema || '').trim()
   );
 
   const handleChange = (field, value) => {
@@ -148,6 +152,15 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
       newErrors.direccion_fiscal = 'Debe contener al menos 3 caracteres.';
     }
 
+    const cleanDominio = formData.dominio_sistema.trim();
+    if (!cleanDominio) {
+      newErrors.dominio_sistema = 'El dominio web del sistema es obligatorio.';
+    } else if (cleanDominio.length > 150) {
+      newErrors.dominio_sistema = 'No puede exceder los 150 caracteres.';
+    } else if (!/^https?:\/\/.+/i.test(cleanDominio)) {
+      newErrors.dominio_sistema = 'El dominio web debe ser una URL válida (debe iniciar con http:// o https://).';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -181,6 +194,7 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
         telefono_principal: formData.telefono_principal.trim(),
         correo_contacto: formData.correo_contacto.trim().toLowerCase(),
         direccion_fiscal: formData.direccion_fiscal.trim(),
+        dominio_sistema: formData.dominio_sistema.trim(),
         logo_url: finalLogoUrl,
         logo_public_id: finalLogoPublicId
       };
@@ -392,6 +406,33 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
                   </div>
                   {errors.correo_contacto && (
                     <p className="text-xs text-red-500 mt-1">{errors.correo_contacto}</p>
+                  )}
+                </div>
+
+                {/* Dominio Web del Sistema */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
+                    Dominio Web del Sistema <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400">
+                      <Globe size={16} />
+                    </div>
+                    <input
+                      type="url"
+                      value={formData.dominio_sistema}
+                      onChange={(e) => handleChange('dominio_sistema', e.target.value)}
+                      placeholder="https://franyermobilecenter.com"
+                      maxLength={150}
+                      disabled={!isSuperAdmin || isSubmitting}
+                      className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all disabled:bg-neutral-100 dark:disabled:bg-neutral-800/60 disabled:cursor-not-allowed ${errors.dominio_sistema
+                          ? 'border-red-500 focus:ring-red-500/20'
+                          : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10'
+                        }`}
+                    />
+                  </div>
+                  {errors.dominio_sistema && (
+                    <p className="text-xs text-red-500 mt-1">{errors.dominio_sistema}</p>
                   )}
                 </div>
               </div>

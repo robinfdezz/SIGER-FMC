@@ -29,7 +29,7 @@ const getSucursales = async (req, res) => {
   try {
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, companhia_id, codigo_sucursal, nombre_sucursal, telefono, direccion, activo FROM datos_sucursales WHERE activo = TRUE ORDER BY id ASC'
+      'SELECT id, companhia_id, codigo_sucursal, nombre_sucursal, prefijo_ticket, telefono, direccion, activo FROM datos_sucursales WHERE activo = TRUE ORDER BY id ASC'
     );
     return res.status(200).json({
       ok: true,
