@@ -13,7 +13,10 @@ const {
   uploadFotosServicio
 } = require('../controllers/servicios.controller');
 
-// Todas las rutas de servicios requieren autenticacion
+// ── Ruta pública para consulta / tracking de ticket vía QR ──
+router.get('/ticket/:codigo', getServicioByTicket);
+
+// Todas las demás rutas de servicios requieren autenticación
 router.use(authMiddleware);
 
 // GET /api/servicios?page=1&limit=20&sucursal_id=&estado_id=&q=
@@ -21,9 +24,6 @@ router.get('/', getServicios);
 
 // GET /api/servicios/validar-garantia/:codigoTicket - Validar vigencia de garantía
 router.get('/validar-garantia/:codigoTicket', validarGarantiaTicket);
-
-// GET /api/servicios/ticket/:codigo  - DEBE ir antes de /:id
-router.get('/ticket/:codigo', getServicioByTicket);
 
 // GET /api/servicios/:id
 router.get('/:id', getServicioById);

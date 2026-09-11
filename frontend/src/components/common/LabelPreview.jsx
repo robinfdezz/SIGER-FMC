@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { User, Phone, Smartphone, AlertCircle } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { PatternLockSvg, UnlockMethodView } from './PatternLock';
 
 export { PatternLockSvg, UnlockMethodView };
@@ -8,6 +9,7 @@ const DEFAULT_MOCK_DATA = {
   codigo_ticket: 'FMC-2026-0089',
   nombre_empresa: 'FRANYER MOBILE',
   nombre_sucursal: 'Sucursal SFM',
+  dominio_sistema: 'https://franyermobilecenter.com',
   nombre_cliente: 'Carlos Mendoza',
   cliente_nombre: 'Carlos Mendoza',
   telefono_cliente: '829-555-0149',
@@ -26,72 +28,26 @@ const DEFAULT_MOCK_DATA = {
 };
 
 /**
- * Componente vector SVG de Código QR estilizado con módulos cuadrados nítidos.
+ * Componente vector SVG de Código QR dinámico y nítido.
  */
-export const SvgQRCode = ({ size, className = '' }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 33 33"
-    fill="currentColor"
+export const SvgQRCode = ({
+  value = 'https://franyermobilecenter.com',
+  size = 80,
+  className = '',
+  level = 'M',
+  bgColor = '#ffffff',
+  fgColor = '#000000',
+  includeMargin = false
+}) => (
+  <QRCodeSVG
+    value={value || 'https://franyermobilecenter.com'}
+    size={size}
+    level={level}
+    bgColor={bgColor}
+    fgColor={fgColor}
+    includeMargin={includeMargin}
     className={`shrink-0 ${className}`}
-    xmlns="http://www.w3.org/2000/svg"
-    shapeRendering="crispEdges"
-  >
-    {/* Fondo blanco base */}
-    <rect x="0" y="0" width="33" height="33" fill="white" />
-
-    {/* Finder Pattern Top-Left */}
-    <rect x="0" y="0" width="7" height="7" fill="black" />
-    <rect x="1" y="1" width="5" height="5" fill="white" />
-    <rect x="2" y="2" width="3" height="3" fill="black" />
-
-    {/* Finder Pattern Top-Right */}
-    <rect x="26" y="0" width="7" height="7" fill="black" />
-    <rect x="27" y="1" width="5" height="5" fill="white" />
-    <rect x="28" y="2" width="3" height="3" fill="black" />
-
-    {/* Finder Pattern Bottom-Left */}
-    <rect x="0" y="26" width="7" height="7" fill="black" />
-    <rect x="1" y="27" width="5" height="5" fill="white" />
-    <rect x="2" y="28" width="3" height="3" fill="black" />
-
-    {/* Alignment Pattern */}
-    <rect x="20" y="20" width="5" height="5" fill="black" />
-    <rect x="21" y="21" width="3" height="3" fill="white" />
-    <rect x="22" y="22" width="1" height="1" fill="black" />
-
-    {/* Timing Patterns & Data Modules */}
-    <rect x="8" y="2" width="2" height="2" fill="black" />
-    <rect x="12" y="2" width="2" height="2" fill="black" />
-    <rect x="16" y="2" width="2" height="2" fill="black" />
-    <rect x="20" y="2" width="2" height="2" fill="black" />
-    <rect x="2" y="8" width="2" height="2" fill="black" />
-    <rect x="2" y="12" width="2" height="2" fill="black" />
-    <rect x="2" y="16" width="2" height="2" fill="black" />
-    <rect x="2" y="20" width="2" height="2" fill="black" />
-
-    {/* Inner Data Matrix Grid */}
-    <rect x="9" y="9" width="3" height="3" fill="black" />
-    <rect x="14" y="9" width="2" height="2" fill="black" />
-    <rect x="18" y="9" width="3" height="2" fill="black" />
-    <rect x="23" y="9" width="2" height="3" fill="black" />
-    <rect x="9" y="14" width="2" height="3" fill="black" />
-    <rect x="13" y="13" width="3" height="3" fill="black" />
-    <rect x="18" y="13" width="2" height="2" fill="black" />
-    <rect x="22" y="14" width="3" height="2" fill="black" />
-    <rect x="9" y="19" width="3" height="2" fill="black" />
-    <rect x="14" y="18" width="2" height="3" fill="black" />
-    <rect x="18" y="17" width="3" height="3" fill="black" />
-    <rect x="23" y="18" width="2" height="2" fill="black" />
-    <rect x="9" y="23" width="2" height="3" fill="black" />
-    <rect x="13" y="23" width="3" height="2" fill="black" />
-    <rect x="18" y="22" width="2" height="3" fill="black" />
-    <rect x="26" y="9" width="2" height="4" fill="black" />
-    <rect x="29" y="15" width="2" height="3" fill="black" />
-    <rect x="26" y="26" width="2" height="2" fill="black" />
-    <rect x="29" y="28" width="3" height="3" fill="black" />
-  </svg>
+  />
 );
 
 
@@ -232,6 +188,10 @@ export const LabelPreview = ({
   const tel = (incluir_telefono ? (mergedData.cliente_telefono || mergedData.telefono_cliente || '') : '').trim();
   const textoCliente = [nombre, tel].filter(Boolean).join(' · ');
 
+  const cleanDomain = (mergedData.dominio_sistema || 'https://franyermobilecenter.com').replace(/\/$/, '');
+  const trackingUrl = `${cleanDomain}/estado/${encodeURIComponent(mergedData.codigo_ticket || '')}`;
+  const showQr = Boolean(config.incluir_qr || config.formato_codigo === 'qr' || mergedData.datos_acceso?.tipo === 'qr');
+
   return (
     <div
       className={`relative select-none ${isPrintable ? 'w-full h-full p-0' : 'transition-all flex items-center justify-center'} ${className}`}
@@ -302,7 +262,7 @@ export const LabelPreview = ({
           </div>
         </div>
 
-        {/* Cuerpo del Sticker: Info del Cliente, Dispositivo y Método de Desbloqueo */}
+        {/* Cuerpo del Sticker: Info del Cliente, Dispositivo y Método de Desbloqueo / QR */}
         <div className="flex items-center justify-between gap-2 overflow-hidden flex-1 min-h-0">
           {/* Columna Izquierda: Datos del cliente, equipo, falla y técnico */}
           <div className="flex-1 min-w-0 flex flex-col justify-between h-full space-y-0.5">
@@ -344,8 +304,21 @@ export const LabelPreview = ({
             )}
           </div>
 
-          {/* Renderizado del Método de Desbloqueo (Alineado a la derecha, shrink-0) */}
-          {showUnlock && (
+          {/* Renderizado del Código QR o Método de Desbloqueo (Alineado a la derecha, shrink-0) */}
+          {showQr ? (
+            <div className="shrink-0 flex items-center justify-end">
+              <div className="p-0.5 rounded border border-neutral-200 bg-white flex items-center justify-center">
+                <QRCodeSVG
+                  value={trackingUrl}
+                  size={unlockSize}
+                  level="M"
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                  includeMargin={false}
+                />
+              </div>
+            </div>
+          ) : showUnlock ? (
             <div className="shrink-0 flex items-center justify-end">
               <UnlockMethodView
                 datosAcceso={mergedData.datos_acceso}
@@ -354,7 +327,7 @@ export const LabelPreview = ({
                 className={isPrintable ? 'shadow-none border-neutral-300' : ''}
               />
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

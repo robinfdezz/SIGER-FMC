@@ -10,6 +10,7 @@ import ClientsPage from './pages/ClientsPage';
 import ConfigurationPage from './pages/ConfigurationPage';
 import ServiciosPage from './pages/ServiciosPage';
 import NuevaOrdenPage from './pages/NuevaOrdenPage';
+import EstadoOrdenPage from './pages/EstadoOrdenPage';
 import { useTheme } from './context/ThemeContext';
 import { Toaster } from 'sileo';
 import 'sileo/styles.css';
@@ -26,8 +27,10 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* Ruta Pública: Login */}
+            {/* Rutas Públicas: Login y Seguimiento QR */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/estado" element={<EstadoOrdenPage />} />
+            <Route path="/estado/:codigo" element={<EstadoOrdenPage />} />
 
             {/* Rutas Privadas Protegidas */}
             <Route

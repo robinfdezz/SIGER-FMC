@@ -71,6 +71,7 @@ export const StickerTermico = ({
     codigo_ticket: s.codigo_ticket || 'FMC-2026-0089',
     nombre_empresa: companyData?.nombre_empresa || 'FRANYER MOBILE',
     nombre_sucursal: branch?.nombre_sucursal || 'Sucursal Principal',
+    dominio_sistema: companyData?.dominio_sistema || s.dominio_sistema || 'https://franyermobilecenter.com',
     nombre_cliente: clienteNombre,
     cliente_nombre: clienteNombre,
     telefono_cliente: clienteTel,

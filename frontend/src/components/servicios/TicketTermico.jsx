@@ -1,5 +1,5 @@
 import React from 'react';
-import { SvgQRCode } from '../common/LabelPreview';
+import { QRCodeSVG } from 'qrcode.react';
 
 export const DEFAULT_CONFIG_TICKETS = {
   ancho_papel_mm: 80, // 80 | 58
@@ -115,6 +115,10 @@ export const TicketTermico = ({
   const clienteNombre = data.cliente_nombre || data.nombre_cliente || (data.cliente ? `${data.cliente.nombre || ''} ${data.cliente.apellido || ''}`.trim() : '');
   const clienteTel = data.telefono_cliente || data.telefono_cliente_libre || data.cliente?.telefono || '';
   const clienteCedula = data.cedula_cliente || data.cedula_cliente_libre || data.cliente?.cedula_rnc || '';
+
+  // URL real de seguimiento para código QR
+  const cleanDomain = (companyData?.dominio_sistema || servicio?.dominio_sistema || 'https://franyermobilecenter.com').replace(/\/$/, '');
+  const trackingUrl = `${cleanDomain}/estado/${encodeURIComponent(data.codigo_ticket || '')}`;
 
   // Checklist normalizado (soporta JSON string, array u objeto de claves booleanas)
   const rawChecklist = data.checklist_recepcion ?? data.checklist_entrada ?? data.checklist;
@@ -334,7 +338,15 @@ export const TicketTermico = ({
         {normConfig.incluir_qr_tracking && (
           <div className="text-center my-3 flex flex-col items-center">
             <div className="p-2 border border-neutral-300 rounded-lg bg-white w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center mx-auto shrink-0">
-              <SvgQRCode className="w-full h-full text-black" />
+              <QRCodeSVG
+                value={trackingUrl}
+                size={80}
+                level="M"
+                bgColor="#ffffff"
+                fgColor="#000000"
+                includeMargin={false}
+                className="w-full h-full text-black"
+              />
             </div>
             <div className="mt-2 text-center space-y-0.5">
               <span className="block text-[8.5px] text-neutral-600 font-sans">
