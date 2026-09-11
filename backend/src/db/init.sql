@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS clientes (
 -- 8. Tabla de Servicios de Recepción (Tickets / Órdenes de Trabajo)
 CREATE TABLE IF NOT EXISTS servicios_recepcion (
     id SERIAL PRIMARY KEY,
-    codigo_ticket VARCHAR(20) NOT NULL UNIQUE,
+    codigo_ticket VARCHAR(35) NOT NULL UNIQUE,
     sucursal_id INT NOT NULL,
     categoria_id INT NOT NULL,
     cliente_id INT NULL,

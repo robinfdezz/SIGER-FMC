@@ -219,8 +219,20 @@ const createServicio = async (req, res) => {
     }
     var estado_inicial_id = estadoRes.rows[0].id;
 
-    // ── 2. Generar codigo de ticket unico con retry loop ─────
-    var codigo_ticket = await generateUniqueTicketCode(client);
+    // ── 2. Obtener prefijo_ticket de la sucursal ─────────────
+    const sucursalRes = await client.query(
+      'SELECT prefijo_ticket FROM datos_sucursales WHERE id = $1',
+      [finalSucursalId]
+    );
+    const prefijoSucursal = (sucursalRes.rows[0]?.prefijo_ticket && sucursalRes.rows[0].prefijo_ticket.trim())
+      ? sucursalRes.rows[0].prefijo_ticket.trim()
+      : 'FMC-';
+
+    // ── 3. Generar codigo de ticket unico con retry loop ─────
+    const sufijoTicket = await generateUniqueTicketCode(client);
+    const codigo_ticket = sufijoTicket.startsWith('FMC-')
+      ? sufijoTicket.replace(/^FMC-/, prefijoSucursal)
+      : `${prefijoSucursal}${sufijoTicket}`;
 
     // ── 3. Insertar la orden de servicio ─────────────────────
     var insertRes = await client.query(
