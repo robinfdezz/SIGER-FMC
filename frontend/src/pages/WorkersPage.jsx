@@ -36,34 +36,34 @@ const getRoleConfig = (rolNombre) => {
     return {
       label: 'Super Admin',
       icon: ShieldCheck,
-      color: 'text-red-600/80 dark:text-red-400/80'
+      color: 'danger'
     };
   }
   if (normalized.includes('admin')) {
     return {
       label: 'Admin Sucursal',
       icon: Shield,
-      color: 'text-amber-600/85 dark:text-amber-400/80'
+      color: 'warning'
     };
   }
   if (normalized.includes('secretaria')) {
     return {
       label: 'Secretaria',
       icon: ClipboardList,
-      color: 'text-purple-600/80 dark:text-purple-400/80'
+      color: 'purple'
     };
   }
   if (normalized.includes('tecnic')) {
     return {
       label: 'Técnico',
       icon: Wrench,
-      color: 'text-blue-600/80 dark:text-blue-400/80'
+      color: 'info'
     };
   }
   return {
     label: rolNombre || 'Sin Rol',
     icon: User,
-    color: 'text-neutral-600/80 dark:text-neutral-400/80'
+    color: 'neutral'
   };
 };
 
@@ -526,9 +526,15 @@ const WorkersPage = () => {
                           const RoleIcon = role.icon;
                           return (
                             <div className="space-y-1">
-                              <div className="flex items-center gap-1.5 text-xs font-semibold">
-                                <RoleIcon className={`w-3.5 h-3.5 shrink-0 ${role.color}`} />
-                                <span className={role.color}>{role.label}</span>
+                              <div>
+                                <Badge
+                                  variant="minimal"
+                                  color={role.color}
+                                  icon={RoleIcon}
+                                  className="font-semibold text-xs"
+                                >
+                                  {role.label}
+                                </Badge>
                               </div>
                               <p className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
                                 <Store size={12} className="text-neutral-400 shrink-0" />

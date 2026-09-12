@@ -410,10 +410,12 @@ export const ClientsPage = () => {
                         </td>
 
                         {/* Columna 5: Estado */}
-                        <td className="py-3.5 px-4 sm:px-6 text-center">
+                        <td className="py-3.5 px-4 sm:px-6 text-center align-middle">
                           <Badge
-                            variant={client.activo ? 'success' : 'neutral'}
+                            variant="minimal"
+                            color={client.activo ? 'success' : 'neutral'}
                             icon={client.activo ? CheckCircle2 : XCircle}
+                            className="font-medium"
                           >
                             {client.activo ? 'Activo' : 'Inactivo'}
                           </Badge>

@@ -23,7 +23,11 @@ import {
   Smartphone,
   Calendar,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Flame,
+  ChevronsUp,
+  Equal,
+  ChevronsDown
 } from 'lucide-react';
 
 const extractArray = (res) => {
@@ -35,19 +39,37 @@ const extractArray = (res) => {
   return [];
 };
 
-const getPrioridadVariant = (prioridad) => {
+const getPrioridadConfig = (prioridad) => {
   switch (prioridad?.toLowerCase()) {
     case 'urgente':
-      return 'danger';
+      return {
+        label: 'Urgente',
+        color: 'danger',
+        icon: <Flame className="fill-current" />
+      };
     case 'alta':
-      return 'warning';
+      return {
+        label: 'Alta',
+        color: 'warning',
+        icon: ChevronsUp
+      };
     case 'media':
-      return 'info';
+      return {
+        label: 'Media',
+        color: 'info',
+        icon: Equal
+      };
     case 'baja':
     default:
-      return 'neutral';
+      return {
+        label: 'Baja',
+        color: 'neutral',
+        icon: ChevronsDown
+      };
   }
 };
+
+const getPrioridadVariant = (prioridad) => getPrioridadConfig(prioridad).color;
 
 const FALLBACK_ESTADOS = [
   { id: 1, codigo_estado: 'RECIBIDO', nombre_estado: 'Recibido en Taller', color_badge: '#3B82F6', orden_flujo: 1 },
@@ -505,16 +527,24 @@ export const ServiciosPage = () => {
                         )}
                       </td>
 
-                      {/* Columna 5: Prioridad con Badge institucional */}
+                      {/* Columna 5: Prioridad con Badge minimal */}
                       <td className="py-3 px-3 sm:px-4 whitespace-nowrap align-middle">
                         {orden.prioridad ? (
-                          <Badge
-                            variant={getPrioridadVariant(orden.prioridad)}
-                            size="sm"
-                            className="capitalize font-medium"
-                          >
-                            {orden.prioridad}
-                          </Badge>
+                          (() => {
+                            const config = getPrioridadConfig(orden.prioridad);
+                            const PriorityIcon = config.icon;
+                            return (
+                              <Badge
+                                variant="minimal"
+                                color={config.color}
+                                icon={PriorityIcon}
+                                size="sm"
+                                className="capitalize font-medium"
+                              >
+                                {config.label}
+                              </Badge>
+                            );
+                          })()
                         ) : (
                           <span className="text-neutral-400 dark:text-neutral-500">—</span>
                         )}

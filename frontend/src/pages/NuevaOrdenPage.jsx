@@ -31,7 +31,11 @@ import {
   Lock,
   Tag,
   Wrench,
-  Check
+  Check,
+  Flame,
+  ChevronsUp,
+  Equal,
+  ChevronsDown
 } from 'lucide-react';
 
 const FALLBACK_CATEGORIAS = [
@@ -44,10 +48,30 @@ const FALLBACK_CATEGORIAS = [
 ];
 
 const PRIORIDAD_OPTIONS = [
-  { id: 'baja', value: 'baja', label: 'Baja' },
-  { id: 'media', value: 'media', label: 'Media' },
-  { id: 'alta', value: 'alta', label: 'Alta' },
-  { id: 'urgente', value: 'urgente', label: 'Urgente' }
+  {
+    id: 'baja',
+    value: 'baja',
+    label: 'Baja',
+    icon: <ChevronsDown size={16} className="text-neutral-500 dark:text-neutral-400 shrink-0" />
+  },
+  {
+    id: 'media',
+    value: 'media',
+    label: 'Media',
+    icon: <Equal size={16} className="text-blue-500 dark:text-blue-400 shrink-0" />
+  },
+  {
+    id: 'alta',
+    value: 'alta',
+    label: 'Alta',
+    icon: <ChevronsUp size={16} className="text-amber-500 dark:text-amber-400 shrink-0" />
+  },
+  {
+    id: 'urgente',
+    value: 'urgente',
+    label: 'Urgente',
+    icon: <Flame size={16} className="fill-current text-red-500 dark:text-red-400 shrink-0" />
+  }
 ];
 
 const GARANTIA_OPTIONS = [

@@ -10,7 +10,63 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ### Planned
 - Módulo de Banco de Trabajo y Diagnóstico Técnico.
-- Portal público de seguimiento de tickets para clientes (`/tracking/:codigo_ticket`).
+
+---
+
+## [0.6.1] - 2026-09-11
+
+### Added
+- **Generación Vectorial de Código QR Dinámico (`qrcode.react` / `TicketQR.jsx`):**
+  - Integración de la dependencia `qrcode.react` (`QRCodeSVG`) en el frontend.
+  - Creación del componente `TicketQR.jsx` (`frontend/src/components/common/TicketQR.jsx`) para renderizado vectorial SVG de alta definición, eliminando dependencias externas de APIs web y garantizando legibilidad en impresión térmica.
+  - Enlace de rastreo resuelto dinámicamente según la sucursal y la empresa: `${dominio_sistema}/estado/${codigo_ticket}` (ej. `https://franyermobilecenter.com/estado/FMC-2026-0089`), embebido en comprobantes térmicos (`TicketTermico.jsx`) y stickers adhesivos (`StickerTermico.jsx`, `LabelPreview.jsx`).
+- **Portal Público de Seguimiento de Órdenes para Clientes (`EstadoOrdenPage.jsx`):**
+  - Nuevas rutas públicas en el frontend (`App.jsx`): `/estado` y `/estado/:codigo`, accesibles libremente sin requerir inicio de sesión.
+  - Interfaz de rastreo en tiempo real estilo courier con buscador manual de ticket, stepper de las 8 fases operativas, detalles del dispositivo, desglose de costos y bitácora pública de avances.
+- **Parametrización en Base de Datos de Dominio Web y Prefijos (`init.sql`, `DATABASE.md`):**
+  - `datos_companhia`: Adición de la columna `dominio_sistema VARCHAR(150) NOT NULL DEFAULT 'https://franyermobilecenter.com'` para centralizar el dominio corporativo base para códigos QR y notificaciones.
+  - `datos_sucursales`: Adición de la columna `prefijo_ticket VARCHAR(15) NOT NULL DEFAULT 'FMC-'` para la nomenclatura y formato personalizado de tickets por sede física.
+- **Estandarización de Tablas de Gestión (`ServiciosPage.jsx`, `ClientsPage.jsx`, `WorkersPage.jsx`):**
+  - Contenedor con altura fija homogénea de `h-[560px]` con scroll vertical y horizontal independiente (`overflow-y-auto overflow-x-auto relative`).
+  - Cabecera fija (`thead sticky top-0`) con sombras sutiles y soporte coherente para modo claro y oscuro.
+  - Barra inferior de conteo y resumen homologada en todas las vistas maestras (`"Mostrando X órdenes / clientes / usuarios"`).
+  - Unificación de scrollbars globales (`frontend/src/index.css`) a `8px` tanto en el eje vertical como horizontal con `scrollbar-gutter: stable`.
+  - Habilitación de salto de línea natural (`whitespace-normal break-words leading-snug`) en nombres de clientes y descripciones de equipos, eliminando truncados prematuros con puntos suspensivos.
+  - Optimización de anchos de columnas: columna Cliente ajustada a `w-[19%] min-w-[150px]` y columna Fecha de Registro ampliada a `w-[145px] min-w-[135px] whitespace-nowrap`.
+
+### Changed
+- **Adopción de Iconos de Prioridad en Tablas y Formularios (`ServiciosPage.jsx`, `NuevaOrdenPage.jsx`):**
+  - **Clientes (`ClientsPage.jsx`):** Columna de estado activo/inactivo migrada a `<Badge variant="minimal" ... />` con iconos `CheckCircle2` y `XCircle`.
+  - **Órdenes de Servicio (`ServiciosPage.jsx`):** Columna de prioridad migrada a `<Badge variant="minimal" ... />` con iconos específicos para cada uno de los 4 niveles.
+  - **Formulario de Ingreso de Órdenes (`NuevaOrdenPage.jsx`):** Selector de nivel de prioridad en el Paso 1 ("Dispositivo y Falla") enriquecido con los 4 iconos semánticos tanto en las opciones del menú como en el campo seleccionado:
+    * `Urgente`: Icono `Flame` con relleno sólido (`fill-current text-red-500 dark:text-red-400`).
+    * `Alta`: Icono `ChevronsUp` (`text-amber-500 dark:text-amber-400`).
+    * `Media`: Icono `Equal` (`text-blue-500 dark:text-blue-400`).
+    * `Baja`: Icono `ChevronsDown` (`text-neutral-500 dark:text-neutral-400`).
+- **Extensión del Componente `Badge` (`Badge.jsx`) y Refactorización en `WorkersPage.jsx`:**
+  - Soporte para dos variantes visuales mediante la prop `variant`:
+    * `'pill'` (predeterminado): estilo clásico tipo cápsula con fondo suave, borde y padding (`rounded-lg border px-2.5 py-1`).
+    * `'minimal'`: estilo limpio en línea sin fondo ni borde (`bg-transparent border-0 p-0 rounded-none`), con icono y texto a color semántico.
+  - Soporte de prop `color` para asignar colores semánticos (`danger`, `warning`, `purple`, `info`, `success`, `neutral`) con retrocompatibilidad absoluta para llamadas existentes.
+  - Refactorización de la columna de roles en `WorkersPage.jsx` para utilizar la interfaz oficial: `<Badge variant="minimal" color={role.color} icon={RoleIcon}>{role.label}</Badge>`.
+  - Asignación de iconos semánticos de Lucide y colores atenuados por rol:
+    * `SuperAdmin`: Icono `ShieldCheck` con color `danger` (`text-red-600/80 dark:text-red-400/80`).
+    * `Admin_Sucursal`: Icono `Shield` con color `warning` (`text-amber-600/85 dark:text-amber-400/80`).
+    * `Secretaria`: Icono `ClipboardList` con color `purple` (`text-purple-600/80 dark:text-purple-400/80`).
+    * `Tecnico`: Icono `Wrench` con color `info` (`text-blue-600/80 dark:text-blue-400/80`).
+    * Default / Otros: Icono `User` con color `neutral` (`text-neutral-600/80 dark:text-neutral-400/80`).
+  - Mantenimiento del subtexto atenuado de sucursal con icono `Store` (`text-neutral-500 text-xs`).
+- **Controles Inferiores del Sidebar (`Sidebar.jsx`):**
+  - Corrección de alineación a la izquierda (`items-start`) en el contenedor inferior cuando el sidebar se encuentra expandido o fijado, alineándose a la misma vertical que el menú principal.
+  - Botones de alternancia de tema (Modo Claro/Oscuro) y modo de visualización del sidebar definidos como cuadrados compactos (`w-10 h-10 aspect-square rounded-lg flex items-center justify-center`).
+  - Efecto hover delimitado estrictamente al recuadro cuadrado (`hover:bg-neutral-100 dark:hover:bg-neutral-800`), eliminando la deformación rectangular a lo ancho.
+
+### Fixed
+- **Validación y Bloqueo de Reingresos por Garantía (`servicios.controller.js`, `NuevaOrdenPage.jsx`):**
+  - Backend: Bloqueo estricto que impide procesar un reingreso por garantía si la orden de servicio previa no cuenta con estado `ENTREGADO` o fecha formal de entrega (`fecha_entrega`), retornando código de error `NO_ENTREGADO`.
+  - Frontend: Bloqueo interactivo en el Paso 1 de apertura de órdenes al ingresar tickets de equipos aún en taller, alertando al usuario y deshabilitando el avance a pasos posteriores.
+- **Formulario de Recepción de Servicios (`NuevaOrdenPage.jsx`):**
+  - Unificación y aseguramiento del color rojo institucional (`text-red-500`) en los asteriscos (`*`) de todos los campos obligatorios del formulario (Nombre del Cliente, Teléfono, Marca, Modelo, Falla Reportada, Categoría de Dispositivo, Código de Ticket Original y Costo Estimado).
 
 ---
 

@@ -85,6 +85,15 @@ frontend/
 * **Feedback Visual:** Spinners en peticiones asíncronas, toasts de notificación para acciones exitosas/fallidas.
 * **Fotos de Perfil:** Si el usuario no tiene `foto_perfil_url`, mostrar un avatar con sus iniciales.
 * **Atenuación en Modo Solo Lectura:** Bloques y formularios no editables por restricciones de rol (RBAC) aplican la directriz uniforme `opacity-50 select-none pointer-events-none` junto a un banner explicativo conciso.
+* **Tablas de Gestión Scroleables y Sticky:**
+  - Contenedor con altura fija estándar (`h-[560px] overflow-y-auto overflow-x-auto relative`).
+  - Cabecera fija (`thead sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs`).
+  - Barra inferior con resumen dinámico de conteo (`"Mostrando X registros"`).
+  - Scrollbars estandarizados a `8px` tanto en el eje vertical como horizontal (`scrollbar-gutter: stable`).
+* **Envoltorio Natural de Texto en Tablas:** En columnas de nombres de clientes y modelos de dispositivos, evitar el uso de `truncate` estricto; utilizar `whitespace-normal break-words leading-snug` con ancho delimitado para permitir el flujo multilínea sin cortes bruscos.
+* **Presentación de Roles en Tablas:** Utilizar el componente oficial `<Badge variant="minimal" color={...} icon={RoleIcon}>{nombreRol}</Badge>` para proyectar un formato en línea limpio con icono y texto a color semántico sin recuadros ni fondos pesados.
+* **Indicadores de Campos Obligatorios:** En formularios, todo asterisco indicador de obligatoriedad debe proyectar explícitamente `<span className="text-red-500">*</span>` en color rojo institucional.
+* **Controles Inferiores del Sidebar:** En estado expandido, los botones de tema y modo se alinean a la izquierda en la misma vertical del menú (`items-start`), con formato cuadrado estricto (`w-10 h-10 aspect-square rounded-lg flex items-center justify-center`) y hover contenido sin expansión a lo ancho.
 * **Seguimiento Público:** Vista minimalista y limpia para clientes sin requerir inicio de sesión.
 
 ---

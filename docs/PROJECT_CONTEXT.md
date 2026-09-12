@@ -47,6 +47,7 @@ Cada orden de servicio transita de manera estructurada a través de 8 estados se
    * Equipo validado y listo en mostrador; notificación al cliente para retiro.
 7. **`ENTREGADO` (ID: 7 | Esmeralda Oscuro):**
    * Cierre formal en mostrador, liquidación del costo final, entrega física y emisión de condiciones de garantía (ej. 30 días).
+   * **Reingreso por Garantía:** Una orden previa únicamente es admisible para un nuevo ticket de garantía si su estado formal es `ENTREGADO` (o cuenta con `fecha_entrega`). Equipos aún no retirados del taller no son elegibles para garantía.
 8. **`CANCELADO_DEVUELTO` (ID: 8 | Rojo):**
    * Cancelación por falta de solución técnica o no aprobación del presupuesto por parte del cliente.
 
@@ -60,11 +61,12 @@ Cada orden de servicio transita de manera estructurada a través de 8 estados se
 * **`incidencias_servicio`:** Registro de imprevistos, piezas extra y costos adicionales surgidos durante el diagnóstico/reparación.
 * **`evidencias_fotograficas`:** Registro fotográfico del estado de entrada, fallas detectadas y resultado final.
 * **`categorias_dispositivos`:** Clasificación de equipos atendidos (Smartphone, Tablet/iPad, Laptop, Consola de Videojuegos, Smartwatch, Otros).
+* **Portal de Seguimiento Público (`EstadoOrdenPage.jsx`):** Consulta web pública en tiempo real (`/estado` y `/estado/:codigo`) accesible vía escaneo de código QR generado por `TicketQR.jsx` con enlace dinámico corporativo.
 
 ---
 
 ## 6. Stack Tecnológico
-* **Frontend:** React, Tailwind CSS, Vite, Lucide Icons, Morphicons, Sileo (Toaster).
+* **Frontend:** React, Tailwind CSS, Vite, Lucide Icons, Morphicons, QRCode.react (`qrcode.react`), Sileo (Toaster).
 * **Backend:** Node.js, Express.js.
 * **Base de Datos:** PostgreSQL (`siger_fmc_db`) vía driver nativo `pg` con Connection Pooling.
 * **Gestión Multimedia:** Cloudinary SDK v2 + Multer (MemoryStorage), compresión adaptativa a WebP (`siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`).
