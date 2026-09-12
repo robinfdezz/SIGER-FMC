@@ -27,7 +27,12 @@ import {
   Flame,
   ChevronsUp,
   Equal,
-  ChevronsDown
+  ChevronsDown,
+  Laptop,
+  Tablet,
+  Gamepad2,
+  Watch,
+  Package
 } from 'lucide-react';
 
 const extractArray = (res) => {
@@ -70,6 +75,27 @@ const getPrioridadConfig = (prioridad) => {
 };
 
 const getPrioridadVariant = (prioridad) => getPrioridadConfig(prioridad).color;
+
+const getDeviceCategoryIcon = (categoria) => {
+  const norm = (categoria || '').toLowerCase().trim();
+  const iconClass = "text-red-600 dark:text-red-400 shrink-0 mt-0.5";
+  if (norm.includes('laptop') || norm.includes('portatil') || norm.includes('portátil') || norm.includes('notebook') || norm.includes('computadora')) {
+    return <Laptop size={14} className={iconClass} />;
+  }
+  if (norm.includes('tablet') || norm.includes('ipad') || norm.includes('tableta')) {
+    return <Tablet size={14} className={iconClass} />;
+  }
+  if (norm.includes('consola') || norm.includes('videojuego') || norm.includes('game') || norm.includes('play') || norm.includes('xbox') || norm.includes('nintendo')) {
+    return <Gamepad2 size={14} className={iconClass} />;
+  }
+  if (norm.includes('watch') || norm.includes('reloj') || norm.includes('band')) {
+    return <Watch size={14} className={iconClass} />;
+  }
+  if (norm.includes('phone') || norm.includes('celular') || norm.includes('movil') || norm.includes('móvil') || norm.includes('smartphone')) {
+    return <Smartphone size={14} className={iconClass} />;
+  }
+  return <Package size={14} className={iconClass} />;
+};
 
 const FALLBACK_ESTADOS = [
   { id: 1, codigo_estado: 'RECIBIDO', nombre_estado: 'Recibido en Taller', color_badge: '#3B82F6', orden_flujo: 1 },
@@ -267,10 +293,30 @@ export const ServiciosPage = () => {
 
   const prioridadOptions = useMemo(() => [
     { id: 'all', label: 'Todas las Prioridades' },
-    { id: 'baja', label: 'Baja' },
-    { id: 'media', label: 'Media' },
-    { id: 'alta', label: 'Alta' },
-    { id: 'urgente', label: 'Urgente' }
+    {
+      id: 'baja',
+      value: 'baja',
+      label: 'Baja',
+      icon: <ChevronsDown size={16} className="text-neutral-500 dark:text-neutral-400 shrink-0" />
+    },
+    {
+      id: 'media',
+      value: 'media',
+      label: 'Media',
+      icon: <Equal size={16} className="text-blue-500 dark:text-blue-400 shrink-0" />
+    },
+    {
+      id: 'alta',
+      value: 'alta',
+      label: 'Alta',
+      icon: <ChevronsUp size={16} className="text-amber-500 dark:text-amber-400 shrink-0" />
+    },
+    {
+      id: 'urgente',
+      value: 'urgente',
+      label: 'Urgente',
+      icon: <Flame size={16} className="fill-current text-red-500 dark:text-red-400 shrink-0" />
+    }
   ], []);
 
   const branchOptions = useMemo(() => [
@@ -481,7 +527,7 @@ export const ServiciosPage = () => {
                       {/* Columna 3: Equipo */}
                       <td className="py-3 px-3 sm:px-4 align-middle min-w-[165px] max-w-[230px]">
                         <div className="flex items-start gap-1.5">
-                          <Smartphone size={14} className="text-neutral-400 shrink-0 mt-0.5" />
+                          {getDeviceCategoryIcon(orden.categoria)}
                           <span className="text-neutral-700 dark:text-neutral-300 font-medium text-xs leading-snug whitespace-normal break-words">
                             {orden.marca_equipo} {orden.modelo_equipo}
                           </span>

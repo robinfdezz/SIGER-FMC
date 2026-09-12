@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { stripEmojis } from '../utils/stripEmojis';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -8,7 +9,7 @@ const api = axios.create({
   timeout: 15000,
 });
 
-// Interceptor para inyectar automáticamente el Bearer Token
+// Interceptor para inyectar automáticamente el Bearer Token y sanitizar emojis de los datos enviados
 api.interceptors.request.use(
   (config) => {
     // Buscar token en localStorage (si marcó Recordar) o en sessionStorage
@@ -17,6 +18,17 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Sanitizar emojis de forma recursiva en el cuerpo de la petición
+    if (config.data) {
+      config.data = stripEmojis(config.data);
+    }
+
+    // Sanitizar parámetros URL de búsqueda si existen
+    if (config.params) {
+      config.params = stripEmojis(config.params);
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

@@ -546,10 +546,12 @@ const WorkersPage = () => {
                       </td>
 
                       {/* Columna 4: Estado (Activo/Inactivo) */}
-                      <td className="py-3.5 px-4 sm:px-6 text-center">
+                      <td className="py-3.5 px-4 sm:px-6 text-center align-middle">
                         <Badge
-                          variant={worker.activo ? 'success' : 'neutral'}
+                          variant="minimal"
+                          color={worker.activo ? 'success' : 'neutral'}
                           icon={worker.activo ? CheckCircle2 : XCircle}
+                          className="font-medium"
                         >
                           {worker.activo ? 'Activo' : 'Inactivo'}
                         </Badge>

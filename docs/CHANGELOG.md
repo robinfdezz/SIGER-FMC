@@ -16,6 +16,9 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 ## [0.6.1] - 2026-09-11
 
 ### Added
+- **Sanitización y Bloqueo Centralizado de Emojis (Backend & Frontend):**
+  - **Backend (`stripEmojis.middleware.js` / `app.js`):** Middleware global registrado inmediatamente tras `express.json()`. Aplica remoción recursiva en `req.body` y `req.query` mediante regex Unicode que abarca pictografías extendidas, bloques de emojis y símbolos suplementarios (`[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE0E}-\u{FE0F}\u{200D}]/gu`), normalizando espacios redundantes sin afectar contraseñas o instancias no planas (`Date`, `Buffer`).
+  - **Frontend (`stripEmojis.js` / `api.js` / `Input.jsx`):** Interceptor de solicitudes Axios que sanitiza `config.data` y `config.params` de forma transparente antes de disparar cualquier petición HTTP hacia el backend (incluyendo `FormData`). Se provee además el componente base `Input.jsx` con sanitización en tiempo real en eventos `onChange` y `onPaste`.
 - **Generación Vectorial de Código QR Dinámico (`qrcode.react` / `TicketQR.jsx`):**
   - Integración de la dependencia `qrcode.react` (`QRCodeSVG`) en el frontend.
   - Creación del componente `TicketQR.jsx` (`frontend/src/components/common/TicketQR.jsx`) para renderizado vectorial SVG de alta definición, eliminando dependencias externas de APIs web y garantizando legibilidad en impresión térmica.
@@ -35,14 +38,12 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   - Optimización de anchos de columnas: columna Cliente ajustada a `w-[19%] min-w-[150px]` y columna Fecha de Registro ampliada a `w-[145px] min-w-[135px] whitespace-nowrap`.
 
 ### Changed
-- **Adopción de Iconos de Prioridad en Tablas y Formularios (`ServiciosPage.jsx`, `NuevaOrdenPage.jsx`):**
+- **Adopción de Iconos de Prioridad y Categorías en Tablas y Formularios (`ServiciosPage.jsx`, `NuevaOrdenPage.jsx`):**
   - **Clientes (`ClientsPage.jsx`):** Columna de estado activo/inactivo migrada a `<Badge variant="minimal" ... />` con iconos `CheckCircle2` y `XCircle`.
-  - **Órdenes de Servicio (`ServiciosPage.jsx`):** Columna de prioridad migrada a `<Badge variant="minimal" ... />` con iconos específicos para cada uno de los 4 niveles.
-  - **Formulario de Ingreso de Órdenes (`NuevaOrdenPage.jsx`):** Selector de nivel de prioridad en el Paso 1 ("Dispositivo y Falla") enriquecido con los 4 iconos semánticos tanto en las opciones del menú como en el campo seleccionado:
-    * `Urgente`: Icono `Flame` con relleno sólido (`fill-current text-red-500 dark:text-red-400`).
-    * `Alta`: Icono `ChevronsUp` (`text-amber-500 dark:text-amber-400`).
-    * `Media`: Icono `Equal` (`text-blue-500 dark:text-blue-400`).
-    * `Baja`: Icono `ChevronsDown` (`text-neutral-500 dark:text-neutral-400`).
+  - **Órdenes de Servicio (`ServiciosPage.jsx`):** Columna de prioridad migrada a `<Badge variant="minimal" ... />` con iconos específicos para cada uno de los 4 niveles, selector de filtro de prioridad actualizado con los mismos iconos, y columna "Equipo" dinamizada con iconos semánticos según la categoría técnica del dispositivo (`Smartphone`, `Laptop`, `Tablet`, `Gamepad2`, `Watch`, `Package`).
+  - **Formulario de Ingreso de Órdenes (`NuevaOrdenPage.jsx`):**
+    * **Nivel de Prioridad:** Enriquecido con los 4 iconos (`ChevronsDown`, `Equal`, `ChevronsUp`, `Flame` relleno) en cada opción y en el disparador.
+    * **Categoría de Dispositivos:** Enriquecido con iconos específicos por categoría técnica tanto para opciones dinámicas de API como de respaldo (`Smartphone`, `Laptop`, `Tablet / iPad`, `Consola de Videojuegos`, `Smartwatch`, `Otros`).
 - **Extensión del Componente `Badge` (`Badge.jsx`) y Refactorización en `WorkersPage.jsx`:**
   - Soporte para dos variantes visuales mediante la prop `variant`:
     * `'pill'` (predeterminado): estilo clásico tipo cápsula con fondo suave, borde y padding (`rounded-lg border px-2.5 py-1`).
@@ -55,6 +56,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
     * `Secretaria`: Icono `ClipboardList` con color `purple` (`text-purple-600/80 dark:text-purple-400/80`).
     * `Tecnico`: Icono `Wrench` con color `info` (`text-blue-600/80 dark:text-blue-400/80`).
     * Default / Otros: Icono `User` con color `neutral` (`text-neutral-600/80 dark:text-neutral-400/80`).
+  - Columna de estado activo/inactivo en `WorkersPage.jsx` migrada a `<Badge variant="minimal" color={worker.activo ? 'success' : 'neutral'} icon={worker.activo ? CheckCircle2 : XCircle}>` para completa coherencia visual con la tabla de clientes.
   - Mantenimiento del subtexto atenuado de sucursal con icono `Store` (`text-neutral-500 text-xs`).
 - **Controles Inferiores del Sidebar (`Sidebar.jsx`):**
   - Corrección de alineación a la izquierda (`items-start`) en el contenedor inferior cuando el sidebar se encuentra expandido o fijado, alineándose a la misma vertical que el menú principal.

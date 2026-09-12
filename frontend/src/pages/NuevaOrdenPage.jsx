@@ -35,16 +35,42 @@ import {
   Flame,
   ChevronsUp,
   Equal,
-  ChevronsDown
+  ChevronsDown,
+  Laptop,
+  Tablet,
+  Gamepad2,
+  Watch,
+  Package
 } from 'lucide-react';
 
+const getCategoryIcon = (categoryName) => {
+  const norm = (categoryName || '').toLowerCase().trim();
+  const iconClass = "text-red-600 dark:text-red-400 shrink-0";
+  if (norm.includes('laptop') || norm.includes('portatil') || norm.includes('portátil') || norm.includes('notebook') || norm.includes('computadora')) {
+    return <Laptop size={16} className={iconClass} />;
+  }
+  if (norm.includes('tablet') || norm.includes('ipad') || norm.includes('tableta')) {
+    return <Tablet size={16} className={iconClass} />;
+  }
+  if (norm.includes('consola') || norm.includes('videojuego') || norm.includes('game') || norm.includes('play') || norm.includes('xbox') || norm.includes('nintendo')) {
+    return <Gamepad2 size={16} className={iconClass} />;
+  }
+  if (norm.includes('watch') || norm.includes('reloj') || norm.includes('band')) {
+    return <Watch size={16} className={iconClass} />;
+  }
+  if (norm.includes('phone') || norm.includes('celular') || norm.includes('movil') || norm.includes('móvil') || norm.includes('smartphone')) {
+    return <Smartphone size={16} className={iconClass} />;
+  }
+  return <Package size={16} className={iconClass} />;
+};
+
 const FALLBACK_CATEGORIAS = [
-  { id: '1', value: '1', label: 'Smartphone' },
-  { id: '2', value: '2', label: 'Laptop' },
-  { id: '3', value: '3', label: 'Tablet / iPad' },
-  { id: '4', value: '4', label: 'Consola de Videojuegos' },
-  { id: '5', value: '5', label: 'Smartwatch' },
-  { id: '6', value: '6', label: 'Otros' }
+  { id: '1', value: '1', label: 'Smartphone', icon: <Smartphone size={16} className="text-red-600 dark:text-red-400 shrink-0" /> },
+  { id: '2', value: '2', label: 'Laptop', icon: <Laptop size={16} className="text-red-600 dark:text-red-400 shrink-0" /> },
+  { id: '3', value: '3', label: 'Tablet / iPad', icon: <Tablet size={16} className="text-red-600 dark:text-red-400 shrink-0" /> },
+  { id: '4', value: '4', label: 'Consola de Videojuegos', icon: <Gamepad2 size={16} className="text-red-600 dark:text-red-400 shrink-0" /> },
+  { id: '5', value: '5', label: 'Smartwatch', icon: <Watch size={16} className="text-red-600 dark:text-red-400 shrink-0" /> },
+  { id: '6', value: '6', label: 'Otros', icon: <Package size={16} className="text-red-600 dark:text-red-400 shrink-0" /> }
 ];
 
 const PRIORIDAD_OPTIONS = [
@@ -438,11 +464,15 @@ export const NuevaOrdenPage = () => {
 
   const categoriaOptions = useMemo(() => {
     if (categorias && categorias.length > 0) {
-      return categorias.map((c) => ({
-        id: String(c.id),
-        value: String(c.id),
-        label: c.nombre_categoria || c.nombre || `Categoría ${c.id}`
-      }));
+      return categorias.map((c) => {
+        const label = c.nombre_categoria || c.nombre || `Categoría ${c.id}`;
+        return {
+          id: String(c.id),
+          value: String(c.id),
+          label,
+          icon: getCategoryIcon(label)
+        };
+      });
     }
     return FALLBACK_CATEGORIAS;
   }, [categorias]);
