@@ -592,7 +592,27 @@ const getServicioById = async (req, res) => {
       '  c.telefono AS telefono_cliente_reg,\n' +
       '  COALESCE((SELECT TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id ORDER BY ta.id ASC LIMIT 1), \'Sin asignar\') AS tecnico_nombre,\n' +
       '  COALESCE((SELECT json_agg(json_build_object(\'id\', dt_tec.id, \'nombre_completo\', TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)))) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), \'[]\'::json) AS tecnicos,\n' +
-      '  COALESCE((SELECT json_agg(json_build_object(\'id\', ef.id, \'url\', ef.url_foto, \'url_foto\', ef.url_foto, \'public_id\', ef.public_id, \'tipo_evidencia\', ef.tipo_evidencia, \'fecha_subida\', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE), \'[]\'::json) AS fotos\n' +
+      '  COALESCE((SELECT json_agg(json_build_object(\'id\', ef.id, \'url\', ef.url_foto, \'url_foto\', ef.url_foto, \'public_id\', ef.public_id, \'tipo_evidencia\', ef.tipo_evidencia, \'fecha_subida\', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE), \'[]\'::json) AS fotos,\n' +
+      '  COALESCE((\n' +
+      '    SELECT json_agg(\n' +
+      '      json_build_object(\n' +
+      '        \'id\', he.id,\n' +
+      '        \'estado_id\', he.estado_id,\n' +
+      '        \'nombre_estado\', es_h.nombre_estado,\n' +
+      '        \'codigo_estado\', es_h.codigo_estado,\n' +
+      '        \'color_badge\', es_h.color_badge,\n' +
+      '        \'orden_flujo\', es_h.orden_flujo,\n' +
+      '        \'usuario_id\', he.usuario_id,\n' +
+      '        \'usuario_nombre\', TRIM(CONCAT(dt_h.nombre, \' \', dt_h.apellido)),\n' +
+      '        \'nota_cambio\', he.nota_cambio,\n' +
+      '        \'fecha_registro\', he.fecha_registro\n' +
+      '      ) ORDER BY he.fecha_registro ASC, he.id ASC\n' +
+      '    )\n' +
+      '    FROM historial_estados he\n' +
+      '    LEFT JOIN estados_servicio es_h ON es_h.id = he.estado_id\n' +
+      '    LEFT JOIN datos_trabajadores dt_h ON dt_h.id = he.usuario_id\n' +
+      '    WHERE he.servicio_id = sr.id\n' +
+      '  ), \'[]\'::json) AS historial_estados\n' +
       'FROM servicios_recepcion sr\n' +
       'LEFT JOIN estados_servicio es ON es.id = sr.estado_actual_id\n' +
       'LEFT JOIN categorias_dispositivos cd ON cd.id = sr.categoria_id\n' +

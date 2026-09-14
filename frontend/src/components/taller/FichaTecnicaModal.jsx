@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
 import Select from '../common/Select';
@@ -36,7 +37,8 @@ import {
   AlertTriangle,
   Search,
   Wrench,
-  ClipboardCheck
+  ClipboardCheck,
+  History
 } from 'lucide-react';
 import { UnlockMethodView } from '../common/PatternLock';
 import {
@@ -372,6 +374,27 @@ export const FichaTecnicaModal = ({
   const CurrentEstadoIcon = getEstadoIcon(currentEstadoObj);
   const currentEstadoColor = orden?.estado_color || currentEstadoObj.color_badge || '#6B7280';
   const currentEstadoLabel = getEstadoLabel(currentEstadoObj);
+
+  const rawHistorial = Array.isArray(orden?.historial_estados) && orden.historial_estados.length > 0
+    ? orden.historial_estados
+    : [];
+
+  const timelineItems = rawHistorial.length > 0
+    ? rawHistorial
+    : [
+        {
+          id: 'inicio',
+          estado_id: orden?.estado_actual_id || orden?.estado_id,
+          nombre_estado: orden?.estado || 'Recibido en Taller',
+          codigo_estado: orden?.codigo_estado,
+          color_badge: orden?.estado_color,
+          orden_flujo: orden?.orden_flujo || 1,
+          usuario_nombre: orden?.recepcionista || 'Recepción',
+          nota_cambio: orden?.observaciones_recepcion || orden?.observaciones || null,
+          fecha_registro: orden?.created_at,
+          fotos: fotosArray
+        }
+      ];
 
   return (
     <>
@@ -735,45 +758,153 @@ export const FichaTecnicaModal = ({
                 </div>
               )}
 
-              {/* Fotos de Evidencia */}
-              {fotosArray.length > 0 && (
-                <div className="space-y-2">
-                  <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 flex items-center gap-1.5">
-                    <ImageIcon size={14} />
-                    <span>Fotos de Recepción <strong className="text-neutral-700 dark:text-neutral-300 font-bold ml-1">{fotosArray.length}</strong></span>
+              {/* Histórico en Taller (Línea de Tiempo) */}
+              <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-800 p-5 bg-white dark:bg-neutral-900/50 h-auto space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 flex items-center gap-1.5 font-outfit">
+                    <History size={14} className="text-red-500 shrink-0" />
+                    <span>Histórico en Taller</span>
+                    <strong className="text-neutral-700 dark:text-neutral-300 font-bold ml-1">
+                      {timelineItems.length}
+                    </strong>
                   </span>
-                  <div className="grid grid-cols-4 gap-2.5">
-                    {fotosArray.map((foto, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => setActivePhoto(foto.url || foto.url_foto)}
-                        className="aspect-square rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-800 cursor-pointer group relative bg-neutral-100 dark:bg-neutral-900"
-                      >
-                        <img
-                          src={foto.url || foto.url_foto}
-                          alt={`Evidencia ${idx + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                      </div>
-                    ))}
-                  </div>
                 </div>
-              )}
+
+                <div className="relative pl-6 space-y-6 pt-1">
+                  {timelineItems.map((item, idx) => {
+                    const isLast = idx === timelineItems.length - 1;
+                    const estadoObj =
+                      (allEstados || []).find(
+                        (e) => String(e.id) === String(item.estado_id) || e.codigo_estado === item.codigo_estado
+                      ) || item;
+                    const estadoColor = item.color_badge || estadoObj.color_badge || '#6B7280';
+                    const estadoLabel = getEstadoLabel(estadoObj) || item.nombre_estado || item.estado || 'Estado Actualizado';
+                    const EstadoIcon = getEstadoIcon(estadoObj);
+                    const itemFotos =
+                      Array.isArray(item.fotos) && item.fotos.length > 0
+                        ? item.fotos
+                        : idx === 0
+                        ? fotosArray
+                        : [];
+                    const formattedDate = item.fecha_registro
+                      ? new Date(item.fecha_registro).toLocaleString('es-DO', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true
+                        })
+                      : '—';
+
+                    return (
+                      <div key={item.id || idx} className="relative group">
+                        {/* Línea vertical conectora */}
+                        {!isLast && (
+                          <div className="absolute -left-[19px] top-3.5 -bottom-6 w-0.5 bg-neutral-200 dark:bg-neutral-800" />
+                        )}
+
+                        {/* Punto / Nodo circular */}
+                        <div
+                          className="absolute -left-[23px] top-1.5 w-2.5 h-2.5 rounded-full ring-4 ring-white dark:ring-[#18181b] shrink-0 z-10"
+                          style={{ backgroundColor: estadoColor }}
+                        />
+
+                        {/* Contenido a la derecha del nodo */}
+                        <div className="space-y-1.5">
+                          {/* Fila superior: Estado, Fecha/Hora y Técnico responsable */}
+                          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <EstadoIcon size={13} className="shrink-0 stroke-[2.2]" style={{ color: estadoColor }} />
+                              <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-neutral-100 font-outfit">
+                                {estadoLabel}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-[11px] text-neutral-400 dark:text-neutral-500 font-inter">
+                              {item.usuario_nombre && (
+                                <>
+                                  <span className="flex items-center gap-1 text-neutral-600 dark:text-neutral-300 font-medium">
+                                    <User size={11} className="shrink-0 text-neutral-400" />
+                                    <span>{item.usuario_nombre}</span>
+                                  </span>
+                                  <span>·</span>
+                                </>
+                              )}
+                              <span className="tabular-nums">{formattedDate}</span>
+                            </div>
+                          </div>
+
+                          {/* Nota de avance / cambio */}
+                          {item.nota_cambio && (
+                            <p className="text-xs text-neutral-600 dark:text-neutral-300 font-inter leading-relaxed bg-neutral-50 dark:bg-neutral-800/40 rounded-xl p-2.5 border border-neutral-200/50 dark:border-neutral-800/60">
+                              {item.nota_cambio}
+                            </p>
+                          )}
+
+                          {/* Evidencias fotográficas asociadas */}
+                          {itemFotos.length > 0 && (
+                            <div className="pt-2 space-y-2">
+                              <span className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <ImageIcon size={13} />
+                                <span>Evidencias Fotográficas ({itemFotos.length})</span>
+                              </span>
+                              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                                {itemFotos.map((foto, fIdx) => (
+                                  <div
+                                    key={fIdx}
+                                    onClick={() => setActivePhoto(foto.url || foto.url_foto)}
+                                    className="aspect-square rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-800 cursor-pointer group/img relative bg-neutral-100 dark:bg-neutral-900 shadow-2xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all"
+                                    title="Ver imagen en tamaño completo"
+                                  >
+                                    <img
+                                      src={foto.url || foto.url_foto}
+                                      alt={`Evidencia ${fIdx + 1}`}
+                                      className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-200"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </>
           )}
       </Modal>
 
       {/* Modal Lightbox de Foto */}
-      {activePhoto && (
-        <div
-          onClick={() => setActivePhoto(null)}
-          className="fixed inset-0 z-60 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm cursor-pointer"
-        >
-          <div className="relative max-w-2xl max-h-[85vh] rounded-2xl overflow-hidden">
-            <img src={activePhoto} alt="Evidencia completa" className="w-full h-full object-contain" />
-          </div>
-        </div>
-      )}
+      {activePhoto &&
+        createPortal(
+          <div
+            onClick={() => setActivePhoto(null)}
+            className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md cursor-pointer animate-fade-in"
+          >
+            <button
+              type="button"
+              onClick={() => setActivePhoto(null)}
+              className="absolute top-4 right-4 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer z-10"
+              title="Cerrar visor"
+            >
+              <X size={22} />
+            </button>
+            <div
+              className="relative max-w-4xl max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={activePhoto}
+                alt="Evidencia completa"
+                className="w-auto h-auto max-w-full max-h-[85vh] object-contain rounded-xl"
+              />
+            </div>
+          </div>,
+          document.body
+        )}
     </>
   );
 };
