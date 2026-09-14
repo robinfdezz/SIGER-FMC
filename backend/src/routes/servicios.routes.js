@@ -9,6 +9,10 @@ const {
   getServicios,
   getServicioById,
   getServicioByTicket,
+  getServiciosTaller,
+  updateServicioEstado,
+  assignTecnicoServicio,
+  removeTecnicoServicio,
   validarGarantiaTicket,
   uploadFotosServicio
 } = require('../controllers/servicios.controller');
@@ -19,6 +23,9 @@ router.get('/ticket/:codigo', getServicioByTicket);
 // Todas las demás rutas de servicios requieren autenticación
 router.use(authMiddleware);
 
+// GET /api/servicios/taller - Órdenes activas para el tablero Kanban de taller
+router.get('/taller', getServiciosTaller);
+
 // GET /api/servicios?page=1&limit=20&sucursal_id=&estado_id=&q=
 router.get('/', getServicios);
 
@@ -27,6 +34,15 @@ router.get('/validar-garantia/:codigoTicket', validarGarantiaTicket);
 
 // GET /api/servicios/:id
 router.get('/:id', getServicioById);
+
+// PATCH /api/servicios/:id/estado - Actualización de estado en taller
+router.patch('/:id/estado', updateServicioEstado);
+
+// POST /api/servicios/:id/tecnicos - Asignar técnico colaborador
+router.post('/:id/tecnicos', assignTecnicoServicio);
+
+// DELETE /api/servicios/:id/tecnicos/:tecnicoId - Remover técnico colaborador
+router.delete('/:id/tecnicos/:tecnicoId', removeTecnicoServicio);
 
 // POST /api/servicios
 router.post('/', createServicio);

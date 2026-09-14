@@ -34,7 +34,8 @@ import {
   Watch,
   Package,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  ShieldCheck
 } from 'lucide-react';
 
 const extractArray = (res) => {
@@ -630,9 +631,10 @@ export const ServiciosPage = () => {
                           {orden.codigo_ticket}
                         </div>
                         {orden.es_garantia && (
-                          <span className="text-[10px] text-rose-500 dark:text-rose-400 font-semibold font-inter block mt-0.5">
-                            GARANTÍA
-                          </span>
+                          <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-500 dark:text-red-400 leading-none mt-1">
+                            <ShieldCheck size={11} className="stroke-[2.2] shrink-0" />
+                            <span className="leading-none">GARANTÍA</span>
+                          </div>
                         )}
                       </td>
 

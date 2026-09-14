@@ -831,11 +831,493 @@ const validarGarantiaTicket = async (req, res) => {
   }
 };
 
+// ============================================================
+// GET /api/servicios/taller — Órdenes activas en flujo de taller
+// ============================================================
+const getServiciosTaller = async (req, res) => {
+  try {
+    const pool = getPool();
+    const userRole = String(req.user?.rol_nombre || req.user?.rol || '').toLowerCase();
+    const isSuperAdmin = userRole === 'superadmin';
+
+    // Determinar sucursal a filtrar
+    let sucursalId = null;
+    if (req.query.sucursal_id && req.query.sucursal_id !== 'all') {
+      sucursalId = parseInt(req.query.sucursal_id);
+    } else if (!isSuperAdmin && req.user?.sucursal_id) {
+      sucursalId = parseInt(req.user.sucursal_id);
+    }
+
+    // Filtro opcional por técnico
+    let tecnicoId = null;
+    if (req.query.tecnico_id && req.query.tecnico_id !== 'all') {
+      tecnicoId = parseInt(req.query.tecnico_id);
+    }
+
+    // Construcción de condiciones WHERE
+    // Estados activos en taller: orden_flujo entre 1 y 6 (excluye 7: Entregado y 8: Cancelado)
+    const conditions = [
+      'sr.activo = TRUE',
+      'es.orden_flujo >= 1',
+      'es.orden_flujo <= 6'
+    ];
+    const params = [];
+
+    if (sucursalId) {
+      params.push(sucursalId);
+      conditions.push(`sr.sucursal_id = $${params.length}`);
+    }
+
+    if (tecnicoId) {
+      params.push(tecnicoId);
+      conditions.push(`EXISTS (SELECT 1 FROM tecnicos_asignados ta WHERE ta.servicio_id = sr.id AND ta.tecnico_id = $${params.length})`);
+    }
+
+    const whereClause = `WHERE ${conditions.join(' AND ')}`;
+
+    const query = `
+      SELECT
+        sr.id,
+        sr.codigo_ticket,
+        sr.sucursal_id,
+        ds.nombre_sucursal AS sucursal,
+        sr.categoria_id,
+        cd.nombre_categoria AS categoria,
+        sr.marca_equipo,
+        sr.modelo_equipo,
+        sr.num_serie_imei,
+        sr.falla_reportada,
+        sr.observaciones_recepcion,
+        sr.prioridad,
+        sr.es_garantia,
+        sr.datos_acceso_equipo,
+        sr.checklist_entrada,
+        sr.costo_previsto,
+        sr.monto_anticipo,
+        sr.fecha_entrega_estimada,
+        sr.created_at,
+        sr.updated_at,
+        es.id AS estado_id,
+        es.codigo_estado,
+        es.nombre_estado AS estado,
+        es.color_badge AS estado_color,
+        es.orden_flujo,
+        COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS nombre_cliente,
+        COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS cliente,
+        COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,
+        COALESCE((
+          SELECT TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido))
+          FROM tecnicos_asignados ta
+          JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+          WHERE ta.servicio_id = sr.id
+          ORDER BY ta.id ASC
+          LIMIT 1
+        ), 'Sin asignar') AS tecnico_nombre,
+        COALESCE((
+          SELECT ta.tecnico_id
+          FROM tecnicos_asignados ta
+          WHERE ta.servicio_id = sr.id
+          ORDER BY ta.id ASC
+          LIMIT 1
+        ), NULL) AS tecnico_id,
+        COALESCE((
+          SELECT string_agg(TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido)), ', ' ORDER BY ta.id ASC)
+          FROM tecnicos_asignados ta
+          JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+          WHERE ta.servicio_id = sr.id
+        ), 'Sin asignar') AS tecnicos_nombres,
+        COALESCE((
+          SELECT json_agg(json_build_object(
+            'id', dt_tec.id,
+            'nombre', dt_tec.nombre,
+            'apellido', dt_tec.apellido,
+            'nombre_completo', TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido)),
+            'usuario', dt_tec.usuario,
+            'foto_perfil_url', dt_tec.foto_perfil_url
+          ) ORDER BY ta.id ASC)
+          FROM tecnicos_asignados ta
+          JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+          WHERE ta.servicio_id = sr.id
+        ), '[]'::json) AS tecnicos
+      FROM servicios_recepcion sr
+      JOIN estados_servicio es ON es.id = sr.estado_actual_id
+      LEFT JOIN categorias_dispositivos cd ON cd.id = sr.categoria_id
+      LEFT JOIN datos_sucursales ds ON ds.id = sr.sucursal_id
+      LEFT JOIN clientes c ON c.id = sr.cliente_id
+      ${whereClause}
+      ORDER BY
+        CASE sr.prioridad
+          WHEN 'urgente' THEN 4
+          WHEN 'alta' THEN 3
+          WHEN 'media' THEN 2
+          WHEN 'baja' THEN 1
+          ELSE 0
+        END DESC,
+        sr.created_at ASC
+    `;
+
+    const result = await pool.query(query, params);
+
+    return res.status(200).json({
+      ok: true,
+      success: true,
+      total: result.rowCount,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('❌ Error en getServiciosTaller:', error);
+    return res.status(500).json({
+      ok: false,
+      success: false,
+      message: 'Error al consultar órdenes del taller.'
+    });
+  }
+};
+
+// ============================================================
+// PATCH /api/servicios/:id/estado — Actualizar estado de una orden
+// ============================================================
+const updateServicioEstado = async (req, res) => {
+  const pool = getPool();
+  const client = await pool.connect();
+
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id < 1) {
+      return res.status(400).json({ ok: false, message: 'ID de orden inválido.' });
+    }
+
+    const { nuevo_estado_id, notas, tecnico_id } = req.body;
+    const estadoId = parseInt(nuevo_estado_id);
+
+    if (!estadoId || estadoId < 1) {
+      return res.status(400).json({ ok: false, message: 'Debe especificar un nuevo_estado_id válido.' });
+    }
+
+    const usuarioId = req.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ ok: false, message: 'Usuario no autenticado.' });
+    }
+
+    // 1. Validar existencia del nuevo estado
+    const estadoRes = await client.query(
+      'SELECT id, codigo_estado, nombre_estado, color_badge, orden_flujo FROM estados_servicio WHERE id = $1',
+      [estadoId]
+    );
+
+    if (estadoRes.rowCount === 0) {
+      return res.status(404).json({ ok: false, message: 'El estado seleccionado no existe en el catálogo.' });
+    }
+    const nuevoEstado = estadoRes.rows[0];
+
+    // 2. Verificar existencia de la orden y sucursal autorizada
+    const userRole = String(req.user?.rol_nombre || req.user?.rol || '').toLowerCase();
+    const isSuperAdmin = userRole === 'superadmin';
+
+    let checkQuery = 'SELECT id, codigo_ticket, sucursal_id, estado_actual_id FROM servicios_recepcion WHERE id = $1 AND activo = TRUE';
+    const checkParams = [id];
+
+    if (!isSuperAdmin && req.user?.sucursal_id) {
+      checkQuery += ' AND sucursal_id = $2';
+      checkParams.push(Number(req.user.sucursal_id));
+    }
+
+    const ordenRes = await client.query(checkQuery, checkParams);
+    if (ordenRes.rowCount === 0) {
+      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada o fuera de su sucursal.' });
+    }
+
+    await client.query('BEGIN');
+
+    // 3. Actualizar estado_actual_id y timestamp
+    let updateQuery = 'UPDATE servicios_recepcion SET estado_actual_id = $1, updated_at = NOW()';
+    const updateParams = [estadoId, id];
+
+    if (nuevoEstado.codigo_estado === 'ENTREGADO' || nuevoEstado.orden_flujo === 7) {
+      updateQuery = 'UPDATE servicios_recepcion SET estado_actual_id = $1, fecha_entrega_real = COALESCE(fecha_entrega_real, NOW()), updated_at = NOW()';
+    }
+    updateQuery += ' WHERE id = $2 RETURNING *';
+
+    await client.query(updateQuery, updateParams);
+
+    // 4. Autoasignación inteligente de técnico:
+    // Si se envió un tecnico_id explícito, agregarlo como técnico colaborador si no lo está ya.
+    // Si NO tiene ningún técnico asignado y el estado pasa a diagnóstico o reparación, asignar al usuario logueado.
+    // Si YA tiene técnicos asignados, NUNCA se borran ni sobrescriben.
+    const tecCountRes = await client.query(
+      'SELECT COUNT(*)::int AS total FROM tecnicos_asignados WHERE servicio_id = $1',
+      [id]
+    );
+    const totalTecnicos = tecCountRes.rows[0]?.total || 0;
+
+    let tecnicoParaAgregar = null;
+    const esEstadoTecnico = ['EN_DIAGNOSTICO', 'EN_REPARACION'].includes(nuevoEstado.codigo_estado) ||
+      (nuevoEstado.orden_flujo >= 2 && nuevoEstado.orden_flujo <= 4);
+
+    if (tecnico_id && Number.isInteger(parseInt(tecnico_id))) {
+      tecnicoParaAgregar = parseInt(tecnico_id);
+    } else if (totalTecnicos === 0 && esEstadoTecnico) {
+      tecnicoParaAgregar = usuarioId;
+    }
+
+    if (tecnicoParaAgregar) {
+      const existeTecnico = await client.query(
+        'SELECT 1 FROM tecnicos_asignados WHERE servicio_id = $1 AND tecnico_id = $2',
+        [id, tecnicoParaAgregar]
+      );
+      if (existeTecnico.rowCount === 0) {
+        await client.query(
+          'INSERT INTO tecnicos_asignados (servicio_id, tecnico_id, fecha_asignacion) VALUES ($1, $2, NOW())',
+          [id, tecnicoParaAgregar]
+        );
+      }
+    }
+
+    // 5. Insertar en historial_estados
+    const notaTexto = (notas && String(notas).trim())
+      ? String(notas).trim()
+      : `Estado actualizado a: ${nuevoEstado.nombre_estado}`;
+
+    await client.query(
+      'INSERT INTO historial_estados (servicio_id, estado_id, usuario_id, nota_cambio, fecha_registro) VALUES ($1, $2, $3, $4, NOW())',
+      [id, estadoId, usuarioId, notaTexto]
+    );
+
+    await client.query('COMMIT');
+
+    // 6. Consultar orden actualizada completa con badge y técnicos
+    const finalRes = await pool.query(
+      `SELECT
+        sr.id,
+        sr.codigo_ticket,
+        sr.sucursal_id,
+        ds.nombre_sucursal AS sucursal,
+        sr.categoria_id,
+        cd.nombre_categoria AS categoria,
+        sr.marca_equipo,
+        sr.modelo_equipo,
+        sr.falla_reportada,
+        sr.prioridad,
+        sr.es_garantia,
+        sr.fecha_entrega_estimada,
+        sr.fecha_entrega_real,
+        sr.created_at,
+        sr.updated_at,
+        es.id AS estado_id,
+        es.codigo_estado,
+        es.nombre_estado AS estado,
+        es.color_badge AS estado_color,
+        es.orden_flujo,
+        COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS nombre_cliente,
+        COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS cliente,
+        COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,
+        COALESCE((
+          SELECT TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido))
+          FROM tecnicos_asignados ta
+          JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+          WHERE ta.servicio_id = sr.id
+          ORDER BY ta.id ASC
+          LIMIT 1
+        ), 'Sin asignar') AS tecnico_nombre,
+        COALESCE((
+          SELECT string_agg(TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido)), ', ' ORDER BY ta.id ASC)
+          FROM tecnicos_asignados ta
+          JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+          WHERE ta.servicio_id = sr.id
+        ), 'Sin asignar') AS tecnicos_nombres,
+        COALESCE((
+          SELECT json_agg(json_build_object(
+            'id', dt_tec.id,
+            'nombre', dt_tec.nombre,
+            'apellido', dt_tec.apellido,
+            'nombre_completo', TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido)),
+            'usuario', dt_tec.usuario,
+            'foto_perfil_url', dt_tec.foto_perfil_url
+          ) ORDER BY ta.id ASC)
+          FROM tecnicos_asignados ta
+          JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+          WHERE ta.servicio_id = sr.id
+        ), '[]'::json) AS tecnicos
+      FROM servicios_recepcion sr
+      JOIN estados_servicio es ON es.id = sr.estado_actual_id
+      LEFT JOIN categorias_dispositivos cd ON cd.id = sr.categoria_id
+      LEFT JOIN datos_sucursales ds ON ds.id = sr.sucursal_id
+      LEFT JOIN clientes c ON c.id = sr.cliente_id
+      WHERE sr.id = $1`,
+      [id]
+    );
+
+    return res.status(200).json({
+      ok: true,
+      success: true,
+      message: `Estado actualizado a "${nuevoEstado.nombre_estado}" correctamente.`,
+      data: finalRes.rows[0]
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error en updateServicioEstado:', error);
+    return res.status(500).json({
+      ok: false,
+      success: false,
+      message: 'Error al actualizar el estado de la orden de servicio.'
+    });
+  } finally {
+    client.release();
+  }
+};
+
+// ============================================================
+// POST /api/servicios/:id/tecnicos — Asignar técnico colaborador
+// ============================================================
+const assignTecnicoServicio = async (req, res) => {
+  try {
+    const pool = getPool();
+    const id = parseInt(req.params.id);
+    if (!id || id < 1) {
+      return res.status(400).json({ ok: false, message: 'ID de orden inválido.' });
+    }
+
+    const targetTecnicoId = req.body.tecnico_id ? parseInt(req.body.tecnico_id) : req.user?.id;
+    if (!targetTecnicoId || targetTecnicoId < 1) {
+      return res.status(400).json({ ok: false, message: 'ID de técnico inválido.' });
+    }
+
+    // Verificar que el técnico exista y esté activo
+    const tecRes = await pool.query(
+      'SELECT id, nombre, apellido, usuario, activo FROM datos_trabajadores WHERE id = $1',
+      [targetTecnicoId]
+    );
+    if (tecRes.rowCount === 0 || !tecRes.rows[0].activo) {
+      return res.status(404).json({ ok: false, message: 'El técnico seleccionado no existe o está inactivo.' });
+    }
+    const tecnicoInfo = tecRes.rows[0];
+
+    // Verificar que la orden exista y esté activa
+    const ordenRes = await pool.query(
+      'SELECT id, codigo_ticket FROM servicios_recepcion WHERE id = $1 AND activo = TRUE',
+      [id]
+    );
+    if (ordenRes.rowCount === 0) {
+      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada.' });
+    }
+
+    // Verificar si ya está asignado
+    const existe = await pool.query(
+      'SELECT id FROM tecnicos_asignados WHERE servicio_id = $1 AND tecnico_id = $2',
+      [id, targetTecnicoId]
+    );
+
+    if (existe.rowCount > 0) {
+      return res.status(200).json({
+        ok: true,
+        success: true,
+        message: 'El técnico ya se encuentra asignado a esta orden.'
+      });
+    }
+
+    // Insertar asignación
+    await pool.query(
+      'INSERT INTO tecnicos_asignados (servicio_id, tecnico_id, fecha_asignacion) VALUES ($1, $2, NOW())',
+      [id, targetTecnicoId]
+    );
+
+    // Retornar lista completa actualizada de técnicos
+    const listRes = await pool.query(
+      `SELECT json_agg(json_build_object(
+        'id', dt_tec.id,
+        'nombre', dt_tec.nombre,
+        'apellido', dt_tec.apellido,
+        'nombre_completo', TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido)),
+        'usuario', dt_tec.usuario,
+        'foto_perfil_url', dt_tec.foto_perfil_url
+      ) ORDER BY ta.id ASC) AS tecnicos
+      FROM tecnicos_asignados ta
+      JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+      WHERE ta.servicio_id = $1`,
+      [id]
+    );
+
+    return res.status(200).json({
+      ok: true,
+      success: true,
+      message: `${tecnicoInfo.nombre} ${tecnicoInfo.apellido} asignado exitosamente a la orden.`,
+      data: {
+        tecnicos: listRes.rows[0]?.tecnicos || []
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error en assignTecnicoServicio:', error);
+    return res.status(500).json({
+      ok: false,
+      success: false,
+      message: 'Error al asignar técnico colaborador.'
+    });
+  }
+};
+
+// ============================================================
+// DELETE /api/servicios/:id/tecnicos/:tecnicoId — Remover técnico colaborador
+// ============================================================
+const removeTecnicoServicio = async (req, res) => {
+  try {
+    const pool = getPool();
+    const id = parseInt(req.params.id);
+    const tecnicoId = parseInt(req.params.tecnicoId);
+
+    if (!id || !tecnicoId) {
+      return res.status(400).json({ ok: false, message: 'Parámetros inválidos.' });
+    }
+
+    await pool.query(
+      'DELETE FROM tecnicos_asignados WHERE servicio_id = $1 AND tecnico_id = $2',
+      [id, tecnicoId]
+    );
+
+    const listRes = await pool.query(
+      `SELECT json_agg(json_build_object(
+        'id', dt_tec.id,
+        'nombre', dt_tec.nombre,
+        'apellido', dt_tec.apellido,
+        'nombre_completo', TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido)),
+        'usuario', dt_tec.usuario,
+        'foto_perfil_url', dt_tec.foto_perfil_url
+      ) ORDER BY ta.id ASC) AS tecnicos
+      FROM tecnicos_asignados ta
+      JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+      WHERE ta.servicio_id = $1`,
+      [id]
+    );
+
+    return res.status(200).json({
+      ok: true,
+      success: true,
+      message: 'Técnico desvinculado de la orden.',
+      data: {
+        tecnicos: listRes.rows[0]?.tecnicos || []
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error en removeTecnicoServicio:', error);
+    return res.status(500).json({
+      ok: false,
+      success: false,
+      message: 'Error al remover técnico.'
+    });
+  }
+};
+
 module.exports = {
   createServicio,
   getServicios,
   getServicioById,
   getServicioByTicket,
+  getServiciosTaller,
+  updateServicioEstado,
+  assignTecnicoServicio,
+  removeTecnicoServicio,
   validarGarantiaTicket,
   uploadFotosServicio
 };

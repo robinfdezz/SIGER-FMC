@@ -11,6 +11,7 @@ import ConfigurationPage from './pages/ConfigurationPage';
 import ServiciosPage from './pages/ServiciosPage';
 import NuevaOrdenPage from './pages/NuevaOrdenPage';
 import EstadoOrdenPage from './pages/EstadoOrdenPage';
+import BancoTrabajoPage from './pages/BancoTrabajoPage';
 import { useTheme } from './context/ThemeContext';
 import { Toaster } from 'sileo';
 import 'sileo/styles.css';
@@ -74,6 +75,24 @@ function App() {
               element={
                 <ProtectedRoute>
                   <NuevaOrdenPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/taller"
+              element={
+                <ProtectedRoute>
+                  <BancoTrabajoPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/banco-trabajo"
+              element={
+                <ProtectedRoute>
+                  <BancoTrabajoPage />
                 </ProtectedRoute>
               }
             />

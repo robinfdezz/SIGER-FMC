@@ -83,6 +83,8 @@ app.use('/api/servicios', serviciosRoutes);
 
 // Alias directo para el selector de categorias en el modulo de recepcion
 app.use('/api/categorias-dispositivos', catalogsRoutes);
+// Alias directo para estados de servicio
+app.use('/api/estados-servicio', catalogsRoutes);
 
 // Manejador de rutas no encontradas (404)
 app.use((req, res) => {

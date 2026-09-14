@@ -70,3 +70,42 @@ export const getServicioById = async (id) => {
   const response = await api.get(`/servicios/${id}`);
   return response.data;
 };
+
+/**
+ * Obtener órdenes de servicio activas en el taller (flujo operativo 1 a 6)
+ * @param {Object} params - { sucursal_id, tecnico_id }
+ */
+export const getServiciosTaller = async (params = {}) => {
+  const response = await api.get('/servicios/taller', { params });
+  return response.data;
+};
+
+/**
+ * Actualizar el estado de una orden de servicio en taller
+ * @param {number|string} id
+ * @param {Object} data - { nuevo_estado_id, notas, tecnico_id }
+ */
+export const updateServicioEstado = async (id, data) => {
+  const response = await api.patch(`/servicios/${id}/estado`, data);
+  return response.data;
+};
+
+/**
+ * Asignar técnico colaborador a una orden de servicio
+ * @param {number|string} id
+ * @param {number|string} [tecnico_id] - ID opcional (si se omite, se asigna el usuario en sesión)
+ */
+export const assignTecnicoServicio = async (id, tecnico_id = null) => {
+  const response = await api.post(`/servicios/${id}/tecnicos`, { tecnico_id });
+  return response.data;
+};
+
+/**
+ * Remover técnico colaborador de una orden de servicio
+ * @param {number|string} id
+ * @param {number|string} tecnicoId
+ */
+export const removeTecnicoServicio = async (id, tecnicoId) => {
+  const response = await api.delete(`/servicios/${id}/tecnicos/${tecnicoId}`);
+  return response.data;
+};

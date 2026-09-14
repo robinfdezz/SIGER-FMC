@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
+import AnimatedTabs from '../components/common/AnimatedTabs';
 import CompanyProfileTab from '../components/configuration/CompanyProfileTab';
 import BranchesTab from '../components/configuration/BranchesTab';
 import PrintingTab from '../components/configuration/PrintingTab';
@@ -40,28 +41,6 @@ export const ConfigurationPage = () => {
   const handleTabChange = (tabKey) => {
     setSearchParams({ tab: tabKey });
   };
-
-  const containerRef = useRef(null);
-  const tabsRef = useRef([]);
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0, opacity: 0 });
-
-  useEffect(() => {
-    const updateIndicator = () => {
-      const activeIndex = TABS.findIndex((t) => t.id === activeTab);
-      const currentTab = tabsRef.current[activeIndex];
-      if (currentTab) {
-        setIndicatorStyle({
-          left: currentTab.offsetLeft,
-          width: currentTab.offsetWidth,
-          opacity: 1
-        });
-      }
-    };
-
-    updateIndicator();
-    window.addEventListener('resize', updateIndicator);
-    return () => window.removeEventListener('resize', updateIndicator);
-  }, [activeTab]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -107,42 +86,12 @@ export const ConfigurationPage = () => {
         {/* Fila de Pestañas (Tabs) y Acción de Recarga */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Selector de Pestañas (Tabs) con Pastilla Deslizante */}
-          <div
-            ref={containerRef}
-            className="relative flex items-center p-1 bg-neutral-100 dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700/60 w-full sm:w-fit overflow-x-auto"
-          >
-            {/* Pastilla deslizante (indicador activo absoluto) */}
-            <span
-              className="absolute top-1 bottom-1 bg-white dark:bg-neutral-900 rounded-lg shadow-sm border border-neutral-200/60 dark:border-neutral-700 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] pointer-events-none"
-              style={{
-                left: `${indicatorStyle.left}px`,
-                width: `${indicatorStyle.width}px`,
-                opacity: indicatorStyle.opacity
-              }}
-            />
-
-            {TABS.map((tab, idx) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-
-              return (
-                <button
-                  key={tab.id}
-                  ref={(el) => (tabsRef.current[idx] = el)}
-                  type="button"
-                  onClick={() => handleTabChange(tab.id)}
-                  className={`relative z-10 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-colors duration-200 cursor-pointer select-none whitespace-nowrap flex-1 sm:flex-none ${
-                    isActive
-                      ? 'text-neutral-900 dark:text-white'
-                      : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'
-                  }`}
-                >
-                  <Icon size={16} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          <AnimatedTabs
+            items={TABS}
+            value={activeTab}
+            onChange={handleTabChange}
+            className="w-full sm:w-fit"
+          />
 
           {/* Botón de Recarga a la Derecha */}
           <button

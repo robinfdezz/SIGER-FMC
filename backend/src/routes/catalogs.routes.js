@@ -19,6 +19,7 @@ router.get('/', (req, res, next) => {
   if (req.baseUrl.includes('categoria')) return getCategorias(req, res, next);
   if (req.baseUrl.includes('sucursal')) return getSucursales(req, res, next);
   if (req.baseUrl.includes('rol')) return getRoles(req, res, next);
+  if (req.baseUrl.includes('estado')) return getEstados(req, res, next);
   return getSucursales(req, res, next);
 });
 

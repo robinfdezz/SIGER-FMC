@@ -5,6 +5,7 @@ import { updateBranch } from '../../services/configuracion.service';
 import Select from '../common/Select';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
+import AnimatedTabs from '../common/AnimatedTabs';
 import { sileo } from 'sileo';
 import {
   Printer,
@@ -74,6 +75,11 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
 
   // Modos de vista previa: 'etiqueta' (Sticker) | 'ticket' (Térmico)
   const [previewMode, setPreviewMode] = useState('etiqueta');
+
+  const previewTabs = useMemo(() => [
+    { id: 'etiqueta', label: 'Sticker Taller', icon: Tag },
+    { id: 'ticket', label: 'Ticket Térmico', icon: Receipt }
+  ], []);
 
   // Estados de configuración para tickets y etiquetas
   const [ticketsConfig, setTicketsConfig] = useState(DEFAULT_CONFIG_TICKETS);
@@ -552,30 +558,12 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
           <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
             {/* Header de Vista Previa con Selector Centrado */}
             <div className="flex justify-center border-b border-neutral-100 dark:border-neutral-800/80 pb-3">
-              <div className="flex items-center p-1 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200/80 dark:border-neutral-700/80 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setPreviewMode('etiqueta')}
-                  className={`px-4 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
-                    previewMode === 'etiqueta'
-                      ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-2xs font-semibold'
-                      : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
-                  }`}
-                >
-                  Sticker Taller
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewMode('ticket')}
-                  className={`px-4 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
-                    previewMode === 'ticket'
-                      ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-2xs font-semibold'
-                      : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
-                  }`}
-                >
-                  Ticket Térmico
-                </button>
-              </div>
+              <AnimatedTabs
+                items={previewTabs}
+                value={previewMode}
+                onChange={setPreviewMode}
+                size="sm"
+              />
             </div>
 
             {/* Contenedor del Preview Visual */}
