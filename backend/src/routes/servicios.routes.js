@@ -34,7 +34,7 @@ router.post('/', createServicio);
 // POST /api/servicios/upload-foto  - Subida de hasta 5 fotos a Cloudinary
 router.post(
   '/upload-foto',
-  handleMulterErrors(upload.array('fotos', 5)),
+  handleMulterErrors(upload.any()),
   uploadFotosServicio
 );
 

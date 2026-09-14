@@ -27,7 +27,9 @@ import {
   Shield,
   ClipboardList,
   Wrench,
-  User
+  User,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 
 const getRoleConfig = (rolNombre) => {
@@ -290,6 +292,76 @@ const WorkersPage = () => {
     });
   }, [workers, searchTerm, selectedRole, selectedBranch, selectedStatus]);
 
+  const [sortConfig, setSortConfig] = useState({ key: 'usuario', direction: 'asc' });
+
+  const handleSort = (columnKey) => {
+    setSortConfig((prev) => ({
+      key: columnKey,
+      direction: prev.key === columnKey && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedWorkers = useMemo(() => {
+    const items = [...filteredWorkers];
+    if (!sortConfig.key) return items;
+
+    // Jerarquía de roles: Super Admin > Admin Sucursal > Secretaria > Técnico
+    const getRoleRank = (worker) => {
+      const normalized = (worker.rol_nombre || '').toLowerCase().replace(/[\s_-]/g, '');
+      if (normalized.includes('superadmin')) return 4;
+      if (normalized.includes('admin')) return 3;
+      if (normalized.includes('secretaria')) return 2;
+      if (normalized.includes('tecnic')) return 1;
+      return 0;
+    };
+
+    return items.sort((a, b) => {
+      let valA = '';
+      let valB = '';
+
+      switch (sortConfig.key) {
+        case 'usuario':
+          valA = `${a.nombre || ''} ${a.apellido || ''} ${a.usuario || ''}`.trim().toLowerCase();
+          valB = `${b.nombre || ''} ${b.apellido || ''} ${b.usuario || ''}`.trim().toLowerCase();
+          break;
+        case 'contacto':
+          valA = (a.cedula || a.correo || a.telefono || '').toLowerCase();
+          valB = (b.cedula || b.correo || b.telefono || '').toLowerCase();
+          break;
+        case 'rol': {
+          const rankA = getRoleRank(a);
+          const rankB = getRoleRank(b);
+          if (rankA !== rankB) {
+            return sortConfig.direction === 'asc' ? rankA - rankB : rankB - rankA;
+          }
+          // Si tienen el mismo rol jerárquico, ordenar por sucursal / nombre
+          valA = (a.sucursal_nombre || a.nombre || '').toLowerCase();
+          valB = (b.sucursal_nombre || b.nombre || '').toLowerCase();
+          break;
+        }
+        case 'estado':
+          valA = a.activo ? 1 : 0;
+          valB = b.activo ? 1 : 0;
+          return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        default:
+          return 0;
+      }
+
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredWorkers, sortConfig]);
+
+  const renderSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) return null;
+    return sortConfig.direction === 'asc' ? (
+      <ChevronUp size={13} strokeWidth={2.5} className="text-red-600 dark:text-red-400 shrink-0 transition-transform" />
+    ) : (
+      <ChevronDown size={13} strokeWidth={2.5} className="text-red-600 dark:text-red-400 shrink-0 transition-transform" />
+    );
+  };
+
   // Opciones formateadas para los componentes Select
   const roleOptions = useMemo(() => [
     { id: '', label: 'Todos los Roles' },
@@ -418,7 +490,7 @@ const WorkersPage = () => {
             {/* Resumen de conteo */}
             <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 pt-1">
               <span>
-                Mostrando <strong>{filteredWorkers.length}</strong> de <strong>{workers.length}</strong> usuarios registrados
+                Mostrando <strong>{sortedWorkers.length}</strong> de <strong>{workers.length}</strong> usuarios registrados
               </span>
             </div>
           </div>
@@ -430,11 +502,45 @@ const WorkersPage = () => {
             <table className="w-full text-left border-collapse min-w-[700px]">
               <thead className="sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs">
                 <tr className="border-b border-neutral-200 dark:border-neutral-800 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
-                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[26%]">Usuario</th>
-                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0">Cédula y Contacto</th>
-                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0">Rol y Sucursal</th>
-                  <th className="py-3 px-3 sm:px-4.5 text-center bg-neutral-50 dark:bg-[#141416] sticky top-0">Estado</th>
-                  <th className="py-3 px-2.5 sm:px-3 text-right w-[80px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Acciones</th>
+                  <th
+                    onClick={() => handleSort('usuario')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[26%] cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Usuario</span>
+                      {renderSortIcon('usuario')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('contacto')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Cédula y Contacto</span>
+                      {renderSortIcon('contacto')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('rol')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Rol y Sucursal</span>
+                      {renderSortIcon('rol')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('estado')}
+                    className="py-3 px-3 sm:px-4.5 text-center bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>Estado</span>
+                      {renderSortIcon('estado')}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2.5 sm:px-3 text-right w-[80px] bg-neutral-50 dark:bg-[#141416] sticky top-0">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
@@ -447,7 +553,7 @@ const WorkersPage = () => {
                       </div>
                     </td>
                   </tr>
-                ) : filteredWorkers.length === 0 ? (
+                ) : sortedWorkers.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-12 text-center text-neutral-400">
                       <div className="flex flex-col items-center justify-center gap-2">
@@ -462,7 +568,7 @@ const WorkersPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredWorkers.map((worker) => (
+                  sortedWorkers.map((worker) => (
                     <tr
                       key={worker.id}
                       className={`hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all ${worker.activo ? '' : 'opacity-50 hover:opacity-100'

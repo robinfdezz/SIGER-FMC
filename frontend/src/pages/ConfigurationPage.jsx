@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import CompanyProfileTab from '../components/configuration/CompanyProfileTab';
@@ -14,6 +14,12 @@ import {
   RefreshCw,
   AlertTriangle
 } from 'lucide-react';
+
+const TABS = [
+  { id: 'perfil', label: 'Perfil de la Empresa', icon: Building2 },
+  { id: 'sucursales', label: 'Sucursales Físicas', icon: Store },
+  { id: 'impresion', label: 'Impresión y Comprobantes', icon: Printer },
+];
 
 export const ConfigurationPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,6 +40,28 @@ export const ConfigurationPage = () => {
   const handleTabChange = (tabKey) => {
     setSearchParams({ tab: tabKey });
   };
+
+  const containerRef = useRef(null);
+  const tabsRef = useRef([]);
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0, opacity: 0 });
+
+  useEffect(() => {
+    const updateIndicator = () => {
+      const activeIndex = TABS.findIndex((t) => t.id === activeTab);
+      const currentTab = tabsRef.current[activeIndex];
+      if (currentTab) {
+        setIndicatorStyle({
+          left: currentTab.offsetLeft,
+          width: currentTab.offsetWidth,
+          opacity: 1
+        });
+      }
+    };
+
+    updateIndicator();
+    window.addEventListener('resize', updateIndicator);
+    return () => window.removeEventListener('resize', updateIndicator);
+  }, [activeTab]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -65,7 +93,7 @@ export const ConfigurationPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
         {/* Cabecera Principal */}
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight">
@@ -78,46 +106,42 @@ export const ConfigurationPage = () => {
 
         {/* Fila de Pestañas (Tabs) y Acción de Recarga */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Selector de Pestañas (Tabs) */}
-          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 w-full sm:w-fit flex-wrap">
-            <button
-              type="button"
-              onClick={() => handleTabChange('perfil')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
-                activeTab === 'perfil' || activeTab === 'companhia'
-                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-              }`}
-            >
-              <Building2 size={16} />
-              <span>Perfil de la Empresa</span>
-            </button>
+          {/* Selector de Pestañas (Tabs) con Pastilla Deslizante */}
+          <div
+            ref={containerRef}
+            className="relative flex items-center p-1 bg-neutral-100 dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700/60 w-full sm:w-fit overflow-x-auto"
+          >
+            {/* Pastilla deslizante (indicador activo absoluto) */}
+            <span
+              className="absolute top-1 bottom-1 bg-white dark:bg-neutral-900 rounded-lg shadow-sm border border-neutral-200/60 dark:border-neutral-700 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] pointer-events-none"
+              style={{
+                left: `${indicatorStyle.left}px`,
+                width: `${indicatorStyle.width}px`,
+                opacity: indicatorStyle.opacity
+              }}
+            />
 
-            <button
-              type="button"
-              onClick={() => handleTabChange('sucursales')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
-                activeTab === 'sucursales'
-                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-              }`}
-            >
-              <Store size={16} />
-              <span>Sucursales Físicas</span>
-            </button>
+            {TABS.map((tab, idx) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
 
-            <button
-              type="button"
-              onClick={() => handleTabChange('impresion')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
-                activeTab === 'impresion'
-                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-              }`}
-            >
-              <Printer size={16} />
-              <span>Impresión y Comprobantes</span>
-            </button>
+              return (
+                <button
+                  key={tab.id}
+                  ref={(el) => (tabsRef.current[idx] = el)}
+                  type="button"
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`relative z-10 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-colors duration-200 cursor-pointer select-none whitespace-nowrap flex-1 sm:flex-none ${
+                    isActive
+                      ? 'text-neutral-900 dark:text-white'
+                      : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'
+                  }`}
+                >
+                  <Icon size={16} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Botón de Recarga a la Derecha */}

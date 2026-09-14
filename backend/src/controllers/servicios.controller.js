@@ -328,11 +328,30 @@ const createServicio = async (req, res) => {
     }
 
     // ── 6. Insertar fotos de recepcion en evidencias_fotograficas ─
-    var fotosUrls = Array.isArray(fotos_recepcion) ? fotos_recepcion.filter(function(u) { return u && typeof u === 'string'; }) : [];
-    for (var fi = 0; fi < fotosUrls.length; fi++) {
+    const rawFotos = Array.isArray(fotos_recepcion)
+      ? fotos_recepcion
+      : (Array.isArray(req.body.evidencias_fotograficas) ? req.body.evidencias_fotograficas : []);
+
+    const fotosValidas = rawFotos
+      .filter(Boolean)
+      .map(function(item) {
+        if (typeof item === 'object' && item !== null) {
+          const url = String(item.url || item.url_foto || item.secure_url || '').trim();
+          const public_id = item.public_id ? String(item.public_id).trim() : null;
+          return url ? { url: url, public_id: public_id } : null;
+        }
+        if (typeof item === 'string' && item.trim().length > 0) {
+          return { url: item.trim(), public_id: null };
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    for (var fi = 0; fi < fotosValidas.length; fi++) {
+      var foto = fotosValidas[fi];
       await client.query(
-        'INSERT INTO evidencias_fotograficas (servicio_id, url_foto, tipo_evidencia, usuario_id) VALUES ($1, $2, $3, $4)',
-        [nuevaOrden.id, fotosUrls[fi], 'RECEPCION', usuario_recepcion_id]
+        'INSERT INTO evidencias_fotograficas (servicio_id, url_foto, public_id, tipo_evidencia, usuario_id) VALUES ($1, $2, $3, $4, $5)',
+        [nuevaOrden.id, foto.url, foto.public_id, 'RECEPCION', usuario_recepcion_id]
       );
     }
 
@@ -369,7 +388,8 @@ const createServicio = async (req, res) => {
         monto_descuento: nuevaOrden.monto_descuento,
         fecha_entrega_estimada: nuevaOrden.fecha_entrega_estimada,
         estado_actual_id: nuevaOrden.estado_actual_id,
-        fotos_count: fotosUrls.length,
+        fotos_count: fotosValidas.length,
+        fotos: fotosValidas,
         tecnicos_count: cleanTecnicosIds.length,
         tecnico_nombre: primerTecnicoNombre,
         tecnico_asignado: primerTecnicoNombre,
@@ -571,7 +591,8 @@ const getServicioById = async (req, res) => {
       '  TRIM(CONCAT(c.nombre, \' \', c.apellido)) AS nombre_cliente_reg,\n' +
       '  c.telefono AS telefono_cliente_reg,\n' +
       '  COALESCE((SELECT TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id ORDER BY ta.id ASC LIMIT 1), \'Sin asignar\') AS tecnico_nombre,\n' +
-      '  COALESCE((SELECT json_agg(json_build_object(\'id\', dt_tec.id, \'nombre_completo\', TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)))) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), \'[]\'::json) AS tecnicos\n' +
+      '  COALESCE((SELECT json_agg(json_build_object(\'id\', dt_tec.id, \'nombre_completo\', TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)))) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), \'[]\'::json) AS tecnicos,\n' +
+      '  COALESCE((SELECT json_agg(json_build_object(\'id\', ef.id, \'url\', ef.url_foto, \'url_foto\', ef.url_foto, \'public_id\', ef.public_id, \'tipo_evidencia\', ef.tipo_evidencia, \'fecha_subida\', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE), \'[]\'::json) AS fotos\n' +
       'FROM servicios_recepcion sr\n' +
       'LEFT JOIN estados_servicio es ON es.id = sr.estado_actual_id\n' +
       'LEFT JOIN categorias_dispositivos cd ON cd.id = sr.categoria_id\n' +
@@ -636,20 +657,37 @@ const getServicioByTicket = async (req, res) => {
 // ============================================================
 const uploadFotosServicio = async (req, res) => {
   try {
-    if (!req.files || req.files.length === 0) {
+    const files = req.files || (req.file ? [req.file] : []);
+    if (!files || files.length === 0) {
       return res.status(400).json({ ok: false, message: 'No se recibieron archivos de imagen.' });
     }
-    if (req.files.length > 5) {
+    if (files.length > 5) {
       return res.status(400).json({ ok: false, message: 'Se permiten como maximo 5 fotos por recepcion.' });
     }
 
-    var urls = [];
-    for (var i = 0; i < req.files.length; i++) {
-      var result = await uploadImageBuffer(req.files[i].buffer, 'siger-fmc/recepcion');
+    const fotos = [];
+    const urls = [];
+    for (let i = 0; i < files.length; i++) {
+      const result = await uploadImageBuffer(files[i].buffer, 'siger-fmc/recepcion');
+      fotos.push({
+        url: result.secure_url,
+        public_id: result.public_id
+      });
       urls.push(result.secure_url);
     }
 
-    return res.status(200).json({ ok: true, urls: urls });
+    return res.status(200).json({
+      ok: true,
+      url: fotos[0]?.url,
+      public_id: fotos[0]?.public_id,
+      fotos: fotos,
+      urls: urls,
+      data: {
+        url: fotos[0]?.url,
+        public_id: fotos[0]?.public_id,
+        fotos: fotos
+      }
+    });
   } catch (error) {
     console.error('Error en uploadFotosServicio:', error);
     return res.status(500).json({

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ClipboardList, CheckCircle2, AlertTriangle, Minus, RotateCcw } from 'lucide-react';
+import { ClipboardList, CheckCircle2, AlertTriangle, Minus, RotateCcw, CheckCheck } from 'lucide-react';
 
 const CHECKLIST_ITEMS = [
   { key: 'enciende',       label: 'Enciende' },
@@ -46,6 +46,12 @@ const DeviceChecklistPicker = ({ value = {}, onChange }) => {
   const handleToggle = (key) => {
     const next = nextState(getState(key));
     onChange({ ...value, [key]: next });
+  };
+
+  const handleMarkAll = () => {
+    const allOk = {};
+    CHECKLIST_ITEMS.forEach(({ key }) => { allOk[key] = 'ok'; });
+    onChange(allOk);
   };
 
   const handleReset = () => {
@@ -112,15 +118,29 @@ const DeviceChecklistPicker = ({ value = {}, onChange }) => {
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={handleReset}
-          className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:underline transition-colors cursor-pointer"
-          title="Reiniciar todos los componentes a sin revisar"
-        >
-          <RotateCcw size={12} />
-          <span>Limpiar</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleMarkAll}
+            className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:underline transition-colors cursor-pointer"
+            title="Marcar todos los componentes como OK"
+          >
+            <CheckCheck size={13} className="text-emerald-600 dark:text-emerald-400" />
+            <span>Marcar todos</span>
+          </button>
+
+          <span className="text-neutral-300 dark:text-neutral-700 select-none">|</span>
+
+          <button
+            type="button"
+            onClick={handleReset}
+            className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:underline transition-colors cursor-pointer"
+            title="Reiniciar todos los componentes a sin revisar"
+          >
+            <RotateCcw size={12} />
+            <span>Limpiar</span>
+          </button>
+        </div>
       </div>
     </div>
   );

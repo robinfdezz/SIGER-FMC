@@ -23,7 +23,9 @@ import {
   CreditCard,
   Calendar,
   CheckCircle2,
-  XCircle
+  XCircle,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 
 export const ClientsPage = () => {
@@ -127,6 +129,62 @@ export const ClientsPage = () => {
       return true;
     });
   }, [clients, searchTerm, selectedStatus]);
+
+  const [sortConfig, setSortConfig] = useState({ key: 'registro', direction: 'desc' });
+
+  const handleSort = (columnKey) => {
+    setSortConfig((prev) => ({
+      key: columnKey,
+      direction: prev.key === columnKey && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedClients = useMemo(() => {
+    const items = [...filteredClients];
+    if (!sortConfig.key) return items;
+
+    return items.sort((a, b) => {
+      let valA = '';
+      let valB = '';
+
+      switch (sortConfig.key) {
+        case 'cliente':
+          valA = `${a.nombre || ''} ${a.apellido || ''}`.trim().toLowerCase();
+          valB = `${b.nombre || ''} ${b.apellido || ''}`.trim().toLowerCase();
+          break;
+        case 'contacto':
+          valA = (a.cedula_rnc || a.telefono || a.correo || '').toLowerCase();
+          valB = (b.cedula_rnc || b.telefono || b.correo || '').toLowerCase();
+          break;
+        case 'direccion':
+          valA = (a.direccion || '').toLowerCase();
+          valB = (b.direccion || '').toLowerCase();
+          break;
+        case 'estado':
+          valA = a.activo ? 1 : 0;
+          valB = b.activo ? 1 : 0;
+          return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        case 'registro':
+        default:
+          valA = new Date(a.created_at || 0).getTime();
+          valB = new Date(b.created_at || 0).getTime();
+          return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+      }
+
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredClients, sortConfig]);
+
+  const renderSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) return null;
+    return sortConfig.direction === 'asc' ? (
+      <ChevronUp size={13} strokeWidth={2.5} className="text-red-600 dark:text-red-400 shrink-0 transition-transform" />
+    ) : (
+      <ChevronDown size={13} strokeWidth={2.5} className="text-red-600 dark:text-red-400 shrink-0 transition-transform" />
+    );
+  };
 
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
@@ -285,7 +343,7 @@ export const ClientsPage = () => {
             {/* Resumen de conteo */}
             <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 pt-1">
               <span>
-                Mostrando <strong>{filteredClients.length}</strong> de <strong>{clients.length}</strong> clientes registrados
+                Mostrando <strong>{sortedClients.length}</strong> de <strong>{clients.length}</strong> clientes registrados
               </span>
             </div>
           </div>
@@ -297,12 +355,54 @@ export const ClientsPage = () => {
             <table className="w-full text-left border-collapse min-w-[700px]">
               <thead className="sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs">
                 <tr className="border-b border-neutral-200 dark:border-neutral-800 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
-                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[19%] min-w-[150px]">Cliente</th>
-                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0">Contacto</th>
-                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0">Dirección</th>
-                  <th className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[145px] min-w-[135px] whitespace-nowrap">Registro</th>
-                  <th className="py-3 px-3 sm:px-4.5 text-center bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[110px]">Estado</th>
-                  <th className="py-3 px-2.5 sm:px-3 text-right w-[80px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Acciones</th>
+                  <th
+                    onClick={() => handleSort('cliente')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[19%] min-w-[150px] cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Cliente</span>
+                      {renderSortIcon('cliente')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('contacto')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Contacto</span>
+                      {renderSortIcon('contacto')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('direccion')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Dirección</span>
+                      {renderSortIcon('direccion')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('registro')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[145px] min-w-[135px] whitespace-nowrap cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Registro</span>
+                      {renderSortIcon('registro')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('estado')}
+                    className="py-3 px-3 sm:px-4.5 text-center bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[110px] cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>Estado</span>
+                      {renderSortIcon('estado')}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2.5 sm:px-3 text-right w-[80px] bg-neutral-50 dark:bg-[#141416] sticky top-0">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
@@ -315,7 +415,7 @@ export const ClientsPage = () => {
                       </div>
                     </td>
                   </tr>
-                ) : filteredClients.length === 0 ? (
+                ) : sortedClients.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-neutral-400">
                       <div className="flex flex-col items-center justify-center gap-2">
@@ -332,7 +432,7 @@ export const ClientsPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredClients.map((client) => {
+                  sortedClients.map((client) => {
                     const fullName = `${client.nombre} ${client.apellido || ''}`.trim();
                     const initials = getInitials(client.nombre, client.apellido);
                     const formattedDate = client.created_at

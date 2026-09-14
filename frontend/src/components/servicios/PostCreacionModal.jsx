@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, Tag, X, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Printer, Tag, X, CheckCircle2 } from 'lucide-react';
 import Button from '../common/Button';
 import TicketTermico, { normalizeTicketsConfig, DEFAULT_CONFIG_TICKETS } from './TicketTermico';
 import StickerTermico, { DEFAULT_CONFIG_ETIQUETAS } from './StickerTermico';
@@ -130,18 +130,6 @@ export const PostCreacionModal = ({ isOpen, onClose, orden, companyData, branchD
               Etiqueta / Sticker
             </Button>
           </div>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="md"
-            icon={ArrowRight}
-            iconPosition="right"
-            onClick={onClose}
-            className="w-full text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
-          >
-            Cerrar
-          </Button>
         </div>
 
         {/* Botón Cerrar (X) */}

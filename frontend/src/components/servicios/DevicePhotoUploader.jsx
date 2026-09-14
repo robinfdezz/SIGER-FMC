@@ -53,11 +53,37 @@ const DevicePhotoUploader = ({ value = [], onChange }) => {
     setIsUploading(true);
     try {
       const result = await uploadFotosRecepcion(validFiles);
-      if (result.ok && Array.isArray(result.urls)) {
-        const newUrls = [...currentPhotos, ...result.urls].slice(0, MAX_PHOTOS);
-        onChange(newUrls);
+      if (result && (result.ok || result.status === 200)) {
+        let uploaded = [];
+        if (Array.isArray(result.fotos) && result.fotos.length > 0) {
+          uploaded = result.fotos.map((f) => ({
+            url: f.url || f.secure_url,
+            public_id: f.public_id || null
+          }));
+        } else if (Array.isArray(result.data?.fotos) && result.data.fotos.length > 0) {
+          uploaded = result.data.fotos.map((f) => ({
+            url: f.url || f.secure_url,
+            public_id: f.public_id || null
+          }));
+        } else if (result.url || result.data?.url) {
+          uploaded = [{
+            url: result.url || result.data?.url,
+            public_id: result.public_id || result.data?.public_id || null
+          }];
+        } else if (Array.isArray(result.urls)) {
+          uploaded = result.urls.map((url) => ({ url, public_id: null }));
+        }
+
+        const normalizedCurrent = currentPhotos.map((item) =>
+          typeof item === 'object' && item !== null
+            ? { url: item.url, public_id: item.public_id || null }
+            : { url: item, public_id: null }
+        );
+
+        const newPhotos = [...normalizedCurrent, ...uploaded].slice(0, MAX_PHOTOS);
+        onChange(newPhotos);
       } else {
-        sileo.error({ title: 'Error de subida', description: result.message || 'No se pudieron subir las imágenes.' });
+        sileo.error({ title: 'Error de subida', description: result?.message || 'No se pudieron subir las imágenes.' });
       }
     } catch {
       sileo.error({ title: 'Error de subida', description: 'No se pudo subir la imagen. Intenta de nuevo.' });
@@ -75,8 +101,8 @@ const DevicePhotoUploader = ({ value = [], onChange }) => {
   };
 
   const handleRemove = (indexToRemove) => {
-    const newUrls = currentPhotos.filter((_, idx) => idx !== indexToRemove);
-    onChange(newUrls);
+    const newPhotos = currentPhotos.filter((_, idx) => idx !== indexToRemove);
+    onChange(newPhotos);
   };
 
   return (
@@ -119,34 +145,38 @@ const DevicePhotoUploader = ({ value = [], onChange }) => {
       {/* Galería dinámica de miniaturas y slot de subida */}
       <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
         {/* Fotos agregadas */}
-        {currentPhotos.map((url, index) => (
-          <div
-            key={url + index}
-            className="relative w-28 h-28 sm:w-32 sm:h-32 aspect-square shrink-0 rounded-xl overflow-hidden group border border-neutral-200/80 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800 shadow-2xs"
-          >
-            <img
-              src={url}
-              alt={`Evidencia ${index + 1}`}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
+        {currentPhotos.map((item, index) => {
+          const photoUrl = typeof item === 'object' && item !== null ? item.url : item;
+          const photoKey = typeof item === 'object' && item?.public_id ? item.public_id : `${photoUrl}-${index}`;
+          return (
+            <div
+              key={photoKey}
+              className="relative w-28 h-28 sm:w-32 sm:h-32 aspect-square shrink-0 rounded-xl overflow-hidden group border border-neutral-200/80 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800 shadow-2xs"
+            >
+              <img
+                src={photoUrl}
+                alt={`Evidencia ${index + 1}`}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
 
-            {/* Overlay centralizado con botón de eliminar institucional */}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemove(index);
-                }}
-                className="p-2 rounded-xl bg-red-600/90 hover:bg-red-700 text-white shadow-md backdrop-blur-xs transition-all active:scale-95 cursor-pointer"
-                title="Eliminar foto"
-              >
-                <Trash2 size={16} strokeWidth={2.2} />
-              </button>
+              {/* Overlay centralizado con botón de eliminar institucional */}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemove(index);
+                  }}
+                  className="p-2 rounded-xl bg-red-600/90 hover:bg-red-700 text-white shadow-md backdrop-blur-xs transition-all active:scale-95 cursor-pointer"
+                  title="Eliminar foto"
+                >
+                  <Trash2 size={16} strokeWidth={2.2} />
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Slot de carga en progreso */}
         {isUploading && (

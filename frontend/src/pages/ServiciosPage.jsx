@@ -32,7 +32,9 @@ import {
   Tablet,
   Gamepad2,
   Watch,
-  Package
+  Package,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 
 const extractArray = (res) => {
@@ -78,7 +80,7 @@ const getPrioridadVariant = (prioridad) => getPrioridadConfig(prioridad).color;
 
 const getDeviceCategoryIcon = (categoria) => {
   const norm = (categoria || '').toLowerCase().trim();
-  const iconClass = "text-red-600 dark:text-red-400 shrink-0 mt-0.5";
+  const iconClass = "text-neutral-400 dark:text-neutral-500 shrink-0 mt-0.5";
   if (norm.includes('laptop') || norm.includes('portatil') || norm.includes('portátil') || norm.includes('notebook') || norm.includes('computadora')) {
     return <Laptop size={14} className={iconClass} />;
   }
@@ -281,6 +283,75 @@ export const ServiciosPage = () => {
     }
   };
 
+  // Estado y lógica de ordenamiento interactivo (sort)
+  const [sortConfig, setSortConfig] = useState({ key: 'fecha', direction: 'desc' });
+
+  const handleSort = (columnKey) => {
+    setSortConfig((prev) => ({
+      key: columnKey,
+      direction: prev.key === columnKey && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedServicios = useMemo(() => {
+    const items = [...ordenes];
+    if (!sortConfig.key) return items;
+
+    // Mapeo numérico de prioridades para orden lógico (no alfabético)
+    const priorityWeight = { urgente: 3, alta: 2, media: 1, baja: 0 };
+
+    return items.sort((a, b) => {
+      let valA = '';
+      let valB = '';
+
+      switch (sortConfig.key) {
+        case 'ticket':
+          valA = (a.codigo_ticket || '').toLowerCase();
+          valB = (b.codigo_ticket || '').toLowerCase();
+          break;
+        case 'cliente':
+          valA = (a.nombre_cliente || a.cliente_nombre || a.cliente || '').toLowerCase();
+          valB = (b.nombre_cliente || b.cliente_nombre || b.cliente || '').toLowerCase();
+          break;
+        case 'equipo':
+          valA = `${a.marca_equipo || a.marca || ''} ${a.modelo_equipo || a.modelo || ''}`.toLowerCase();
+          valB = `${b.marca_equipo || b.marca || ''} ${b.modelo_equipo || b.modelo || ''}`.toLowerCase();
+          break;
+        case 'estado':
+          valA = (a.estado || a.estado_nombre || a.nombre_estado || '').toLowerCase();
+          valB = (b.estado || b.estado_nombre || b.nombre_estado || '').toLowerCase();
+          break;
+        case 'prioridad': {
+          const prioA = (a.prioridad || a.nivel_prioridad || '').toLowerCase();
+          const prioB = (b.prioridad || b.nivel_prioridad || '').toLowerCase();
+          valA = priorityWeight[prioA] ?? 0;
+          valB = priorityWeight[prioB] ?? 0;
+          return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        }
+        case 'fecha':
+        default:
+          valA = new Date(a.fecha_ingreso || a.created_at || 0).getTime();
+          valB = new Date(b.fecha_ingreso || b.created_at || 0).getTime();
+          return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+      }
+
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [ordenes, sortConfig]);
+
+  const renderSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) {
+      return null;
+    }
+    return sortConfig.direction === 'asc' ? (
+      <ChevronUp size={13} strokeWidth={2.5} className="text-red-600 dark:text-red-400 shrink-0 transition-transform" />
+    ) : (
+      <ChevronDown size={13} strokeWidth={2.5} className="text-red-600 dark:text-red-400 shrink-0 transition-transform" />
+    );
+  };
+
   // Opciones para los componentes Select
   const estadoOptions = useMemo(() => [
     { id: '', value: '', label: 'Todos los Estados' },
@@ -446,7 +517,7 @@ export const ServiciosPage = () => {
             {/* Resumen de conteo */}
             <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 pt-1">
               <span>
-                Mostrando <strong>{ordenes.length}</strong> de <strong>{pagination.total}</strong> órdenes registradas
+                Mostrando <strong>{sortedServicios.length}</strong> de <strong>{pagination.total}</strong> órdenes registradas
               </span>
             </div>
           </div>
@@ -458,13 +529,69 @@ export const ServiciosPage = () => {
             <table className="w-full min-w-[760px] text-left border-collapse">
               <thead className="sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs">
                 <tr className="border-b border-neutral-200 dark:border-neutral-800 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
-                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap w-[11%] min-w-[105px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Ticket</th>
-                  <th className="py-3 px-3 sm:px-4 whitespace-nowrap w-[20%] min-w-[165px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Cliente</th>
-                  <th className="py-3 px-3 sm:px-4 whitespace-nowrap w-[22%] min-w-[165px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Equipo</th>
-                  <th className="py-3 px-3 sm:px-4 whitespace-nowrap w-[17%] min-w-[130px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Estado</th>
-                  <th className="py-3 px-3 sm:px-4 whitespace-nowrap w-[13%] min-w-[100px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Prioridad</th>
-                  <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap w-[12%] min-w-[90px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Fecha</th>
-                  <th className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-right w-[5%] min-w-[50px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Acciones</th>
+                  <th
+                    onClick={() => handleSort('ticket')}
+                    className="py-3 px-2.5 sm:px-3 whitespace-nowrap w-[11%] min-w-[105px] bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Ticket</span>
+                      {renderSortIcon('ticket')}
+                    </div>
+                  </th>
+
+                  <th
+                    onClick={() => handleSort('cliente')}
+                    className="py-3 px-3 sm:px-4 whitespace-nowrap w-[20%] min-w-[165px] bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Cliente</span>
+                      {renderSortIcon('cliente')}
+                    </div>
+                  </th>
+
+                  <th
+                    onClick={() => handleSort('equipo')}
+                    className="py-3 px-3 sm:px-4 whitespace-nowrap w-[22%] min-w-[165px] bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Equipo</span>
+                      {renderSortIcon('equipo')}
+                    </div>
+                  </th>
+
+                  <th
+                    onClick={() => handleSort('estado')}
+                    className="py-3 px-3 sm:px-4 whitespace-nowrap w-[17%] min-w-[130px] bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Estado</span>
+                      {renderSortIcon('estado')}
+                    </div>
+                  </th>
+
+                  <th
+                    onClick={() => handleSort('prioridad')}
+                    className="py-3 px-3 sm:px-4 whitespace-nowrap w-[13%] min-w-[100px] bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Prioridad</span>
+                      {renderSortIcon('prioridad')}
+                    </div>
+                  </th>
+
+                  <th
+                    onClick={() => handleSort('fecha')}
+                    className="py-3 px-2.5 sm:px-3 whitespace-nowrap w-[12%] min-w-[90px] bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Fecha</span>
+                      {renderSortIcon('fecha')}
+                    </div>
+                  </th>
+
+                  <th className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-right w-[5%] min-w-[50px] bg-neutral-50 dark:bg-[#141416] sticky top-0">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
@@ -477,7 +604,7 @@ export const ServiciosPage = () => {
                       </div>
                     </td>
                   </tr>
-                ) : ordenes.length === 0 ? (
+                ) : sortedServicios.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-neutral-400">
                       <div className="flex flex-col items-center justify-center gap-2">
@@ -492,7 +619,7 @@ export const ServiciosPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  ordenes.map((orden) => (
+                  sortedServicios.map((orden) => (
                     <tr
                       key={orden.id}
                       className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all"

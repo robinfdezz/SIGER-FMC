@@ -182,6 +182,11 @@ frontend/
 * **Cabecera y Filtros Integrados:** El título de la vista, la descripción, el botón de refrescar y el botón de acción principal (`+ Nuevo ...`) deben residir dentro de la misma tarjeta superior que contiene los buscadores y filtros.
 * **Filas Inactivas:** Las filas con registros deshabilitados o inactivos (`activo = false`) deben mostrarse con opacidad atenuada (`opacity-50`) para comunicar visualmente su estado sin alterar la alineación.
 * **Botones de Acción en Tablas:** Los botones de acción por fila (Editar, Activar/Desactivar) comparten dimensiones idénticas (`p-2 rounded-lg`), color base neutro (`text-neutral-500`) y estados hover sutiles.
+* **Ordenamiento Interactivo en Tablas (Sort Multi-columna):**
+  * **Comportamiento:** Cada encabezado ordenable incluye `cursor-pointer select-none group` y conmuta entre ascendente (`asc`) y descendente (`desc`) al hacer clic.
+  * **Indicador Visual:** Para mantener un diseño limpio y despejado, las columnas inactivas **no muestran icono**. Al activarse una columna, se muestra un chevron minimalista (`ChevronUp` o `ChevronDown` con color de acento corporativo) indicando con precisión la dirección.
+  * **Columna de Acciones:** La columna de acciones permanece fija al extremo derecho sin interactividad de ordenamiento.
+  * **Contenedor Homogéneo:** Las tablas maestras utilizan un contenedor de altura fija (`h-[560px] relative overflow-x-auto overflow-y-auto`) con cabecera fija (`thead sticky top-0 bg-neutral-50 dark:bg-[#141416]`) y barra de conteo inferior unificada (`Mostrando X de Y registros`).
 
 ---
 

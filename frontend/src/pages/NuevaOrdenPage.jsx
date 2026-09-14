@@ -623,7 +623,12 @@ export const NuevaOrdenPage = () => {
         observaciones_recepcion: form.observaciones_recepcion.trim() || null,
         datos_acceso_equipo: form.datos_acceso_equipo,
         checklist_entrada: form.checklist_entrada,
-        fotos_recepcion: form.fotos_recepcion.filter(Boolean),
+        fotos_recepcion: form.fotos_recepcion
+          .filter(Boolean)
+          .map((f) => (typeof f === 'object' && f !== null ? { url: f.url, public_id: f.public_id || null } : { url: String(f), public_id: null })),
+        evidencias_fotograficas: form.fotos_recepcion
+          .filter(Boolean)
+          .map((f) => (typeof f === 'object' && f !== null ? { url: f.url, public_id: f.public_id || null } : { url: String(f), public_id: null })),
         costo_previsto: parseFloat(form.costo_previsto) || 0,
         monto_anticipo: parseFloat(form.monto_anticipo) || 0,
         monto_descuento: parseFloat(form.monto_descuento) || 0,

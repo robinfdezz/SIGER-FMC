@@ -55,6 +55,7 @@ const formatDisplayDate = (dateStr) => {
  * @param {string} [props.className=""]
  * @param {string} [props.buttonClassName=""]
  * @param {string} [props.minDate] - Fecha mínima seleccionable "YYYY-MM-DD"
+ * @param {string} [props.startDate] - Fecha inicial para evaluación de rangos (por defecto hoy)
  * @param {'left'|'right'} [props.align="left"] - Alineación del popover
  */
 export const DatePicker = ({
@@ -68,6 +69,7 @@ export const DatePicker = ({
   className = '',
   buttonClassName = '',
   minDate,
+  startDate: propStartDate,
   align = 'left'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -80,6 +82,9 @@ export const DatePicker = ({
   const [viewMonth, setViewMonth] = useState(initialDate ? initialDate[1] - 1 : now.getMonth());
 
   const todayStr = getTodayString();
+  const startDate = propStartDate || todayStr;
+  const endDate = value || '';
+  const hasForwardRange = Boolean(startDate && endDate && startDate < endDate);
 
   // Si cambia el valor exteriormente, sincronizar la vista del calendario
   useEffect(() => {
@@ -310,12 +315,12 @@ export const DatePicker = ({
           </div>
 
           {/* Cuadrícula de días */}
-          <div className="grid grid-cols-7 gap-1 text-center">
+          <div className="grid grid-cols-7 gap-y-1 text-center">
             {/* Días del mes anterior (apagados) */}
             {prevDays.map((day, idx) => (
               <div
                 key={`prev-${idx}`}
-                className="h-8 flex items-center justify-center text-xs text-neutral-300 dark:text-neutral-600 font-inter pointer-events-none select-none"
+                className="h-8 w-full flex items-center justify-center text-xs text-neutral-300 dark:text-neutral-600 font-inter pointer-events-none select-none"
               >
                 {day}
               </div>
@@ -327,28 +332,74 @@ export const DatePicker = ({
               const dayStr = String(day).padStart(2, '0');
               const cellDateStr = `${viewYear}-${monthStr}-${dayStr}`;
 
-              const isSelected = value === cellDateStr;
-              const isToday = todayStr === cellDateStr;
+              const dayOfWeek = new Date(viewYear, viewMonth, day).getDay(); // 0 = Domingo, 6 = Sábado
+              const isStart = cellDateStr === startDate;
+              const isEnd = cellDateStr === endDate;
+              const isInRange = hasForwardRange && cellDateStr > startDate && cellDateStr < endDate;
+              const isToday = cellDateStr === todayStr;
               const isDisabled = minDate && cellDateStr < minDate;
 
+              // Bordes de fila o mes para sombreado continuo (redondeado en bordes, no semicírculo)
+              const isLeftEdge = dayOfWeek === 0 || day === 1;
+              const isRightEdge = dayOfWeek === 6 || day === daysInMonth;
+
+              const roundedTrackClass = isLeftEdge && isRightEdge
+                ? 'rounded-lg'
+                : isLeftEdge
+                ? 'rounded-l-lg rounded-r-none'
+                : isRightEdge
+                ? 'rounded-r-lg rounded-l-none'
+                : 'rounded-none';
+
               return (
-                <button
+                <div
                   key={`curr-${day}`}
-                  type="button"
-                  disabled={isDisabled}
-                  onClick={() => handleSelectDay(day)}
-                  className={`h-8 w-8 mx-auto flex items-center justify-center text-xs rounded-xl transition-all cursor-pointer select-none font-inter ${
-                    isSelected
-                      ? 'bg-red-600 text-white font-semibold shadow-xs'
-                      : isToday
-                      ? 'border border-red-500/60 dark:border-red-500 text-red-600 dark:text-red-400 font-semibold hover:bg-red-50 dark:hover:bg-red-950/30'
-                      : isDisabled
-                      ? 'text-neutral-300 dark:text-neutral-700 cursor-not-allowed'
-                      : 'text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                  className={`relative h-8 w-full flex items-center justify-center ${
+                    isInRange
+                      ? `bg-red-500/15 dark:bg-red-500/20 text-red-700 dark:text-red-300 ${roundedTrackClass}`
+                      : ''
                   }`}
                 >
-                  {day}
-                </button>
+                  {/* Capa de fondo para el extremo inicial si hay rango hacia adelante (cubre la mitad derecha) */}
+                  {isStart && hasForwardRange && (
+                    <div
+                      className={`absolute inset-y-0 right-0 w-1/2 bg-red-500/15 dark:bg-red-500/20 pointer-events-none ${
+                        isRightEdge ? 'rounded-r-lg' : ''
+                      }`}
+                    />
+                  )}
+
+                  {/* Capa de fondo para el extremo final si hay rango hacia adelante (cubre la mitad izquierda) */}
+                  {isEnd && hasForwardRange && (
+                    <div
+                      className={`absolute inset-y-0 left-0 w-1/2 bg-red-500/15 dark:bg-red-500/20 pointer-events-none ${
+                        isLeftEdge ? 'rounded-l-lg' : ''
+                      }`}
+                    />
+                  )}
+
+                  {/* Botón interactivo del día (cuadrito redondeado original rounded-xl) */}
+                  <button
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={() => handleSelectDay(day)}
+                    className={`relative z-10 h-8 w-8 mx-auto flex items-center justify-center text-xs rounded-xl transition-all cursor-pointer select-none font-inter ${
+                      isEnd
+                        ? 'bg-red-600 text-white font-semibold shadow-xs'
+                        : isStart
+                        ? 'border border-red-500/60 dark:border-red-500 text-red-600 dark:text-red-400 font-semibold bg-white dark:bg-neutral-900 shadow-2xs hover:bg-red-50 dark:hover:bg-red-950/30'
+                        : isInRange
+                        ? 'text-red-700 dark:text-red-300 font-medium hover:bg-red-500/20 dark:hover:bg-red-500/30'
+                        : isToday
+                        ? 'border border-red-500/60 dark:border-red-500 text-red-600 dark:text-red-400 font-semibold hover:bg-red-50 dark:hover:bg-red-950/30'
+                        : isDisabled
+                        ? 'text-neutral-300 dark:text-neutral-700 cursor-not-allowed'
+                        : 'text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                    }`}
+                  >
+                    {day}
+                  </button>
+                </div>
               );
             })}
 
@@ -356,7 +407,7 @@ export const DatePicker = ({
             {nextDays.map((day, idx) => (
               <div
                 key={`next-${idx}`}
-                className="h-8 flex items-center justify-center text-xs text-neutral-300 dark:text-neutral-600 font-inter pointer-events-none select-none"
+                className="h-8 w-full flex items-center justify-center text-xs text-neutral-300 dark:text-neutral-600 font-inter pointer-events-none select-none"
               >
                 {day}
               </div>

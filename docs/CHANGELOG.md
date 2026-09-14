@@ -13,9 +13,38 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.6.2] - 2026-09-13
+
+### Added
+- **Ordenamiento Interactivo Multi-Columna en Tablas Maestras (`ServiciosPage.jsx`, `ClientsPage.jsx`, `WorkersPage.jsx`):**
+  - **Estado y Alternancia:** Implementación de `sortConfig` (`key`, `direction`) con función `handleSort` reactiva que conmuta entre orden ascendente y descendente en clics sucesivos.
+  - **Servicios (`ServiciosPage.jsx`):** Ordenamiento por Ticket (alfabético), Cliente (A-Z / Z-A), Equipo (marca y modelo), Estado, Prioridad (ponderación por severidad `Urgente: 3 > Alta: 2 > Media: 1 > Baja: 0`) y Fecha de ingreso (cronológica precisa por timestamp).
+  - **Clientes (`ClientsPage.jsx`):** Ordenamiento por Cliente (nombre completo A-Z / Z-A), Contacto (cédula/RNC, teléfono, correo), Dirección, Fecha de Registro y Estado (activo/inactivo).
+  - **Usuarios / Trabajadores (`WorkersPage.jsx`):** Ordenamiento por Usuario/Nombre (A-Z / Z-A), Cédula/Contacto, Rol (jerarquía de permisos `Super Admin > Admin Sucursal > Secretaria > Técnico`) y Estado (activo/inactivo).
+  - **UI/UX Minimalista:** Encabezados interactivos (`cursor-pointer select-none`) limpios y sin iconos cuando la columna está inactiva, y con indicadores de flecha minimalistas estilizados (`ChevronUp` / `ChevronDown` en color rojo de acento) al activarse.
+- **Acción Rápida de Selección Masiva en Checklist de Recepción (`ChecklistRecepcion.jsx`):**
+  - Botón complementario "Marcar todos" junto al botón de limpiar, manteniendo coherencia estética y permitiendo completar rápidamente las comprobaciones de entrada de dispositivos.
+- **Píldora Deslizante Animada en Selector de Pestañas (`ConfigurationPage.jsx`):**
+  - Navegación animada entre pestañas mediante indicador deslizante reactivo utilizando React nativo (`useRef`, `useState`, `useEffect`) y Tailwind CSS, calculando dinámicamente `offsetLeft` y `offsetWidth`.
+- **Sombreado Visual de Rango en Selector de Fechas (`DatePicker.jsx` / `Calendar.jsx`):**
+  - Efecto continuo de recorrido entre la fecha inicial y la fecha de destino seleccionada (`isInRange`), con resaltado visual estilizado y bordes redondeados.
+
+### Changed
+- **Estandarización de Ancho de Contenedor en Dashboard:**
+  - Ajuste del área de trabajo del Dashboard a `max-w-7xl mx-auto w-full` para armonizar el ancho de mesa de trabajo con las demás vistas del sistema (`Servicios`, `Clientes`, `Usuarios`).
+- **Limpieza de Modales de Impresión:**
+  - Remoción del botón redundante "Cerrar" en el modal de tickets y etiquetas térmicas, delegando el cierre a la interacción estándar (`Esc` / clic exterior / botón de aspa superior).
+
+---
+
 ## [0.6.1] - 2026-09-11
 
 ### Added
+- **Auditoría y Persistencia de `public_id` de Cloudinary en Evidencias Fotográficas (`servicios.controller.js`, `DevicePhotoUploader.jsx`):**
+  - **Endpoint de Subida (`POST /api/servicios/upload-foto`):** Respuesta estructurada retornando `url`, `public_id`, `fotos: [{ url, public_id }]` y `urls`, asegurando acceso directo tanto a nivel raíz como anidado.
+  - **Componente de Carga (`DevicePhotoUploader.jsx`):** Almacenamiento en el estado local de objetos estructurados `{ url, public_id }` con soporte de renderizado resiliente y preservación de identificadores de Cloudinary.
+  - **Envío en Formulario (`NuevaOrdenPage.jsx`):** Mapeo de `fotos_recepcion` y `evidencias_fotograficas` enviando arreglos de objetos estructurados `{ url, public_id }`.
+  - **Persistencia en Base de Datos (`createServicio`):** Inserción relacional en `evidencias_fotograficas (servicio_id, url_foto, public_id, tipo_evidencia, usuario_id)` almacenando fielmente el `public_id` de Cloudinary para futura gestión y depuración física de assets.
 - **Sanitización y Bloqueo Centralizado de Emojis (Backend & Frontend):**
   - **Backend (`stripEmojis.middleware.js` / `app.js`):** Middleware global registrado inmediatamente tras `express.json()`. Aplica remoción recursiva en `req.body` y `req.query` mediante regex Unicode que abarca pictografías extendidas, bloques de emojis y símbolos suplementarios (`[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE0E}-\u{FE0F}\u{200D}]/gu`), normalizando espacios redundantes sin afectar contraseñas o instancias no planas (`Date`, `Buffer`).
   - **Frontend (`stripEmojis.js` / `api.js` / `Input.jsx`):** Interceptor de solicitudes Axios que sanitiza `config.data` y `config.params` de forma transparente antes de disparar cualquier petición HTTP hacia el backend (incluyendo `FormData`). Se provee además el componente base `Input.jsx` con sanitización en tiempo real en eventos `onChange` y `onPaste`.
