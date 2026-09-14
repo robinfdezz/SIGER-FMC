@@ -18,7 +18,7 @@ import 'sileo/styles.css';
 
 const ThemedToaster = () => {
   const { isDark } = useTheme();
-  return <Toaster position="top-center" theme={isDark ? 'dark' : 'light'} />;
+  return <Toaster position="bottom-right" theme={isDark ? 'dark' : 'light'} />;
 };
 
 function App() {
