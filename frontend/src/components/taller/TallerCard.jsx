@@ -211,7 +211,7 @@ export const TallerCard = ({
             <div className="flex items-center gap-1.5 min-w-0">
               <Inbox className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <span className="text-xs font-medium text-amber-600 dark:text-amber-400 truncate">
-                En bolsa general
+                Sin asignar
               </span>
             </div>
           )}

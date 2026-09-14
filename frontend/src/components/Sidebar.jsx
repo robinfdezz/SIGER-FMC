@@ -22,8 +22,9 @@ import {
 const MENU_ITEMS = [
   { id: 'dashboard', name: 'Inicio / Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { id: 'tickets', name: 'Órdenes de Servicio', path: '/tickets', icon: Ticket },
-  { id: 'clientes', name: 'Clientes', path: '/clientes', icon: Contact },
   { id: 'taller', name: 'Banco de Trabajo', path: '/taller', icon: Wrench },
+  { id: 'divider-ops', isDivider: true },
+  { id: 'clientes', name: 'Clientes', path: '/clientes', icon: Contact },
   { id: 'trabajadores', name: 'Usuarios', path: '/trabajadores', icon: Users, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
   { id: 'config', name: 'Configuración', path: '/configuracion', icon: Settings, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
 ];
@@ -35,6 +36,7 @@ const Sidebar = () => {
 
   const filteredMenuItems = useMemo(() => {
     return MENU_ITEMS.filter((item) => {
+      if (item.isDivider) return true;
       if (!item.allowedRoles) return true;
       return item.allowedRoles.includes(user?.rol_nombre);
     });
@@ -120,6 +122,15 @@ const Sidebar = () => {
       {/* Navegación Principal */}
       <nav className="flex-1 py-4 px-2 space-y-1.5 overflow-visible">
         {filteredMenuItems.map((item) => {
+          if (item.isDivider) {
+            return (
+              <div
+                key={item.id}
+                className="my-2.5 -mx-2 border-t border-zinc-100 dark:border-dark-border"
+              />
+            );
+          }
+
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
 
@@ -159,9 +170,8 @@ const Sidebar = () => {
 
       {/* Sección Inferior / Controles */}
       <div
-        className={`py-2 px-2.5 border-t border-zinc-100 dark:border-dark-border space-y-1 relative flex flex-col ${
-          isExpanded ? 'items-start' : 'items-center'
-        }`}
+        className={`py-2 px-2.5 border-t border-zinc-100 dark:border-dark-border space-y-1 relative flex flex-col ${isExpanded ? 'items-start' : 'items-center'
+          }`}
         ref={configMenuRef}
       >
         {/* 1. Botón de Tema (Icono animado MorphIcon con Tooltip) */}
@@ -195,11 +205,10 @@ const Sidebar = () => {
               onClick={() => setShowConfigMenu((prev) => !prev)}
               type="button"
               aria-label="Modo de barra lateral"
-              className={`w-10 h-10 flex items-center justify-center rounded-lg aspect-square text-sm font-medium transition-colors cursor-pointer shrink-0 ${
-                showConfigMenu
+              className={`w-10 h-10 flex items-center justify-center rounded-lg aspect-square text-sm font-medium transition-colors cursor-pointer shrink-0 ${showConfigMenu
                   ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-              }`}
+                }`}
             >
               {sidebarMode === 'expanded' && <PanelLeftClose className="w-5 h-5" />}
               {sidebarMode === 'hover' && <MousePointer className="w-5 h-5" />}

@@ -5,6 +5,7 @@ import TallerCard from '../components/taller/TallerCard';
 import FichaTecnicaModal from '../components/taller/FichaTecnicaModal';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
 import AnimatedIconButton from '../components/common/AnimatedIconButton';
+import Badge from '../components/common/Badge';
 import { useAuth } from '../context/AuthContext';
 import {
   getServiciosTaller,
@@ -34,7 +35,15 @@ import {
   ChevronRight,
   ShieldCheck,
   X,
-  Filter
+  Filter,
+  ChevronsUp,
+  Equal,
+  ChevronsDown,
+  Smartphone,
+  Laptop,
+  Tablet,
+  Gamepad2,
+  Watch
 } from 'lucide-react';
 
 const formatTimeAgo = (dateString) => {
@@ -68,13 +77,71 @@ const getEstadoIcon = (estado) => {
 };
 
 const getColumnTitle = (estado) => {
+  if (!estado) return '';
   const flujo = Number(estado.orden_flujo);
   const cod = (estado.codigo_estado || '').toUpperCase();
-  if (flujo === 1 || cod === 'RECIBIDO') return 'Recibido';
-  if (flujo === 3 || cod.includes('ESPERA')) return 'Esperando Repuesto';
-  if (flujo === 4 || cod.includes('REPARAC')) return 'En Reparación';
-  if (flujo === 5 || cod.includes('CALIDAD') || cod.includes('CONTROL')) return 'Control de Calidad';
-  return estado.nombre_estado;
+  const nom = (estado.nombre_estado || estado.estado || '').toLowerCase();
+
+  if (flujo === 1 || cod.includes('RECIB') || nom.includes('recib')) return 'Recibido';
+  if (flujo === 2 || cod.includes('DIAGN') || nom.includes('diagn')) return 'En Diagnóstico';
+  if (flujo === 3 || cod.includes('ESPERA') || nom.includes('espera') || cod.includes('REPUESTO') || nom.includes('repuesto')) return 'Esperando Repuesto';
+  if (flujo === 4 || cod.includes('REPARAC') || nom.includes('reparac') || cod.includes('PROCESO') || nom.includes('proceso')) return 'En Reparación';
+  if (flujo === 5 || cod.includes('CALIDAD') || nom.includes('calidad') || cod.includes('CONTROL') || nom.includes('control')) return 'Control de Calidad';
+  if (flujo === 6 || cod.includes('LISTO') || nom.includes('listo')) return 'Listo para Entrega';
+  if (flujo === 7 || cod.includes('ENTREG') || nom.includes('entreg')) return 'Entregado';
+  if (flujo === 8 || cod.includes('CANCEL') || nom.includes('cancel')) return 'Cancelado';
+  return estado.nombre_estado || estado.estado || '';
+};
+
+const getDeviceCategoryIcon = (categoria) => {
+  const norm = (categoria || '').toLowerCase().trim();
+  const iconClass = 'text-neutral-400 dark:text-neutral-500 shrink-0 mt-0.5';
+  if (norm.includes('laptop') || norm.includes('portatil') || norm.includes('portátil') || norm.includes('notebook') || norm.includes('computadora')) {
+    return <Laptop size={14} className={iconClass} />;
+  }
+  if (norm.includes('tablet') || norm.includes('ipad') || norm.includes('tableta')) {
+    return <Tablet size={14} className={iconClass} />;
+  }
+  if (norm.includes('consola') || norm.includes('videojuego') || norm.includes('game') || norm.includes('play') || norm.includes('xbox') || norm.includes('nintendo')) {
+    return <Gamepad2 size={14} className={iconClass} />;
+  }
+  if (norm.includes('watch') || norm.includes('reloj') || norm.includes('band')) {
+    return <Watch size={14} className={iconClass} />;
+  }
+  if (norm.includes('phone') || norm.includes('celular') || norm.includes('movil') || norm.includes('móvil') || norm.includes('smartphone')) {
+    return <Smartphone size={14} className={iconClass} />;
+  }
+  return <Package size={14} className={iconClass} />;
+};
+
+const getPrioridadConfig = (prioridad) => {
+  switch (prioridad?.toLowerCase()) {
+    case 'urgente':
+      return {
+        label: 'Urgente',
+        color: 'danger',
+        icon: <Flame className="fill-current" />
+      };
+    case 'alta':
+      return {
+        label: 'Alta',
+        color: 'warning',
+        icon: ChevronsUp
+      };
+    case 'media':
+      return {
+        label: 'Media',
+        color: 'info',
+        icon: Equal
+      };
+    case 'baja':
+    default:
+      return {
+        label: 'Baja',
+        color: 'neutral',
+        icon: ChevronsDown
+      };
+  }
 };
 
 export const BancoTrabajoPage = () => {
@@ -86,10 +153,43 @@ export const BancoTrabajoPage = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshSuccess, setRefreshSuccess] = useState(false);
 
-  // Vistas y Filtros
-  const [viewMode, setViewMode] = useState('kanban'); // 'kanban' | 'table'
-  const [quickFilter, setQuickFilter] = useState('all'); // 'all' | 'mine' | 'unassigned' | 'urgent'
+  // Vistas y Filtros Persistentes
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('siger_taller_view_mode');
+      return saved === 'table' || saved === 'kanban' ? saved : 'kanban';
+    } catch {
+      return 'kanban';
+    }
+  });
+
+  const [quickFilter, setQuickFilter] = useState(() => {
+    try {
+      const saved = localStorage.getItem('siger_taller_quick_filter');
+      return ['all', 'mine', 'unassigned', 'urgent'].includes(saved) ? saved : 'all';
+    } catch {
+      return 'all';
+    }
+  });
+
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Sincronizar preferencias del usuario en localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('siger_taller_view_mode', viewMode);
+    } catch (e) {
+      console.warn('No se pudo persistir el modo de vista:', e);
+    }
+  }, [viewMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('siger_taller_quick_filter', quickFilter);
+    } catch (e) {
+      console.warn('No se pudo persistir el filtro rápido:', e);
+    }
+  }, [quickFilter]);
 
   // Ordenamiento interactivo para vista tabla
   const [sortConfig, setSortConfig] = useState({ key: 'prioridad', direction: 'desc' });
@@ -398,7 +498,7 @@ export const BancoTrabajoPage = () => {
   const filterTabs = useMemo(() => [
     { id: 'all', label: 'Todos', icon: Layers, count: counts.all },
     { id: 'mine', label: 'Mis Asignados', icon: UserCheck, count: counts.mine },
-    { id: 'unassigned', label: 'Bolsa General', icon: Inbox, count: counts.unassigned },
+    { id: 'unassigned', label: 'Sin Asignar', icon: Inbox, count: counts.unassigned },
     { id: 'urgent', label: 'Urgentes', icon: Flame, iconClassName: 'text-red-500', count: counts.urgent }
   ], [counts]);
 
@@ -519,8 +619,9 @@ export const BancoTrabajoPage = () => {
                     {/* Lista de Tarjetas */}
                     <div className="flex-1 space-y-2.5 overflow-y-auto pr-0.5 min-h-0">
                       {ordenesColumna.length === 0 ? (
-                        <div className="py-12 text-center text-xs text-neutral-400 dark:text-neutral-500 font-inter">
-                          Sin órdenes en este estado
+                        <div className="py-12 flex flex-col items-center justify-center gap-2 text-center text-xs text-neutral-400 dark:text-neutral-500 font-inter select-none">
+                          <Inbox size={22} className="stroke-[1.5] text-neutral-300 dark:text-neutral-600" />
+                          <span>Sin órdenes aquí</span>
                         </div>
                       ) : (
                         ordenesColumna.map((ord) => (
@@ -620,7 +721,7 @@ export const BancoTrabajoPage = () => {
                       </div>
                     </th>
 
-                    <th className="py-3 px-3 text-right w-[60px] bg-neutral-50 dark:bg-[#141416] sticky top-0">
+                    <th className="py-3 px-3 text-center w-[60px] bg-neutral-50 dark:bg-[#141416] sticky top-0">
                       Acción
                     </th>
                   </tr>
@@ -661,13 +762,19 @@ export const BancoTrabajoPage = () => {
                           </td>
 
                           {/* Equipo */}
-                          <td className="py-3 px-3 align-middle">
-                            <span className="font-semibold text-neutral-900 dark:text-neutral-100 block">
-                              {ord.marca_equipo} {ord.modelo_equipo}
-                            </span>
-                            <span className="text-[11px] text-neutral-400 truncate block">
-                              {ord.cliente || ord.nombre_cliente}
-                            </span>
+                          <td className="py-3 px-3 align-middle min-w-[160px] max-w-[220px]">
+                            <div className="flex items-start gap-1.5 text-xs text-neutral-900 dark:text-neutral-100 leading-tight">
+                              {getDeviceCategoryIcon(ord.categoria)}
+                              <span className="font-semibold truncate">
+                                {ord.marca_equipo} {ord.modelo_equipo}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                              <User className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                              <span className="truncate">
+                                {ord.cliente || ord.nombre_cliente || '—'}
+                              </span>
+                            </div>
                           </td>
 
                           {/* Falla */}
@@ -676,23 +783,57 @@ export const BancoTrabajoPage = () => {
                           </td>
 
                           {/* Estado */}
-                          <td className="py-3 px-3 align-middle">
-                            <span
-                              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border"
-                              style={{
-                                backgroundColor: ord.estado_color ? `${ord.estado_color}15` : '#f3f4f6',
-                                color: ord.estado_color || '#374151',
-                                borderColor: ord.estado_color ? `${ord.estado_color}40` : '#e5e7eb'
-                              }}
-                            >
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ord.estado_color }} />
-                              {ord.estado}
-                            </span>
+                          <td className="py-3 px-3 whitespace-nowrap align-middle">
+                            {ord.estado ? (
+                              (() => {
+                                const estadoObj = estados.find((e) => e.id === ord.estado_id || e.codigo_estado === ord.codigo_estado) || {
+                                  orden_flujo: ord.orden_flujo,
+                                  codigo_estado: ord.codigo_estado,
+                                  nombre_estado: ord.estado
+                                };
+                                const EstadoIcon = getEstadoIcon(estadoObj);
+                                const estadoColor = ord.estado_color || estadoObj.color_badge || '#6B7280';
+                                const estadoTitle = getColumnTitle(estadoObj);
+
+                                return (
+                                  <Badge
+                                    variant="minimal"
+                                    size="sm"
+                                    showDot={false}
+                                    icon={<EstadoIcon size={12} className="shrink-0 stroke-[2.2]" style={{ color: estadoColor }} />}
+                                    className="font-medium"
+                                    style={{ color: estadoColor }}
+                                  >
+                                    {estadoTitle}
+                                  </Badge>
+                                );
+                              })()
+                            ) : (
+                              <span className="text-neutral-400 dark:text-neutral-500">—</span>
+                            )}
                           </td>
 
                           {/* Prioridad */}
-                          <td className="py-3 px-3 align-middle capitalize font-semibold text-neutral-700 dark:text-neutral-300">
-                            {ord.prioridad}
+                          <td className="py-3 px-3 whitespace-nowrap align-middle">
+                            {ord.prioridad ? (
+                              (() => {
+                                const config = getPrioridadConfig(ord.prioridad);
+                                const PriorityIcon = config.icon;
+                                return (
+                                  <Badge
+                                    variant="minimal"
+                                    color={config.color}
+                                    icon={PriorityIcon}
+                                    size="sm"
+                                    className="capitalize font-medium"
+                                  >
+                                    {config.label}
+                                  </Badge>
+                                );
+                              })()
+                            ) : (
+                              <span className="text-neutral-400 dark:text-neutral-500">—</span>
+                            )}
                           </td>
 
                           {/* Asignado A */}
@@ -709,32 +850,39 @@ export const BancoTrabajoPage = () => {
                               </div>
                             ) : (
                               <div className="flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <Inbox className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                                 <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                                  Bolsa general
+                                  Sin asignar
                                 </span>
                               </div>
                             )}
                           </td>
 
                           {/* Tiempo */}
-                          <td className="py-3 px-3 align-middle text-neutral-400 font-mono text-[11px]">
-                            {formatTimeAgo(ord.created_at)}
+                          <td className="py-3 px-3 whitespace-nowrap align-middle">
+                            <div className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400">
+                              <Clock className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                              <span className="text-xs font-inter">
+                                {formatTimeAgo(ord.created_at)}
+                              </span>
+                            </div>
                           </td>
 
                           {/* Acción */}
-                          <td className="py-3 px-3 text-right align-middle">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openFicha(ord);
-                              }}
-                              className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                              title="Ver ficha técnica"
-                            >
-                              <ChevronRight size={15} />
-                            </button>
+                          <td className="py-3 px-3 text-center align-middle">
+                            <div className="flex items-center justify-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openFicha(ord);
+                                }}
+                                className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                title="Ver ficha técnica"
+                              >
+                                <ChevronRight size={15} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

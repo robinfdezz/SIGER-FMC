@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import Modal from '../common/Modal';
+import Button from '../common/Button';
+import Select from '../common/Select';
 import {
   X,
-  Smartphone,
   Calendar,
   Clock,
   User,
@@ -14,7 +16,6 @@ import {
   FileText,
   Image as ImageIcon,
   KeyRound,
-  ArrowRight,
   Loader2,
   Lock,
   Layers,
@@ -169,47 +170,77 @@ export const FichaTecnicaModal = ({
     (w) => w.activo && !tecnicosList.some((t) => t.id === w.id)
   );
 
+  const workerSelectItems = availableWorkersToAdd.map((w) => ({
+    id: String(w.id),
+    value: String(w.id),
+    label: `${w.nombre} ${w.apellido}`,
+    supportingText: w.rol_nombre || 'Trabajador',
+    avatarUrl: w.foto_perfil_url || undefined
+  }));
+
+  const estadoSelectItems = allEstados.map((est) => ({
+    id: String(est.id),
+    value: String(est.id),
+    label: est.nombre_estado || est.estado || est.codigo_estado,
+    supportingText: est.codigo_estado,
+    icon: est.color_badge ? (
+      <span
+        className="w-2.5 h-2.5 rounded-full shrink-0"
+        style={{ backgroundColor: est.color_badge }}
+      />
+    ) : null
+  }));
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div
-        className="bg-white dark:bg-[#141416] border border-neutral-200 dark:border-neutral-800 w-full max-w-3xl rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] font-inter"
-        onClick={(e) => e.stopPropagation()}
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        size="2xl"
+        height="h-[85vh] sm:h-[90vh]"
+        title={`Ficha Técnica #${orden?.codigo_ticket || '...'}`}
+        titleSlot={
+          orden?.es_garantia ? (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-300/40 dark:border-amber-800/40 uppercase">
+              Garantía
+            </span>
+          ) : null
+        }
+        description={
+          orden
+            ? `${orden.marca_equipo} ${orden.modelo_equipo} · Cliente: ${orden.cliente || orden.nombre_cliente}`
+            : 'Cargando información...'
+        }
+        bodyClassName="p-5 overflow-y-auto space-y-6"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={onClose}
+              disabled={isUpdating}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              form="form-actualizar-estado"
+              variant="primary"
+              size="md"
+              disabled={isUpdating || !orden || String(selectedEstadoId) === String(orden?.estado_actual_id)}
+              isLoading={isUpdating}
+              onClick={(e) => {
+                e.preventDefault();
+                handleUpdateEstado(e);
+              }}
+            >
+              Guardar Cambio
+            </Button>
+          </>
+        }
       >
-        {/* Cabecera del Modal */}
-        <div className="px-5 py-4 border-b border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between gap-3 bg-neutral-50/50 dark:bg-neutral-900/40 shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-sm shrink-0 border border-red-200/50 dark:border-red-900/40">
-              <Smartphone size={18} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold font-outfit text-neutral-900 dark:text-neutral-100 leading-tight">
-                  Ficha Técnica #{orden?.codigo_ticket || '...'}
-                </h2>
-                {orden?.es_garantia && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-300/40 dark:border-amber-800/40 uppercase">
-                    Garantía
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate">
-                {orden ? `${orden.marca_equipo} ${orden.modelo_equipo} · Cliente: ${orden.cliente || orden.nombre_cliente}` : 'Cargando información...'}
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-            aria-label="Cerrar modal"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Contenido con Scroll */}
-        <div className="p-5 overflow-y-auto space-y-6 flex-1">
-          {loading || !orden ? (
+        {loading || !orden ? (
             <div className="py-16 text-center flex flex-col items-center justify-center gap-3">
               <Loader2 size={32} className="animate-spin text-red-600" />
               <p className="text-sm font-medium text-neutral-500">Cargando expediente de taller...</p>
@@ -321,27 +352,28 @@ export const FichaTecnicaModal = ({
                 {/* Selector para agregar colaborador adicional */}
                 {availableWorkersToAdd.length > 0 && (
                   <div className="flex items-center gap-2 pt-2 border-t border-neutral-200/60 dark:border-neutral-800/60">
-                    <select
-                      value={selectedColabId}
-                      onChange={(e) => setSelectedColabId(e.target.value)}
-                      className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-hidden"
-                    >
-                      <option value="">Seleccionar colaborador para agregar...</option>
-                      {availableWorkersToAdd.map((w) => (
-                        <option key={w.id} value={String(w.id)}>
-                          {w.nombre} {w.apellido} ({w.rol_nombre || 'Trabajador'})
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex-1 min-w-0">
+                      <Select
+                        value={selectedColabId}
+                        onChange={(val) => setSelectedColabId(val)}
+                        items={workerSelectItems}
+                        placeholder="Seleccionar colaborador para agregar..."
+                        disabled={isManagingTecnicos}
+                        buttonClassName="py-1.5 text-xs rounded-xl"
+                      />
+                    </div>
 
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
+                      size="sm"
                       disabled={isManagingTecnicos || !selectedColabId}
+                      isLoading={isManagingTecnicos}
                       onClick={() => handleAddTecnico(parseInt(selectedColabId))}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors disabled:opacity-50 cursor-pointer"
+                      className="h-[38px] px-3.5 text-xs font-semibold shrink-0"
                     >
                       Agregar
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -415,6 +447,7 @@ export const FichaTecnicaModal = ({
 
               {/* Formulario de Transición de Estado */}
               <form
+                id="form-actualizar-estado"
                 onSubmit={handleUpdateEstado}
                 className="pt-4 border-t border-neutral-200 dark:border-neutral-800 space-y-3"
               >
@@ -436,60 +469,35 @@ export const FichaTecnicaModal = ({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
                   <div>
-                    <label className="text-[11px] font-semibold text-neutral-500 block mb-1">
-                      Nuevo Estado
-                    </label>
-                    <select
+                    <Select
+                      label="Nuevo Estado"
                       value={selectedEstadoId}
-                      onChange={(e) => setSelectedEstadoId(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-hidden focus:ring-2 focus:ring-red-500/20"
-                    >
-                      {allEstados.map((est) => (
-                        <option key={est.id} value={String(est.id)}>
-                          {est.nombre_estado} ({est.codigo_estado})
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(val) => setSelectedEstadoId(val)}
+                      items={estadoSelectItems}
+                      placeholder="Seleccionar nuevo estado..."
+                      placement="top"
+                    />
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-neutral-500 block mb-1">
-                      Nota de Avance / Diagnóstico (Opcional)
+                    <label className="block text-xs font-medium font-inter text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      Nota de Avance / Diagnóstico <span className="text-neutral-400 font-normal font-inter">(Opcional)</span>
                     </label>
                     <input
                       type="text"
                       value={notaCambio}
                       onChange={(e) => setNotaCambio(e.target.value)}
                       placeholder="Ej: Se reemplazó conector de carga..."
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-red-500/20"
+                      className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:border-red-500 focus:ring-red-500/20 transition-colors"
                     />
                   </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="px-4 py-2 text-xs font-semibold rounded-xl text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isUpdating || String(selectedEstadoId) === String(orden.estado_actual_id)}
-                    className="px-4 py-2 text-xs font-semibold rounded-xl bg-red-600 hover:bg-red-500 text-white shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                  >
-                    {isUpdating ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
-                    <span>Guardar Cambio</span>
-                  </button>
                 </div>
               </form>
             </>
           )}
-        </div>
-      </div>
+      </Modal>
 
       {/* Modal Lightbox de Foto */}
       {activePhoto && (
@@ -502,7 +510,7 @@ export const FichaTecnicaModal = ({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

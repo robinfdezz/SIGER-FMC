@@ -400,7 +400,7 @@ export const ClientsPage = () => {
                       {renderSortIcon('estado')}
                     </div>
                   </th>
-                  <th className="py-3 px-2.5 sm:px-3 text-right w-[80px] bg-neutral-50 dark:bg-[#141416] sticky top-0">
+                  <th className="py-3 px-2.5 sm:px-3 text-center w-[80px] bg-neutral-50 dark:bg-[#141416] sticky top-0">
                     Acciones
                   </th>
                 </tr>
@@ -522,8 +522,8 @@ export const ClientsPage = () => {
                         </td>
 
                         {/* Columna 6: Acciones */}
-                        <td className="py-3 px-2.5 sm:px-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
+                        <td className="py-3 px-2.5 sm:px-3 text-center align-middle">
+                          <div className="flex items-center justify-center gap-1">
                             {canCreateEdit && (
                               <button
                                 onClick={() => handleOpenEditModal(client)}

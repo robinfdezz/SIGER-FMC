@@ -35,7 +35,12 @@ import {
   Package,
   ChevronUp,
   ChevronDown,
-  ShieldCheck
+  ShieldCheck,
+  Clock,
+  Wrench,
+  ClipboardCheck,
+  CheckCircle2,
+  Inbox
 } from 'lucide-react';
 
 const extractArray = (res) => {
@@ -98,6 +103,38 @@ const getDeviceCategoryIcon = (categoria) => {
     return <Smartphone size={14} className={iconClass} />;
   }
   return <Package size={14} className={iconClass} />;
+};
+
+const getEstadoIcon = (estado) => {
+  const flujo = Number(estado?.orden_flujo);
+  const cod = (estado?.codigo_estado || '').toUpperCase();
+  const nom = (estado?.nombre_estado || estado?.estado || '').toLowerCase();
+
+  if (flujo === 1 || cod.includes('RECIB') || nom.includes('recib')) return Package;
+  if (flujo === 2 || cod.includes('DIAGN') || nom.includes('diagn')) return Search;
+  if (flujo === 3 || cod.includes('ESPERA') || cod.includes('REPUESTO') || nom.includes('espera') || nom.includes('repuesto')) return Clock;
+  if (flujo === 4 || cod.includes('REPARAC') || cod.includes('PROCESO') || nom.includes('reparac') || nom.includes('proceso')) return Wrench;
+  if (flujo === 5 || cod.includes('CALIDAD') || cod.includes('CONTROL') || nom.includes('calidad') || nom.includes('control')) return ClipboardCheck;
+  if (flujo === 6 || cod.includes('LISTO') || cod.includes('ENTREGA') || nom.includes('listo') || nom.includes('entrega')) return CheckCircle2;
+  if (flujo === 7 || cod.includes('ENTREG') || nom.includes('entreg')) return CheckCircle2;
+  return Package;
+};
+
+const getEstadoLabel = (estado) => {
+  if (!estado) return '';
+  const flujo = Number(estado.orden_flujo);
+  const cod = (estado.codigo_estado || '').toUpperCase();
+  const nom = (estado.nombre_estado || estado.estado || '').toLowerCase();
+
+  if (flujo === 1 || cod.includes('RECIB') || nom.includes('recib')) return 'Recibido';
+  if (flujo === 2 || cod.includes('DIAGN') || nom.includes('diagn')) return 'En Diagnóstico';
+  if (flujo === 3 || cod.includes('ESPERA') || nom.includes('espera') || cod.includes('REPUESTO') || nom.includes('repuesto')) return 'Esperando Repuesto';
+  if (flujo === 4 || cod.includes('REPARAC') || nom.includes('reparac') || cod.includes('PROCESO') || nom.includes('proceso')) return 'En Reparación';
+  if (flujo === 5 || cod.includes('CALIDAD') || nom.includes('calidad') || cod.includes('CONTROL') || nom.includes('control')) return 'Control de Calidad';
+  if (flujo === 6 || cod.includes('LISTO') || nom.includes('listo')) return 'Listo para Entrega';
+  if (flujo === 7 || cod.includes('ENTREG') || nom.includes('entreg')) return 'Entregado';
+  if (flujo === 8 || cod.includes('CANCEL') || nom.includes('cancel')) return 'Cancelado';
+  return estado.nombre_estado || estado.estado || '';
 };
 
 const FALLBACK_ESTADOS = [
@@ -359,7 +396,7 @@ export const ServiciosPage = () => {
     ...estados.map((e) => ({
       id: String(e.id),
       value: String(e.id),
-      label: e.nombre_estado || e.codigo_estado
+      label: getEstadoLabel(e)
     }))
   ], [estados]);
 
@@ -590,7 +627,7 @@ export const ServiciosPage = () => {
                     </div>
                   </th>
 
-                  <th className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-right w-[5%] min-w-[50px] bg-neutral-50 dark:bg-[#141416] sticky top-0">
+                  <th className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-center w-[5%] min-w-[50px] bg-neutral-50 dark:bg-[#141416] sticky top-0">
                     Acciones
                   </th>
                 </tr>
@@ -670,33 +707,39 @@ export const ServiciosPage = () => {
                             <span>{orden.tecnicos.map((t) => t.nombre_completo).join(', ')}</span>
                           </p>
                         ) : (
-                          <p className="text-[11px] text-neutral-400 dark:text-neutral-500 font-inter mt-0.5">
-                            Bolsa general
-                          </p>
+                          <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-inter mt-1">
+                            <Inbox size={12} className="text-amber-500 shrink-0" />
+                            <span>Sin asignar</span>
+                          </div>
                         )}
                       </td>
 
-                      {/* Columna 4: Estado con Badge oficial */}
+                      {/* Columna 4: Estado con Badge minimal */}
                       <td className="py-3 px-3 sm:px-4 whitespace-nowrap align-middle">
                         {orden.estado ? (
-                          <Badge
-                            size="sm"
-                            showDot={false}
-                            icon={
-                              <span
-                                className="w-1.5 h-1.5 rounded-full shrink-0"
-                                style={{ backgroundColor: orden.estado_color || '#6B7280' }}
-                              />
-                            }
-                            className="font-medium"
-                            style={{
-                              backgroundColor: `${orden.estado_color || '#6B7280'}18`,
-                              color: orden.estado_color || '#6B7280',
-                              borderColor: `${orden.estado_color || '#6B7280'}35`
-                            }}
-                          >
-                            {orden.estado}
-                          </Badge>
+                          (() => {
+                            const estadoObj = (estados || []).find((e) => e.id === orden.estado_id || e.codigo_estado === orden.codigo_estado) || {
+                              orden_flujo: orden.orden_flujo,
+                              codigo_estado: orden.codigo_estado,
+                              nombre_estado: orden.estado
+                            };
+                            const EstadoIcon = getEstadoIcon(estadoObj);
+                            const estadoColor = orden.estado_color || estadoObj.color_badge || '#6B7280';
+                            const estadoLabel = getEstadoLabel(estadoObj);
+
+                            return (
+                              <Badge
+                                variant="minimal"
+                                size="sm"
+                                showDot={false}
+                                icon={<EstadoIcon size={12} className="shrink-0 stroke-[2.2]" style={{ color: estadoColor }} />}
+                                className="font-medium"
+                                style={{ color: estadoColor }}
+                              >
+                                {estadoLabel}
+                              </Badge>
+                            );
+                          })()
                         ) : (
                           <span className="text-neutral-400 dark:text-neutral-500">—</span>
                         )}
@@ -742,8 +785,8 @@ export const ServiciosPage = () => {
                       </td>
 
                       {/* Columna 7: Acciones */}
-                      <td className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-right align-middle">
-                        <div className="flex items-center justify-end">
+                      <td className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-center align-middle">
+                        <div className="flex items-center justify-center">
                           <button
                             type="button"
                             onClick={() => handleImprimirClick(orden)}

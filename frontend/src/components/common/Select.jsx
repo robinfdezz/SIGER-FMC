@@ -35,7 +35,8 @@ export const Select = ({
   error,
   className = '',
   buttonClassName = '',
-  menuClassName = ''
+  menuClassName = '',
+  placement = 'bottom'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
@@ -197,7 +198,9 @@ export const Select = ({
       {isOpen && (
         <div
           role="listbox"
-          className={`absolute left-0 right-0 mt-1.5 bg-white dark:bg-[#18181B] border border-neutral-200/90 dark:border-neutral-800 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto py-1.5 animate-in fade-in zoom-in-95 duration-150 ${menuClassName}`}
+          className={`absolute left-0 right-0 ${
+            placement === 'top' ? 'bottom-full mb-1.5' : 'mt-1.5'
+          } bg-white dark:bg-[#18181B] border border-neutral-200/90 dark:border-neutral-800 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto py-1.5 animate-in fade-in zoom-in-95 duration-150 ${menuClassName}`}
         >
           {items.length === 0 ? (
             <div className="px-3.5 py-2.5 text-xs text-neutral-400 dark:text-neutral-500 text-center font-inter">
