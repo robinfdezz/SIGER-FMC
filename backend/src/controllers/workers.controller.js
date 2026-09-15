@@ -219,6 +219,11 @@ const getWorkers = async (req, res) => {
       conditions.push(`LOWER(r.nombre_rol) = $${queryParams.length}`);
     }
 
+    // Filtro específico para taller / colaboradores técnicos (excluye roles administrativos/recepción)
+    if (req.query.solo_tecnicos === 'true' || req.query.taller === 'true') {
+      conditions.push(`r.nombre_rol NOT ILIKE '%secretaria%' AND r.nombre_rol NOT ILIKE '%recepcio%' AND r.nombre_rol NOT ILIKE '%cajero%'`);
+    }
+
     if (conditions.length > 0) {
       query += ` WHERE ${conditions.join(' AND ')}`;
     }

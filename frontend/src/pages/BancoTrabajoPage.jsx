@@ -381,19 +381,30 @@ export const BancoTrabajoPage = () => {
   };
 
   const handleModalEstadoUpdated = async (ordenId, nuevoEstadoId, notas) => {
-    const res = await updateServicioEstado(ordenId, {
-      nuevo_estado_id: nuevoEstadoId,
-      notas
-    });
-
-    if (res.ok && res.data) {
-      sileo.success({
-        title: 'Estado actualizado',
-        description: res.message || 'La orden se actualizó correctamente.'
+    try {
+      const res = await updateServicioEstado(ordenId, {
+        nuevo_estado_id: nuevoEstadoId,
+        notas
       });
-      setOrdenes((prev) =>
-        prev.map((o) => (o.id === ordenId ? { ...o, ...res.data } : o))
-      );
+
+      if (res.ok && res.data) {
+        sileo.success({
+          title: 'Estado actualizado',
+          description: res.message || 'La orden se actualizó correctamente.'
+        });
+        setOrdenes((prev) =>
+          prev.map((o) => (o.id === ordenId ? { ...o, ...res.data } : o))
+        );
+      } else {
+        throw new Error(res.message || 'No se pudo actualizar el estado de la orden.');
+      }
+    } catch (err) {
+      console.error('Error en handleModalEstadoUpdated:', err);
+      sileo.error({
+        title: 'Error al cambiar estado',
+        description: err.response?.data?.message || err.message || 'No se pudo actualizar el estado de la orden.'
+      });
+      throw err;
     }
   };
 
@@ -632,6 +643,7 @@ export const BancoTrabajoPage = () => {
                             onQuickAdvance={handleQuickAdvance}
                             onSelfAssign={handleSelfAssign}
                             currentUserId={currentUser?.id}
+                            currentUserRole={currentUser?.rol_nombre || currentUser?.rol}
                             allEstados={estados}
                           />
                         ))
@@ -907,9 +919,11 @@ export const BancoTrabajoPage = () => {
           onClose={() => setIsModalOpen(false)}
           ordenId={selectedOrdenId}
           currentUserId={currentUser?.id}
+          currentUserRole={currentUser?.rol_nombre || currentUser?.rol}
           allEstados={estados}
           onEstadoUpdated={handleModalEstadoUpdated}
           onTecnicosUpdated={handleTecnicosUpdated}
+          onOrderReload={fetchData}
         />
       </div>
     </DashboardLayout>

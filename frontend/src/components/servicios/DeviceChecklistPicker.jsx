@@ -1,5 +1,6 @@
 import React from 'react';
 import { ClipboardList, CheckCircle2, AlertTriangle, Minus, RotateCcw, CheckCheck } from 'lucide-react';
+import SimpleButton from '../common/SimpleButton';
 
 const CHECKLIST_ITEMS = [
   { key: 'enciende',       label: 'Enciende' },
@@ -119,27 +120,24 @@ const DeviceChecklistPicker = ({ value = {}, onChange }) => {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            type="button"
+          <SimpleButton
             onClick={handleMarkAll}
-            className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:underline transition-colors cursor-pointer"
+            icon={CheckCheck}
+            variant="success"
             title="Marcar todos los componentes como OK"
           >
-            <CheckCheck size={13} className="text-emerald-600 dark:text-emerald-400" />
-            <span>Marcar todos</span>
-          </button>
+            Marcar todos
+          </SimpleButton>
 
           <span className="text-neutral-300 dark:text-neutral-700 select-none">|</span>
 
-          <button
-            type="button"
+          <SimpleButton
             onClick={handleReset}
-            className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:underline transition-colors cursor-pointer"
+            icon={RotateCcw}
             title="Reiniciar todos los componentes a sin revisar"
           >
-            <RotateCcw size={12} />
-            <span>Limpiar</span>
-          </button>
+            Limpiar
+          </SimpleButton>
         </div>
       </div>
     </div>

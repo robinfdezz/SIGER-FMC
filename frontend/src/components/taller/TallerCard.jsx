@@ -16,7 +16,8 @@ import {
   Gamepad2,
   Watch,
   Package,
-  Inbox
+  Inbox,
+  AlertTriangle
 } from 'lucide-react';
 import InlineConfirmButton from '../common/InlineConfirmButton';
 
@@ -100,6 +101,7 @@ export const TallerCard = ({
   onQuickAdvance,
   onSelfAssign,
   currentUserId,
+  currentUserRole,
   allEstados = []
 }) => {
   const priorityInfo = getPriorityBadge(orden.prioridad);
@@ -112,8 +114,23 @@ export const TallerCard = ({
     ? allEstados.find((e) => e.orden_flujo === nextAction.nextOrden)
     : null;
 
+  // Detección de costos / repuestos pendientes de aprobación
+  const pendingCostsCount = Number(
+    orden.incidencias_pendientes_costo ||
+    (Array.isArray(orden.incidencias)
+      ? orden.incidencias.filter(
+          (inc) =>
+            Number(inc.costo_adicional_repuesto) > 0 &&
+            inc.aprobado_por_cliente !== true &&
+            !inc.fecha_aprobacion
+        ).length
+      : 0)
+  );
+  const hasPendingCosts = pendingCostsCount > 0;
+
   const handleAdvance = (e) => {
     e.stopPropagation();
+    if (!hasTecnicos || hasPendingCosts) return;
     if (nextEstadoObj && onQuickAdvance) {
       onQuickAdvance(orden, nextEstadoObj);
     }
@@ -130,6 +147,13 @@ export const TallerCard = ({
   const hasTecnicos = tecnicosList.length > 0;
   const isAlreadyAssigned = hasTecnicos && tecnicosList.some((t) => t.id === currentUserId);
 
+  // Roles administrativos/recepción no pueden autoasignarse como técnicos
+  const normalizedRole = String(currentUserRole || '').toLowerCase();
+  const isAdministrativeOrReception = ['secretaria', 'recepcionista', 'recepcion', 'cajero'].some((r) =>
+    normalizedRole.includes(r)
+  );
+  const canSelfAssign = !isAlreadyAssigned && !isAdministrativeOrReception;
+
   return (
     <div
       onClick={() => onSelect && onSelect(orden)}
@@ -143,6 +167,15 @@ export const TallerCard = ({
           </span>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {hasPendingCosts && (
+              <span
+                title="Presupuesto pendiente de aprobación"
+                className="text-amber-500 dark:text-amber-400 hover:text-amber-600 transition-colors inline-flex items-center"
+              >
+                <AlertTriangle size={14} className="stroke-[2.2]" />
+              </span>
+            )}
+
             {orden.es_garantia && (
               <span
                 title="Orden bajo cobertura de garantía"
@@ -217,8 +250,8 @@ export const TallerCard = ({
             </div>
           )}
 
-          {/* Botón rápido "Unirme como técnico" si no está asignado */}
-          {!isAlreadyAssigned && onSelfAssign && (
+          {/* Botón rápido "Unirme como técnico" si no está asignado y tiene rol habilitado */}
+          {canSelfAssign && onSelfAssign && (
             <InlineConfirmButton
               variant="card"
               text="Unirme a ésta orden"
@@ -233,11 +266,33 @@ export const TallerCard = ({
         {nextEstadoObj && (
           <button
             type="button"
+            disabled={!hasTecnicos || hasPendingCosts}
             onClick={handleAdvance}
-            className="w-full mt-0.5 py-1.5 px-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all group-hover:border-neutral-300 dark:group-hover:border-neutral-600"
+            title={
+              hasPendingCosts
+                ? `Bloqueado: Existen ${pendingCostsCount} costo(s) adicional(es) pendiente(s) de aprobación por el cliente.`
+                : !hasTecnicos
+                ? 'Debe asignar al menos un técnico responsable antes de avanzar de estado'
+                : ''
+            }
+            className={`w-full mt-0.5 py-1.5 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+              !hasTecnicos || hasPendingCosts
+                ? 'bg-neutral-100/50 dark:bg-neutral-800/40 text-neutral-400 dark:text-neutral-500 cursor-not-allowed opacity-60'
+                : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 group-hover:border-neutral-300 dark:group-hover:border-neutral-600 cursor-pointer'
+            }`}
           >
             <span>{nextAction.label}</span>
-            <ArrowRight size={13} className="shrink-0 group-hover:translate-x-0.5 transition-transform" />
+            {hasPendingCosts ? (
+              <span className="text-[10px] font-normal text-amber-600 dark:text-amber-400 font-inter">
+                (Costo pendiente)
+              </span>
+            ) : !hasTecnicos ? (
+              <span className="text-[10px] font-normal text-amber-600 dark:text-amber-400 font-inter">
+                (Asigna técnico)
+              </span>
+            ) : (
+              <ArrowRight size={13} className="shrink-0 group-hover:translate-x-0.5 transition-transform" />
+            )}
           </button>
         )}
       </div>

@@ -23,6 +23,15 @@ function isBlank(str) {
   return !str || String(str).trim().length === 0;
 }
 
+/**
+ * Determina si el usuario posee rol SuperAdministrador.
+ */
+function isUserSuperAdmin(user) {
+  if (!user) return false;
+  const role = String(user.rol_nombre || user.rol || '').toLowerCase();
+  return role === 'superadmin' || role === 'superadministrador' || role.includes('superadmin');
+}
+
 // ============================================================
 // POST /api/servicios  — Crear orden de servicio
 // ============================================================
@@ -894,15 +903,22 @@ const validarGarantiaTicket = async (req, res) => {
 const getServiciosTaller = async (req, res) => {
   try {
     const pool = getPool();
-    const userRole = String(req.user?.rol_nombre || req.user?.rol || '').toLowerCase();
-    const isSuperAdmin = userRole === 'superadmin';
+    const isSuperAdmin = isUserSuperAdmin(req.user);
 
-    // Determinar sucursal a filtrar
+    // Determinar sucursal a filtrar con aislamiento estricto
     let sucursalId = null;
-    if (req.query.sucursal_id && req.query.sucursal_id !== 'all') {
-      sucursalId = parseInt(req.query.sucursal_id);
-    } else if (!isSuperAdmin && req.user?.sucursal_id) {
-      sucursalId = parseInt(req.user.sucursal_id);
+    if (!isSuperAdmin) {
+      // Todo usuario no SuperAdmin queda estrictamente enclaustrado en su propia sucursal
+      sucursalId = req.user?.sucursal_id ? parseInt(req.user.sucursal_id, 10) : null;
+      if (!sucursalId) {
+        return res.status(403).json({
+          ok: false,
+          success: false,
+          message: 'Acceso denegado: El usuario no tiene una sucursal asignada.'
+        });
+      }
+    } else if (req.query.sucursal_id && req.query.sucursal_id !== 'all') {
+      sucursalId = parseInt(req.query.sucursal_id, 10);
     }
 
     // Filtro opcional por técnico
@@ -995,7 +1011,16 @@ const getServiciosTaller = async (req, res) => {
           FROM tecnicos_asignados ta
           JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
           WHERE ta.servicio_id = sr.id
-        ), '[]'::json) AS tecnicos
+        ), '[]'::json) AS tecnicos,
+        COALESCE((
+          SELECT COUNT(*)::int
+          FROM incidencias_servicio inc
+          WHERE inc.servicio_id = sr.id
+            AND inc.activo = TRUE
+            AND inc.costo_adicional_repuesto > 0
+            AND inc.aprobado_por_cliente = FALSE
+            AND inc.fecha_aprobacion IS NULL
+        ), 0) AS incidencias_pendientes_costo
       FROM servicios_recepcion sr
       JOIN estados_servicio es ON es.id = sr.estado_actual_id
       LEFT JOIN categorias_dispositivos cd ON cd.id = sr.categoria_id
@@ -1068,15 +1093,17 @@ const updateServicioEstado = async (req, res) => {
     const nuevoEstado = estadoRes.rows[0];
 
     // 2. Verificar existencia de la orden y sucursal autorizada
-    const userRole = String(req.user?.rol_nombre || req.user?.rol || '').toLowerCase();
-    const isSuperAdmin = userRole === 'superadmin';
+    const isSuperAdmin = isUserSuperAdmin(req.user);
 
     let checkQuery = 'SELECT id, codigo_ticket, sucursal_id, estado_actual_id FROM servicios_recepcion WHERE id = $1 AND activo = TRUE';
     const checkParams = [id];
 
-    if (!isSuperAdmin && req.user?.sucursal_id) {
+    if (!isSuperAdmin) {
+      if (!req.user?.sucursal_id) {
+        return res.status(403).json({ ok: false, message: 'Acceso denegado: El usuario no tiene una sucursal asignada.' });
+      }
       checkQuery += ' AND sucursal_id = $2';
-      checkParams.push(Number(req.user.sucursal_id));
+      checkParams.push(parseInt(req.user.sucursal_id, 10));
     }
 
     const ordenRes = await client.query(checkQuery, checkParams);
@@ -1085,6 +1112,57 @@ const updateServicioEstado = async (req, res) => {
     }
 
     await client.query('BEGIN');
+
+    // Regla de Negocio: Ninguna orden puede avanzar más allá de RECIBIDO ni permanecer en estados
+    // operativos posteriores sin al menos un técnico asignado.
+    const esEstadoOperativo = nuevoEstado.codigo_estado !== 'RECIBIDO' && Number(nuevoEstado.orden_flujo) !== 1;
+    if (esEstadoOperativo) {
+      const tecCountRes = await client.query(
+        'SELECT COUNT(*)::int AS total FROM tecnicos_asignados WHERE servicio_id = $1',
+        [id]
+      );
+      const totalTecnicos = tecCountRes.rows[0]?.total || 0;
+      const vieneTecnicoExplicito = Boolean(tecnico_id && Number.isInteger(parseInt(tecnico_id)));
+
+      if (totalTecnicos === 0 && !vieneTecnicoExplicito) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          ok: false,
+          success: false,
+          status: 'error',
+          message: 'Debe asignar al menos un técnico responsable a la orden antes de avanzar de estado.'
+        });
+      }
+    }
+
+    // Regla de Negocio: Bloqueo Defensivo por Costos/Repuestos Pendientes de Aprobación.
+    // Si la orden cuenta con alguna incidencia con costo adicional pendiente de resolución (ni aprobada ni rechazada),
+    // no se permite transicionar la orden a estados operativos de avance (orden_flujo > 3: En Reparación, Control de Calidad, Listo para Entrega, Entregado).
+    const esEstadoAvancePosterior = Number(nuevoEstado.orden_flujo) > 3;
+    if (esEstadoAvancePosterior) {
+      const pendingCostsRes = await client.query(
+        `SELECT id, tipo_incidencia, descripcion, repuesto_requerido, costo_adicional_repuesto
+         FROM incidencias_servicio
+         WHERE servicio_id = $1
+           AND activo = TRUE
+           AND costo_adicional_repuesto > 0
+           AND aprobado_por_cliente = FALSE
+           AND fecha_aprobacion IS NULL`,
+        [id]
+      );
+
+      if (pendingCostsRes.rowCount > 0) {
+        await client.query('ROLLBACK');
+        const count = pendingCostsRes.rowCount;
+        const primerInc = pendingCostsRes.rows[0];
+        return res.status(400).json({
+          ok: false,
+          success: false,
+          status: 'error',
+          message: `No se puede avanzar la orden a "${nuevoEstado.nombre_estado}" porque existen ${count} costo(s)/repuesto(s) adicional(es) pendiente(s) de aprobación por parte del cliente (Ej: ${primerInc.tipo_incidencia} - RD$ ${Number(primerInc.costo_adicional_repuesto).toFixed(2)}). Debe aprobar o rechazar el presupuesto primero.`
+        });
+      }
+    }
 
     // 3. Actualizar estado_actual_id y timestamp
     let updateQuery = 'UPDATE servicios_recepcion SET estado_actual_id = $1, updated_at = NOW()';
@@ -1097,27 +1175,9 @@ const updateServicioEstado = async (req, res) => {
 
     await client.query(updateQuery, updateParams);
 
-    // 4. Autoasignación inteligente de técnico:
-    // Si se envió un tecnico_id explícito, agregarlo como técnico colaborador si no lo está ya.
-    // Si NO tiene ningún técnico asignado y el estado pasa a diagnóstico o reparación, asignar al usuario logueado.
-    // Si YA tiene técnicos asignados, NUNCA se borran ni sobrescriben.
-    const tecCountRes = await client.query(
-      'SELECT COUNT(*)::int AS total FROM tecnicos_asignados WHERE servicio_id = $1',
-      [id]
-    );
-    const totalTecnicos = tecCountRes.rows[0]?.total || 0;
-
-    let tecnicoParaAgregar = null;
-    const esEstadoTecnico = ['EN_DIAGNOSTICO', 'EN_REPARACION'].includes(nuevoEstado.codigo_estado) ||
-      (nuevoEstado.orden_flujo >= 2 && nuevoEstado.orden_flujo <= 4);
-
+    // 4. Asignación si se envió un tecnico_id explícito en la solicitud
     if (tecnico_id && Number.isInteger(parseInt(tecnico_id))) {
-      tecnicoParaAgregar = parseInt(tecnico_id);
-    } else if (totalTecnicos === 0 && esEstadoTecnico) {
-      tecnicoParaAgregar = usuarioId;
-    }
-
-    if (tecnicoParaAgregar) {
+      const tecnicoParaAgregar = parseInt(tecnico_id);
       const existeTecnico = await client.query(
         'SELECT 1 FROM tecnicos_asignados WHERE servicio_id = $1 AND tecnico_id = $2',
         [id, tecnicoParaAgregar]
@@ -1240,9 +1300,14 @@ const assignTecnicoServicio = async (req, res) => {
       return res.status(400).json({ ok: false, message: 'ID de técnico inválido.' });
     }
 
-    // Verificar que el técnico exista y esté activo
+    const isSuperAdmin = isUserSuperAdmin(req.user);
+
+    // Verificar que el técnico exista, esté activo y obtener su rol
     const tecRes = await pool.query(
-      'SELECT id, nombre, apellido, usuario, activo FROM datos_trabajadores WHERE id = $1',
+      `SELECT dt.id, dt.nombre, dt.apellido, dt.usuario, dt.activo, dt.sucursal_id, r.nombre_rol AS rol_nombre
+       FROM datos_trabajadores dt
+       LEFT JOIN roles_equipo r ON r.id = dt.rol_id
+       WHERE dt.id = $1`,
       [targetTecnicoId]
     );
     if (tecRes.rowCount === 0 || !tecRes.rows[0].activo) {
@@ -1250,13 +1315,39 @@ const assignTecnicoServicio = async (req, res) => {
     }
     const tecnicoInfo = tecRes.rows[0];
 
-    // Verificar que la orden exista y esté activa
-    const ordenRes = await pool.query(
-      'SELECT id, codigo_ticket FROM servicios_recepcion WHERE id = $1 AND activo = TRUE',
-      [id]
-    );
+    // Validar que el rol no sea administrativo/recepción (Secretaria, Recepcionista, Cajero, etc.)
+    const tecRole = String(tecnicoInfo.rol_nombre || '').toLowerCase();
+    const rolesNoPermitidos = ['secretaria', 'recepcionista', 'recepcion', 'cajero'];
+    if (rolesNoPermitidos.some((r) => tecRole.includes(r))) {
+      return res.status(400).json({
+        ok: false,
+        message: 'El usuario seleccionado tiene rol de secretaría/recepción y no puede ser asignado como técnico operativo.'
+      });
+    }
+
+    // Verificar que la orden exista, esté activa y pertenezca a la sucursal autorizada
+    let checkOrderQuery = 'SELECT id, codigo_ticket, sucursal_id FROM servicios_recepcion WHERE id = $1 AND activo = TRUE';
+    const checkOrderParams = [id];
+    if (!isSuperAdmin) {
+      if (!req.user?.sucursal_id) {
+        return res.status(403).json({ ok: false, message: 'Acceso denegado: El usuario no tiene una sucursal asignada.' });
+      }
+      checkOrderQuery += ' AND sucursal_id = $2';
+      checkOrderParams.push(parseInt(req.user.sucursal_id, 10));
+    }
+
+    const ordenRes = await pool.query(checkOrderQuery, checkOrderParams);
     if (ordenRes.rowCount === 0) {
-      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada.' });
+      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada o fuera de su sucursal.' });
+    }
+    const ordenInfo = ordenRes.rows[0];
+
+    // Validar que el técnico pertenezca a la misma sucursal de la orden (o sea superadmin / rol global)
+    if (tecnicoInfo.sucursal_id && ordenInfo.sucursal_id && Number(tecnicoInfo.sucursal_id) !== Number(ordenInfo.sucursal_id)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'El técnico pertenece a otra sucursal y no puede ser asignado a esta orden.'
+      });
     }
 
     // Verificar si ya está asignado
@@ -1327,6 +1418,49 @@ const removeTecnicoServicio = async (req, res) => {
       return res.status(400).json({ ok: false, message: 'Parámetros inválidos.' });
     }
 
+    const isSuperAdmin = isUserSuperAdmin(req.user);
+
+    // Regla de Negocio: Si la orden se encuentra en un estado operativo posterior a 'RECIBIDO',
+    // no se puede remover al único técnico asignado. También validar aislamiento multi-sucursal.
+    let checkOrderQuery = `SELECT sr.id, sr.estado_actual_id, sr.sucursal_id, es.codigo_estado, es.orden_flujo
+       FROM servicios_recepcion sr
+       JOIN estados_servicio es ON es.id = sr.estado_actual_id
+       WHERE sr.id = $1 AND sr.activo = TRUE`;
+    const checkOrderParams = [id];
+
+    if (!isSuperAdmin) {
+      if (!req.user?.sucursal_id) {
+        return res.status(403).json({ ok: false, message: 'Acceso denegado: El usuario no tiene una sucursal asignada.' });
+      }
+      checkOrderQuery += ' AND sr.sucursal_id = $2';
+      checkOrderParams.push(parseInt(req.user.sucursal_id, 10));
+    }
+
+    const ordenRes = await pool.query(checkOrderQuery, checkOrderParams);
+
+    if (ordenRes.rowCount === 0) {
+      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada o fuera de su sucursal.' });
+    }
+
+    const estadoOrden = ordenRes.rows[0];
+    const esEstadoPosterior = estadoOrden.codigo_estado !== 'RECIBIDO' && Number(estadoOrden.orden_flujo) > 1;
+
+    if (esEstadoPosterior) {
+      const countRes = await pool.query(
+        'SELECT COUNT(*)::int AS total FROM tecnicos_asignados WHERE servicio_id = $1',
+        [id]
+      );
+      const totalActual = countRes.rows[0]?.total || 0;
+      if (totalActual <= 1) {
+        return res.status(400).json({
+          ok: false,
+          success: false,
+          status: 'error',
+          message: 'No se puede desasignar al único técnico mientras la orden esté en proceso. Asigne otro técnico primero o regrese la orden a Recibido.'
+        });
+      }
+    }
+
     await pool.query(
       'DELETE FROM tecnicos_asignados WHERE servicio_id = $1 AND tecnico_id = $2',
       [id, tecnicoId]
@@ -1375,6 +1509,24 @@ const getIncidenciasServicio = async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!id || id < 1) {
       return res.status(400).json({ ok: false, message: 'ID de orden inválido.' });
+    }
+
+    const isSuperAdmin = isUserSuperAdmin(req.user);
+
+    // Verificar que la orden exista y pertenezca a la sucursal del usuario
+    let checkOrderQuery = 'SELECT id, sucursal_id FROM servicios_recepcion WHERE id = $1 AND activo = TRUE';
+    const checkOrderParams = [id];
+    if (!isSuperAdmin) {
+      if (!req.user?.sucursal_id) {
+        return res.status(403).json({ ok: false, message: 'Acceso denegado: El usuario no tiene una sucursal asignada.' });
+      }
+      checkOrderQuery += ' AND sucursal_id = $2';
+      checkOrderParams.push(parseInt(req.user.sucursal_id, 10));
+    }
+
+    const ordenRes = await pool.query(checkOrderQuery, checkOrderParams);
+    if (ordenRes.rowCount === 0) {
+      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada o fuera de su sucursal.' });
     }
 
     const query = `
@@ -1459,13 +1611,22 @@ const createIncidenciaServicio = async (req, res) => {
       });
     }
 
-    // Verificar que la orden exista y esté activa
-    const ordenRes = await client.query(
-      'SELECT id, codigo_ticket FROM servicios_recepcion WHERE id = $1 AND activo = TRUE',
-      [id]
-    );
+    const isSuperAdmin = isUserSuperAdmin(req.user);
+
+    // Verificar que la orden exista, esté activa y pertenezca a la sucursal autorizada
+    let checkOrderQuery = 'SELECT id, codigo_ticket, sucursal_id, estado_actual_id FROM servicios_recepcion WHERE id = $1 AND activo = TRUE';
+    const checkOrderParams = [id];
+    if (!isSuperAdmin) {
+      if (!req.user?.sucursal_id) {
+        return res.status(403).json({ ok: false, message: 'Acceso denegado: El usuario no tiene una sucursal asignada.' });
+      }
+      checkOrderQuery += ' AND sucursal_id = $2';
+      checkOrderParams.push(parseInt(req.user.sucursal_id, 10));
+    }
+
+    const ordenRes = await client.query(checkOrderQuery, checkOrderParams);
     if (ordenRes.rowCount === 0) {
-      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada.' });
+      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada o fuera de su sucursal.' });
     }
 
     const repuestoFinal = isBlank(repuesto_requerido) ? null : String(repuesto_requerido).trim();
@@ -1553,6 +1714,32 @@ const createIncidenciaServicio = async (req, res) => {
       );
     }
 
+    // Regla de Negocio: Si la incidencia tiene costo adicional y queda pendiente de aprobación,
+    // transicionar automáticamente la orden al estado 'ESPERA_REPUESTO' (si no está ya en ese estado).
+    const tieneCostoPendiente = costoFinal > 0 && !isAprobado;
+    if (tieneCostoPendiente) {
+      const estadoEsperaRes = await client.query(
+        "SELECT id, codigo_estado, nombre_estado FROM estados_servicio WHERE codigo_estado = 'ESPERA_REPUESTO' LIMIT 1"
+      );
+      if (estadoEsperaRes.rowCount > 0) {
+        const estadoEspera = estadoEsperaRes.rows[0];
+        const estadoActualOrdenId = ordenRes.rows[0]?.estado_actual_id;
+
+        if (estadoActualOrdenId !== estadoEspera.id) {
+          await client.query(
+            'UPDATE servicios_recepcion SET estado_actual_id = $1, updated_at = NOW() WHERE id = $2',
+            [estadoEspera.id, id]
+          );
+
+          const notaTransicion = `Transición automática a ${estadoEspera.nombre_estado} por solicitud de repuesto/costo adicional pendiente de aprobación (Incidencia #${nuevaIncidencia.id}: ${nuevaIncidencia.tipo_incidencia} - RD$ ${costoFinal.toFixed(2)}).`;
+          await client.query(
+            'INSERT INTO historial_estados (servicio_id, estado_id, usuario_id, nota_cambio, fecha_registro) VALUES ($1, $2, $3, $4, NOW())',
+            [id, estadoEspera.id, usuarioId, notaTransicion]
+          );
+        }
+      }
+    }
+
     await client.query('COMMIT');
 
     // Consultar el registro recién insertado con usuario y fotos
@@ -1633,6 +1820,24 @@ const updateAprobacionIncidencia = async (req, res) => {
       accion,
       metodo_aprobacion
     } = req.body;
+
+    const isSuperAdmin = isUserSuperAdmin(req.user);
+
+    // Verificar que la orden exista y pertenezca a la sucursal autorizada
+    let checkOrderQuery = 'SELECT id, sucursal_id FROM servicios_recepcion WHERE id = $1 AND activo = TRUE';
+    const checkOrderParams = [servicioId];
+    if (!isSuperAdmin) {
+      if (!req.user?.sucursal_id) {
+        return res.status(403).json({ ok: false, message: 'Acceso denegado: El usuario no tiene una sucursal asignada.' });
+      }
+      checkOrderQuery += ' AND sucursal_id = $2';
+      checkOrderParams.push(parseInt(req.user.sucursal_id, 10));
+    }
+
+    const ordenRes = await pool.query(checkOrderQuery, checkOrderParams);
+    if (ordenRes.rowCount === 0) {
+      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada o fuera de su sucursal.' });
+    }
 
     // Verificar que la incidencia exista para este servicio
     const checkRes = await pool.query(

@@ -5,6 +5,8 @@ import Button from '../common/Button';
 import Select from '../common/Select';
 import Badge from '../common/Badge';
 import InlineConfirmButton from '../common/InlineConfirmButton';
+import SimpleButton from '../common/SimpleButton';
+import { useAuth } from '../../context/AuthContext';
 import {
   X,
   Calendar,
@@ -45,7 +47,8 @@ import {
   XCircle,
   MessageSquare,
   Phone,
-  UserCheck
+  UserCheck,
+  Pencil
 } from 'lucide-react';
 import { UnlockMethodView } from '../common/PatternLock';
 import { stripEmojis } from '../../utils/stripEmojis';
@@ -202,10 +205,16 @@ export const FichaTecnicaModal = ({
   onClose,
   ordenId,
   currentUserId,
+  currentUserRole,
   allEstados = [],
   onEstadoUpdated,
-  onTecnicosUpdated
+  onTecnicosUpdated,
+  onOrderReload
 }) => {
+  const { user: authUser } = useAuth();
+  const effectiveUserId = currentUserId || authUser?.id;
+  const effectiveUserRole = currentUserRole || authUser?.rol_nombre || authUser?.rol;
+
   const [orden, setOrden] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedEstadoId, setSelectedEstadoId] = useState('');
@@ -218,6 +227,7 @@ export const FichaTecnicaModal = ({
   const [isReportingIncidencia, setIsReportingIncidencia] = useState(false);
   const [tipoIncidencia, setTipoIncidencia] = useState('Hallazgo Tecnico');
   const [descripcionIncidencia, setDescripcionIncidencia] = useState('');
+  const [errorDescripcion, setErrorDescripcion] = useState('');
   const [repuestoRequerido, setRepuestoRequerido] = useState('');
   const [costoAdicional, setCostoAdicional] = useState('');
   const [aprobadoPorCliente, setAprobadoPorCliente] = useState(false);
@@ -289,12 +299,10 @@ export const FichaTecnicaModal = ({
   const handleCreateIncidencia = async (e) => {
     e.preventDefault();
     if (!descripcionIncidencia || !descripcionIncidencia.trim()) {
-      sileo.error({
-        title: 'Descripción requerida',
-        description: 'Por favor ingresa una descripción del hallazgo o incidencia.'
-      });
+      setErrorDescripcion('La descripción del hallazgo o daño es obligatoria.');
       return;
     }
+    setErrorDescripcion('');
 
     setIsSubmittingIncidencia(true);
     try {
@@ -312,26 +320,50 @@ export const FichaTecnicaModal = ({
 
       const res = await createIncidenciaServicio(orden.id, payload);
       if (res.ok && res.data) {
+        const tieneCostoPendiente = extraCostNum > 0 && !isApproved;
         sileo.success({
           title: 'Hallazgo Registrado',
-          description: 'La incidencia técnica fue registrada exitosamente.'
+          description: tieneCostoPendiente
+            ? 'Incidencia registrada. La orden pasó automáticamente a "En Espera de Repuesto".'
+            : 'La incidencia técnica fue registrada exitosamente.'
         });
         setIncidencias((prev) => [res.data, ...prev]);
-        setOrden((prev) =>
-          prev
-            ? {
-                ...prev,
-                incidencias: [res.data, ...(prev.incidencias || []).filter((i) => i.id !== res.data.id)]
-              }
-            : prev
-        );
+
+        // Si la orden pasó a Espera de Repuesto automáticamente
+        const estadoEspera = allEstados.find((e) => e.codigo_estado === 'ESPERA_REPUESTO');
+        setOrden((prev) => {
+          if (!prev) return prev;
+          const nextInc = [res.data, ...(prev.incidencias || []).filter((i) => i.id !== res.data.id)];
+          if (tieneCostoPendiente && estadoEspera) {
+            return {
+              ...prev,
+              incidencias: nextInc,
+              estado_actual_id: estadoEspera.id,
+              estado: estadoEspera.nombre_estado,
+              codigo_estado: estadoEspera.codigo_estado,
+              estado_color: estadoEspera.color_badge,
+              orden_flujo: estadoEspera.orden_flujo
+            };
+          }
+          return { ...prev, incidencias: nextInc };
+        });
+
+        if (tieneCostoPendiente && estadoEspera) {
+          setSelectedEstadoId(String(estadoEspera.id));
+        }
+
         setDescripcionIncidencia('');
+        setErrorDescripcion('');
         setRepuestoRequerido('');
         setCostoAdicional('');
         setAprobadoPorCliente(false);
         setMetodoAprobacion('WhatsApp');
         setFotosIncidencia([]);
         setIsReportingIncidencia(false);
+
+        if (onOrderReload) {
+          onOrderReload();
+        }
       } else {
         sileo.error({
           title: 'Error al registrar',
@@ -372,6 +404,9 @@ export const FichaTecnicaModal = ({
           return { ...prev, incidencias: updatedIncidencias };
         });
         setResolvingInc(null);
+        if (onOrderReload) {
+          onOrderReload();
+        }
       } else {
         sileo.error({
           title: 'Error al registrar resolución',
@@ -398,6 +433,31 @@ export const FichaTecnicaModal = ({
       return;
     }
 
+    const targetEstado = allEstados.find((est) => String(est.id) === String(selectedEstadoId));
+    const esEstadoOperativo = targetEstado && targetEstado.codigo_estado !== 'RECIBIDO' && Number(targetEstado.orden_flujo) !== 1;
+    const tieneTecnicos = Array.isArray(orden?.tecnicos) && orden.tecnicos.length > 0;
+
+    if (esEstadoOperativo && !tieneTecnicos) {
+      sileo.warning({
+        title: 'Técnico requerido',
+        description: 'Debe asignar al menos un técnico responsable a la orden antes de avanzar de estado.'
+      });
+      return;
+    }
+
+    // Regla de Negocio: Bloqueo defensivo por costos adicionales pendientes
+    const esEstadoAvance = targetEstado && (
+      ['EN_REPARACION', 'CONTROL_CALIDAD', 'LISTO_ENTREGA', 'ENTREGADO'].includes(targetEstado.codigo_estado) ||
+      (Number(targetEstado.orden_flujo) >= 4 && Number(targetEstado.orden_flujo) <= 7)
+    );
+    if (esEstadoAvance && hasPendingCosts) {
+      sileo.warning({
+        title: 'Costo adicional pendiente',
+        description: `No se puede avanzar la orden a "${targetEstado.nombre_estado}" porque existen ${pendingCostIncidencias.length} repuesto(s)/costo(s) pendiente(s) de aprobación por el cliente (RD$ ${totalCostoPendiente.toFixed(2)}). Resuelva el presupuesto en la sección de incidencias primero.`
+      });
+      return;
+    }
+
     setIsUpdating(true);
     try {
       if (onEstadoUpdated) {
@@ -406,6 +466,10 @@ export const FichaTecnicaModal = ({
       onClose();
     } catch (err) {
       console.error('Error al actualizar estado:', err);
+      sileo.error({
+        title: 'Error al cambiar estado',
+        description: err.response?.data?.message || err.message || 'No se pudo actualizar el estado de la orden.'
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -441,6 +505,18 @@ export const FichaTecnicaModal = ({
 
   // Remover técnico colaborador
   const handleRemoveTecnico = async (tecnicoId) => {
+    const tecnicosActuales = Array.isArray(orden?.tecnicos) ? orden.tecnicos : [];
+    const ordenFlujoActual = Number(orden?.orden_flujo || 1);
+    const esEstadoPosterior = orden?.codigo_estado !== 'RECIBIDO' && ordenFlujoActual > 1;
+
+    if (esEstadoPosterior && tecnicosActuales.length <= 1) {
+      sileo.warning({
+        title: 'Acción bloqueada',
+        description: 'No se puede desasignar al único técnico mientras la orden esté en proceso. Asigne otro técnico primero o regrese la orden a Recibido.'
+      });
+      return;
+    }
+
     setIsManagingTecnicos(true);
     try {
       const res = await removeTecnicoServicio(orden.id, tecnicoId);
@@ -505,12 +581,55 @@ export const FichaTecnicaModal = ({
     (f) => !f.incidencia_id && (f.tipo_evidencia === 'RECEPCION' || !f.tipo_evidencia || f.tipo_evidencia !== 'INCIDENCIA')
   );
   const tecnicosList = Array.isArray(orden?.tecnicos) ? orden.tecnicos : [];
-  const isCurrentUserAssigned = tecnicosList.some((t) => t.id === currentUserId);
+  const isCurrentUserAssigned = tecnicosList.some((t) => t.id === effectiveUserId);
 
-  // Técnicos disponibles para agregar que no estén ya asignados
-  const availableWorkersToAdd = allWorkers.filter(
-    (w) => w.activo && !tecnicosList.some((t) => t.id === w.id)
+  // Incidencias con costo adicional pendientes de aprobación
+  const incidenciasList = Array.isArray(incidencias) && incidencias.length > 0
+    ? incidencias
+    : (Array.isArray(orden?.incidencias) ? orden.incidencias : []);
+
+  const pendingCostIncidencias = incidenciasList.filter(
+    (inc) =>
+      Number(inc.costo_adicional_repuesto) > 0 &&
+      inc.aprobado_por_cliente !== true &&
+      !inc.fecha_aprobacion
   );
+  const hasPendingCosts = pendingCostIncidencias.length > 0;
+  const totalCostoPendiente = pendingCostIncidencias.reduce(
+    (acc, c) => acc + Number(c.costo_adicional_repuesto || 0),
+    0
+  );
+
+  const selectedEstadoObj = allEstados.find((est) => String(est.id) === String(selectedEstadoId));
+  const isSelectedAvance = selectedEstadoObj && (
+    ['EN_REPARACION', 'CONTROL_CALIDAD', 'LISTO_ENTREGA', 'ENTREGADO'].includes(selectedEstadoObj.codigo_estado) ||
+    (Number(selectedEstadoObj.orden_flujo) >= 4 && Number(selectedEstadoObj.orden_flujo) <= 7)
+  );
+  const isSelectedEstadoBlocked = hasPendingCosts && isSelectedAvance;
+
+  // Roles que no pueden operar como técnicos en taller
+  const rolesNoTecnicos = ['secretaria', 'recepcionista', 'recepcion', 'cajero'];
+  const normalizedUserRole = String(effectiveUserRole || '').toLowerCase();
+  const isAdministrativeOrReception = rolesNoTecnicos.some((r) => normalizedUserRole.includes(r));
+  const canSelfAssign = !isCurrentUserAssigned && !isAdministrativeOrReception;
+
+  // Técnicos disponibles para agregar que no estén ya asignados, no sean secretaría/recepción y pertenezcan a la sucursal de la orden
+  const availableWorkersToAdd = allWorkers.filter((w) => {
+    if (!w.activo) return false;
+    if (tecnicosList.some((t) => t.id === w.id)) return false;
+
+    // Excluir roles de secretaría / recepción / administrativo
+    const wRole = String(w.rol_nombre || w.nombre_rol || w.rol || '').toLowerCase();
+    if (rolesNoTecnicos.some((r) => wRole.includes(r))) {
+      return false;
+    }
+
+    // Si la orden tiene sucursal definida, verificar que el trabajador pertenezca a la misma sucursal (o tenga sucursal nula/global)
+    if (orden?.sucursal_id && w.sucursal_id) {
+      return Number(w.sucursal_id) === Number(orden.sucursal_id);
+    }
+    return true;
+  });
 
   const workerSelectItems = availableWorkersToAdd.map((w) => ({
     id: String(w.id),
@@ -520,17 +639,25 @@ export const FichaTecnicaModal = ({
     avatarUrl: w.foto_perfil_url || undefined
   }));
 
-  const estadoSelectItems = allEstados.map((est) => ({
-    id: String(est.id),
-    value: String(est.id),
-    label: getEstadoLabel(est),
-    icon: est.color_badge ? (
-      <span
-        className="w-2.5 h-2.5 rounded-full shrink-0"
-        style={{ backgroundColor: est.color_badge }}
-      />
-    ) : null
-  }));
+  const estadoSelectItems = allEstados.map((est) => {
+    const isAvance =
+      ['EN_REPARACION', 'CONTROL_CALIDAD', 'LISTO_ENTREGA', 'ENTREGADO'].includes(est.codigo_estado) ||
+      (Number(est.orden_flujo) >= 4 && Number(est.orden_flujo) <= 7);
+    const isBlocked = hasPendingCosts && isAvance;
+
+    return {
+      id: String(est.id),
+      value: String(est.id),
+      label: getEstadoLabel(est),
+      disabled: isBlocked,
+      icon: est.color_badge ? (
+        <span
+          className="w-2.5 h-2.5 rounded-full shrink-0"
+          style={{ backgroundColor: est.color_badge }}
+        />
+      ) : null
+    };
+  });
 
   const CategoryIcon = getCategoryIcon(orden?.categoria);
   const priorityConfig = getPrioridadConfig(orden?.prioridad);
@@ -643,7 +770,12 @@ export const FichaTecnicaModal = ({
               form="form-actualizar-estado"
               variant="primary"
               size="md"
-              disabled={isUpdating || !orden || String(selectedEstadoId) === String(orden?.estado_actual_id)}
+              disabled={
+                isUpdating ||
+                !orden ||
+                String(selectedEstadoId) === String(orden?.estado_actual_id) ||
+                isSelectedEstadoBlocked
+              }
               isLoading={isUpdating}
               onClick={(e) => {
                 e.preventDefault();
@@ -757,6 +889,12 @@ export const FichaTecnicaModal = ({
                       placeholder="Seleccionar nuevo estado..."
                       placement="bottom"
                     />
+                    {isSelectedEstadoBlocked && (
+                      <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 font-inter">
+                        <AlertTriangle size={12} className="shrink-0 stroke-[2.5]" />
+                        <span>Estado no permitido mientras existan costos adicionales sin resolver.</span>
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -790,7 +928,10 @@ export const FichaTecnicaModal = ({
                     variant={isReportingIncidencia ? 'secondary' : 'primary'}
                     size="sm"
                     icon={isReportingIncidencia ? X : Plus}
-                    onClick={() => setIsReportingIncidencia((prev) => !prev)}
+                    onClick={() => {
+                      setIsReportingIncidencia((prev) => !prev);
+                      setErrorDescripcion('');
+                    }}
                     className="h-8 px-3 text-xs font-semibold"
                   >
                     {isReportingIncidencia ? 'Cancelar' : 'Reportar Hallazgo'}
@@ -801,6 +942,7 @@ export const FichaTecnicaModal = ({
                 {isReportingIncidencia && (
                   <form
                     onSubmit={handleCreateIncidencia}
+                    noValidate
                     className="p-4 rounded-xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-2xs space-y-4"
                   >
                     {/* Fila 1: Tipo de Incidencia, Repuesto Requerido y Costo Adicional en la misma línea */}
@@ -848,57 +990,66 @@ export const FichaTecnicaModal = ({
 
                     {/* Bloque condicional de Autorización del Cliente (Solo si hay Costo Adicional) */}
                     {parseFloat(costoAdicional || 0) > 0 && (
-                      <div className="p-3.5 rounded-xl bg-neutral-100/70 dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 space-y-2.5 transition-all">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="space-y-0.5">
-                            <label htmlFor="aprobado-check" className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 cursor-pointer flex items-center gap-1.5">
-                              <ShieldCheck size={14} className={aprobadoPorCliente ? "text-emerald-500" : "text-neutral-400"} />
-                              <span>¿El cliente ya autorizó este costo adicional?</span>
-                            </label>
-                            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                              {aprobadoPorCliente ? 'Se registrará como aprobado de inmediato con fecha/hora actual.' : 'Quedará marcado como pendiente de aprobación.'}
-                            </p>
-                          </div>
-
+                      <div className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200/70 dark:border-neutral-700/60 flex flex-wrap items-center justify-between gap-2.5 animate-in fade-in duration-150">
+                        <label className="inline-flex items-center gap-2.5 cursor-pointer select-none group">
                           <input
                             type="checkbox"
-                            id="aprobado-check"
                             checked={aprobadoPorCliente}
                             onChange={(e) => setAprobadoPorCliente(e.target.checked)}
-                            className="w-4 h-4 text-emerald-600 rounded border-neutral-300 focus:ring-emerald-500 cursor-pointer"
+                            className="sr-only"
                           />
-                        </div>
+                          <div
+                            className={`w-4 h-4 rounded-[5px] flex items-center justify-center transition-all duration-150 border ${
+                              aprobadoPorCliente
+                                ? 'bg-red-600 border-red-600 shadow-2xs text-white ring-2 ring-red-500/20'
+                                : 'bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700 group-hover:border-red-400 dark:group-hover:border-red-500/60'
+                            }`}
+                          >
+                            {aprobadoPorCliente && (
+                              <Check size={11} strokeWidth={3} className="text-white animate-in zoom-in-75 duration-150" />
+                            )}
+                          </div>
+                          <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300 font-inter flex items-center gap-1.5">
+                            <ShieldCheck
+                              size={13}
+                              className={aprobadoPorCliente ? 'text-red-500 shrink-0' : 'text-neutral-400 shrink-0'}
+                            />
+                            <span>¿Autorizado previamente por el cliente?</span>
+                          </span>
+                        </label>
 
                         {aprobadoPorCliente && (
-                          <div className="pt-2 border-t border-neutral-200/80 dark:border-neutral-800/80 flex flex-wrap items-center gap-2">
-                            <span className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
-                              Método de autorización:
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              {[
-                                { id: 'WhatsApp', label: 'WhatsApp', icon: MessageSquare },
-                                { id: 'Llamada', label: 'Llamada', icon: Phone },
-                                { id: 'Presencial', label: 'Presencial', icon: UserCheck }
-                              ].map((m) => {
-                                const isSelected = metodoAprobacion === m.id;
-                                const MIcon = m.icon;
-                                return (
-                                  <button
-                                    type="button"
-                                    key={m.id}
-                                    onClick={() => setMetodoAprobacion(m.id)}
-                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                                      isSelected
-                                        ? 'bg-emerald-600 text-white shadow-2xs font-semibold'
-                                        : 'bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 hover:border-neutral-300'
-                                    }`}
-                                  >
-                                    <MIcon size={12} />
-                                    <span>{m.label}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
+                          <div className="inline-flex items-center p-0.5 rounded-md bg-neutral-200/60 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-700/60 animate-in fade-in duration-150">
+                            {[
+                              { id: 'Llamada', label: 'Llamada', icon: Phone },
+                              { id: 'WhatsApp', label: 'WhatsApp', icon: MessageSquare },
+                              { id: 'Presencial', label: 'Presencial', icon: UserCheck }
+                            ].map((m) => {
+                              const isSel = metodoAprobacion === m.id;
+                              const MIcon = m.icon;
+                              return (
+                                <button
+                                  type="button"
+                                  key={m.id}
+                                  onClick={() => setMetodoAprobacion(m.id)}
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] text-xs transition-all cursor-pointer ${
+                                    isSel
+                                      ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-medium shadow-2xs'
+                                      : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
+                                  }`}
+                                >
+                                  <MIcon
+                                    size={12}
+                                    className={
+                                      isSel
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : 'text-neutral-400 dark:text-neutral-500'
+                                    }
+                                  />
+                                  <span>{m.label}</span>
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -912,11 +1063,23 @@ export const FichaTecnicaModal = ({
                       <textarea
                         rows={2}
                         value={descripcionIncidencia}
-                        onChange={(e) => setDescripcionIncidencia(stripEmojis(e.target.value, false))}
+                        onChange={(e) => {
+                          setDescripcionIncidencia(stripEmojis(e.target.value, false));
+                          if (errorDescripcion) setErrorDescripcion('');
+                        }}
                         placeholder="Describe detalladamente el daño no previsto, anomalía detectada o hallazgo técnico..."
-                        required
-                        className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:border-red-500 focus:ring-red-500/20 transition-colors resize-none leading-relaxed"
+                        className={`w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 transition-colors resize-none leading-relaxed font-inter ${
+                          errorDescripcion
+                            ? 'border-red-500 dark:border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                            : 'border-neutral-200 dark:border-neutral-800 focus:border-red-500 focus:ring-red-500/20'
+                        }`}
                       />
+                      {errorDescripcion && (
+                        <p className="text-[11px] text-red-500 mt-1.5 font-inter flex items-center gap-1 animate-in fade-in duration-150">
+                          <AlertCircle size={12} className="shrink-0" />
+                          <span>{errorDescripcion}</span>
+                        </p>
+                      )}
                     </div>
 
                     {/* Cargador de Evidencias Fotográficas */}
@@ -1085,17 +1248,16 @@ export const FichaTecnicaModal = ({
                                           )}
                                         </span>
                                         {resolvingInc?.id !== inc.id && (
-                                          <button
-                                            type="button"
+                                          <SimpleButton
+                                            icon={Pencil}
                                             onClick={() => {
                                               setResolvingInc({ id: inc.id, action: 'RECHAZAR' });
                                               setQuickMetodo('Llamada');
                                             }}
-                                            className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 hover:underline transition-colors cursor-pointer"
-                                            title="Cambiar a rechazado"
+                                            title="Cambiar estado de aprobación"
                                           >
                                             Cambiar
-                                          </button>
+                                          </SimpleButton>
                                         )}
                                       </div>
                                     ) : incIsRechazado ? (
@@ -1116,17 +1278,16 @@ export const FichaTecnicaModal = ({
                                           )}
                                         </span>
                                         {resolvingInc?.id !== inc.id && (
-                                          <button
-                                            type="button"
+                                          <SimpleButton
+                                            icon={Pencil}
                                             onClick={() => {
                                               setResolvingInc({ id: inc.id, action: 'APROBAR' });
                                               setQuickMetodo('WhatsApp');
                                             }}
-                                            className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 hover:underline transition-colors cursor-pointer"
-                                            title="Reconsiderar y marcar como aprobado"
+                                            title="Cambiar estado de aprobación"
                                           >
-                                            Reconsiderar
-                                          </button>
+                                            Cambiar
+                                          </SimpleButton>
                                         )}
                                       </div>
                                     ) : (
@@ -1137,34 +1298,30 @@ export const FichaTecnicaModal = ({
                                         </span>
 
                                         {resolvingInc?.id !== inc.id && (
-                                          <div className="inline-flex items-center gap-2">
-                                            <button
-                                              type="button"
+                                          <div className="inline-flex items-center gap-1.5">
+                                            <SimpleButton
+                                              variant="success"
+                                              icon={Check}
                                               onClick={() => {
                                                 setResolvingInc({ id: inc.id, action: 'APROBAR' });
                                                 setQuickMetodo('WhatsApp');
                                               }}
-                                              className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline transition-colors cursor-pointer"
                                               title="Registrar autorización del cliente"
                                             >
-                                              <Check size={13} className="shrink-0" />
-                                              <span>Aprobar</span>
-                                            </button>
+                                              Aprobar
+                                            </SimpleButton>
 
-                                            <span className="text-neutral-300 dark:text-neutral-700 select-none text-xs">|</span>
-
-                                            <button
-                                              type="button"
+                                            <SimpleButton
+                                              variant="danger"
+                                              icon={X}
                                               onClick={() => {
                                                 setResolvingInc({ id: inc.id, action: 'RECHAZAR' });
                                                 setQuickMetodo('Llamada');
                                               }}
-                                              className="inline-flex items-center gap-1 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 hover:underline transition-colors cursor-pointer"
                                               title="Registrar rechazo / desestimación del cliente"
                                             >
-                                              <XCircle size={13} className="shrink-0" />
-                                              <span>Rechazar</span>
-                                            </button>
+                                              Rechazar
+                                            </SimpleButton>
                                           </div>
                                         )}
                                       </div>
@@ -1348,7 +1505,7 @@ export const FichaTecnicaModal = ({
                 )}
 
                 {/* Selector para agregar colaborador adicional y botón de autoasignación */}
-                {(availableWorkersToAdd.length > 0 || !isCurrentUserAssigned) && (
+                {(availableWorkersToAdd.length > 0 || canSelfAssign) && (
                   <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-200/60 dark:border-neutral-800/60">
                     {availableWorkersToAdd.length > 0 && (
                       <div className="flex-1 min-w-[200px]">
@@ -1377,7 +1534,7 @@ export const FichaTecnicaModal = ({
                       </Button>
                     )}
 
-                    {!isCurrentUserAssigned && (
+                    {canSelfAssign && (
                       <InlineConfirmButton
                         variant="primary"
                         text="Unirme"
@@ -1385,7 +1542,7 @@ export const FichaTecnicaModal = ({
                         icon={UserPlus}
                         disabled={isManagingTecnicos}
                         isLoading={isManagingTecnicos}
-                        onConfirm={() => handleAddTecnico(currentUserId)}
+                        onConfirm={() => handleAddTecnico(effectiveUserId)}
                       />
                     )}
                   </div>
