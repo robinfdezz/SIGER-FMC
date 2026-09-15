@@ -133,11 +133,18 @@ CREATE TABLE IF NOT EXISTS servicios_recepcion (
     condiciones_garantia TEXT NULL,
     fecha_entrega_estimada DATE NULL,
     fecha_entrega_real TIMESTAMPTZ NULL,
+    usuario_entrega_id INT DEFAULT NULL,
+    metodo_pago_entrega VARCHAR(50) DEFAULT NULL,
+    monto_liquidado NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    monto_recibido_entrega NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    cambio_devuelto_entrega NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    observaciones_entrega TEXT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT chk_identificacion_cliente CHECK ((cliente_id IS NOT NULL) OR (nombre_cliente IS NOT NULL)),
     CONSTRAINT chk_prioridad CHECK (prioridad IN ('baja', 'media', 'alta', 'urgente')),
+    CONSTRAINT chk_metodo_pago_entrega CHECK (metodo_pago_entrega IS NULL OR metodo_pago_entrega IN ('Efectivo', 'Tarjeta', 'Transferencia')),
     CONSTRAINT chk_servicio_no_autoreferencia CHECK (id != servicio_origen_id),
     CONSTRAINT fk_servicio_sucursal FOREIGN KEY (sucursal_id) 
         REFERENCES datos_sucursales(id) ON DELETE RESTRICT,
@@ -148,6 +155,8 @@ CREATE TABLE IF NOT EXISTS servicios_recepcion (
     CONSTRAINT fk_servicio_garantia_origen FOREIGN KEY (servicio_origen_id) 
         REFERENCES servicios_recepcion(id) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT fk_servicio_recepcionista FOREIGN KEY (usuario_recepcion_id) 
+        REFERENCES datos_trabajadores(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_servicio_usuario_entrega FOREIGN KEY (usuario_entrega_id) 
         REFERENCES datos_trabajadores(id) ON DELETE RESTRICT,
     CONSTRAINT fk_servicio_estado FOREIGN KEY (estado_actual_id) 
         REFERENCES estados_servicio(id) ON DELETE RESTRICT
@@ -232,6 +241,7 @@ CREATE INDEX IF NOT EXISTS idx_servicios_cliente ON servicios_recepcion(cliente_
 CREATE INDEX IF NOT EXISTS idx_servicios_garantia_origen ON servicios_recepcion(servicio_origen_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_estado ON servicios_recepcion(estado_actual_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_prioridad ON servicios_recepcion(prioridad);
+CREATE INDEX IF NOT EXISTS idx_servicios_usuario_entrega ON servicios_recepcion(usuario_entrega_id);
 CREATE INDEX IF NOT EXISTS idx_tecnicos_servicio ON tecnicos_asignados(servicio_id);
 CREATE INDEX IF NOT EXISTS idx_historial_servicio ON historial_estados(servicio_id);
 CREATE INDEX IF NOT EXISTS idx_incidencias_servicio ON incidencias_servicio(servicio_id);

@@ -3,6 +3,7 @@ import DashboardLayout from '../components/DashboardLayout';
 import AnimatedTabs from '../components/common/AnimatedTabs';
 import TallerCard from '../components/taller/TallerCard';
 import FichaTecnicaModal from '../components/taller/FichaTecnicaModal';
+import EntregaServicioModal from '../components/servicios/EntregaServicioModal';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
 import AnimatedIconButton from '../components/common/AnimatedIconButton';
 import Badge from '../components/common/Badge';
@@ -43,7 +44,8 @@ import {
   Laptop,
   Tablet,
   Gamepad2,
-  Watch
+  Watch,
+  PackageCheck
 } from 'lucide-react';
 
 const formatTimeAgo = (dateString) => {
@@ -146,6 +148,8 @@ const getPrioridadConfig = (prioridad) => {
 
 export const BancoTrabajoPage = () => {
   const { user: currentUser } = useAuth();
+  const userRole = String(currentUser?.rol_nombre || currentUser?.rol || '').trim().toLowerCase();
+  const isTecnico = userRole === 'tecnico' || userRole.includes('tecnic') || Number(currentUser?.rol_id) === 4;
 
   const [ordenes, setOrdenes] = useState([]);
   const [estados, setEstados] = useState([]);
@@ -197,6 +201,9 @@ export const BancoTrabajoPage = () => {
   // Modal de Ficha Técnica
   const [selectedOrdenId, setSelectedOrdenId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Modal de Entrega y Liquidación
+  const [ordenParaEntregar, setOrdenParaEntregar] = useState(null);
 
   // Carga inicial
   const fetchData = useCallback(async () => {
@@ -642,6 +649,7 @@ export const BancoTrabajoPage = () => {
                             onSelect={openFicha}
                             onQuickAdvance={handleQuickAdvance}
                             onSelfAssign={handleSelfAssign}
+                            onEntregar={(o) => setOrdenParaEntregar(o)}
                             currentUserId={currentUser?.id}
                             currentUserRole={currentUser?.rol_nombre || currentUser?.rol}
                             allEstados={estados}
@@ -882,7 +890,20 @@ export const BancoTrabajoPage = () => {
 
                           {/* Acción */}
                           <td className="py-3 px-3 text-center align-middle">
-                            <div className="flex items-center justify-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {(Number(ord.orden_flujo) === 6 || ord.codigo_estado === 'LISTO_ENTREGA') && !isTecnico && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOrdenParaEntregar(ord);
+                                  }}
+                                  className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                                  title="Entregar equipo al cliente"
+                                >
+                                  <PackageCheck size={16} />
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -924,6 +945,18 @@ export const BancoTrabajoPage = () => {
           onEstadoUpdated={handleModalEstadoUpdated}
           onTecnicosUpdated={handleTecnicosUpdated}
           onOrderReload={fetchData}
+        />
+
+        {/* Modal de Liquidación y Entrega */}
+        <EntregaServicioModal
+          isOpen={Boolean(ordenParaEntregar)}
+          onClose={() => setOrdenParaEntregar(null)}
+          orden={ordenParaEntregar}
+          onSuccess={(ordenEntregada) => {
+            // Se remueve de la bandeja activa del taller de inmediato
+            setOrdenes((prev) => prev.filter((o) => o.id !== ordenEntregada.id));
+            fetchData();
+          }}
         />
       </div>
     </DashboardLayout>

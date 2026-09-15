@@ -520,6 +520,13 @@ const getServicios = async (req, res) => {
       '  COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,\n' +
       '  COALESCE(sr.telefono_cliente, c.telefono) AS cliente_telefono,\n' +
       '  sr.fecha_entrega_estimada,\n' +
+      '  sr.fecha_entrega_real,\n' +
+      '  sr.usuario_entrega_id,\n' +
+      '  sr.metodo_pago_entrega,\n' +
+      '  sr.monto_liquidado,\n' +
+      '  sr.monto_recibido_entrega,\n' +
+      '  sr.cambio_devuelto_entrega,\n' +
+      '  sr.observaciones_entrega,\n' +
       '  sr.tiempo_garantia,\n' +
       '  sr.condiciones_garantia,\n' +
       '  sr.created_at,\n' +
@@ -529,6 +536,7 @@ const getServicios = async (req, res) => {
       '  cd.nombre_categoria AS categoria,\n' +
       '  ds.nombre_sucursal AS sucursal,\n' +
       '  TRIM(CONCAT(dt.nombre, \' \', dt.apellido)) AS recepcionista,\n' +
+      '  TRIM(CONCAT(dt_ent.nombre, \' \', dt_ent.apellido)) AS despachado_por,\n' +
       '  COALESCE((SELECT TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id ORDER BY ta.id ASC LIMIT 1), \'Sin asignar\') AS tecnico_nombre,\n' +
       '  COALESCE((SELECT json_agg(json_build_object(\'id\', dt_tec.id, \'nombre_completo\', TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)))) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), \'[]\'::json) AS tecnicos\n' +
       'FROM servicios_recepcion sr\n' +
@@ -536,6 +544,7 @@ const getServicios = async (req, res) => {
       'LEFT JOIN categorias_dispositivos cd ON cd.id = sr.categoria_id\n' +
       'LEFT JOIN datos_sucursales ds ON ds.id = sr.sucursal_id\n' +
       'LEFT JOIN datos_trabajadores dt ON dt.id = sr.usuario_recepcion_id\n' +
+      'LEFT JOIN datos_trabajadores dt_ent ON dt_ent.id = sr.usuario_entrega_id\n' +
       'LEFT JOIN clientes c ON c.id = sr.cliente_id\n' +
       where + '\n' +
       'ORDER BY sr.created_at DESC\n' +
@@ -597,6 +606,7 @@ const getServicioById = async (req, res) => {
       '  cd.nombre_categoria AS categoria,\n' +
       '  ds.nombre_sucursal AS sucursal,\n' +
       '  TRIM(CONCAT(dt.nombre, \' \', dt.apellido)) AS recepcionista,\n' +
+      '  TRIM(CONCAT(dt_ent.nombre, \' \', dt_ent.apellido)) AS despachado_por,\n' +
       '  TRIM(CONCAT(c.nombre, \' \', c.apellido)) AS nombre_cliente_reg,\n' +
       '  c.telefono AS telefono_cliente_reg,\n' +
       '  COALESCE((SELECT TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id ORDER BY ta.id ASC LIMIT 1), \'Sin asignar\') AS tecnico_nombre,\n' +
@@ -664,6 +674,7 @@ const getServicioById = async (req, res) => {
       'LEFT JOIN categorias_dispositivos cd ON cd.id = sr.categoria_id\n' +
       'LEFT JOIN datos_sucursales ds ON ds.id = sr.sucursal_id\n' +
       'LEFT JOIN datos_trabajadores dt ON dt.id = sr.usuario_recepcion_id\n' +
+      'LEFT JOIN datos_trabajadores dt_ent ON dt_ent.id = sr.usuario_entrega_id\n' +
       'LEFT JOIN clientes c ON c.id = sr.cliente_id\n' +
       'WHERE sr.id = $1 AND sr.activo = TRUE' + branchCondition,
       queryParams
@@ -966,7 +977,12 @@ const getServiciosTaller = async (req, res) => {
         sr.datos_acceso_equipo,
         sr.checklist_entrada,
         sr.costo_previsto,
+        sr.costo_final_confirmado,
         sr.monto_anticipo,
+        sr.monto_descuento,
+        sr.tiempo_garantia,
+        sr.condiciones_garantia,
+        sr.fecha_entrega_real,
         sr.fecha_entrega_estimada,
         sr.created_at,
         sr.updated_at,
@@ -1949,6 +1965,260 @@ const updateAprobacionIncidencia = async (req, res) => {
   }
 };
 
+// ============================================================
+// POST /api/servicios/:id/entregar — Liquidación y Entrega de Equipos
+// ============================================================
+const liquidarYEntregarServicio = async (req, res) => {
+  const pool = getPool();
+  const client = await pool.connect();
+
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id < 1) {
+      return res.status(400).json({ ok: false, message: 'ID de orden inválido.' });
+    }
+
+    const usuarioId = req.user?.id;
+    if (!usuarioId) {
+      client.release();
+      return res.status(401).json({ ok: false, message: 'Usuario no autenticado.' });
+    }
+
+    // Validación canónica de roles: El rol Técnico está estrictamente prohibido
+    const userRole = String(req.user?.rol_nombre || req.user?.rol || '').trim().toLowerCase();
+    const userRolId = Number(req.user?.rol_id);
+    if (userRole === 'tecnico' || userRole.includes('tecnic') || userRolId === 4) {
+      client.release();
+      return res.status(403).json({
+        ok: false,
+        message: 'El perfil de Técnico no tiene autorización para realizar la entrega ni cobro de órdenes.'
+      });
+    }
+
+    const isSuperAdmin = isUserSuperAdmin(req.user);
+
+    await client.query('BEGIN');
+
+    // 1. Obtener la orden bloqueándola para actualización
+    const orderRes = await client.query(
+      `SELECT sr.id, sr.codigo_ticket, sr.sucursal_id, sr.estado_actual_id,
+              sr.costo_previsto, sr.costo_final_confirmado, sr.monto_anticipo, sr.monto_descuento,
+              sr.tiempo_garantia, sr.condiciones_garantia, sr.marca_equipo, sr.modelo_equipo,
+              COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS cliente,
+              sr.telefono_cliente,
+              es.codigo_estado, es.nombre_estado, es.orden_flujo
+       FROM servicios_recepcion sr
+       JOIN estados_servicio es ON es.id = sr.estado_actual_id
+       LEFT JOIN clientes c ON c.id = sr.cliente_id
+       WHERE sr.id = $1 AND sr.activo = TRUE
+       FOR UPDATE OF sr`,
+      [id]
+    );
+
+    if (orderRes.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada.' });
+    }
+
+    const order = orderRes.rows[0];
+
+    // Validación estricta multi-sucursal
+    if (!isSuperAdmin && req.user?.sucursal_id && Number(order.sucursal_id) !== Number(req.user.sucursal_id)) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        ok: false,
+        message: 'Acceso denegado: no tiene permisos para liquidar o entregar órdenes de otra sucursal.'
+      });
+    }
+
+    // Validar si ya está entregada
+    if (order.codigo_estado === 'ENTREGADO' || Number(order.orden_flujo) === 7) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        ok: false,
+        message: 'Esta orden ya fue entregada anteriormente.'
+      });
+    }
+
+    // 2. Consultar incidencias activas con costo y calcular repuestos aprobados vs pendientes
+    const incidenciasRes = await client.query(
+      `SELECT id, tipo_incidencia, descripcion, repuesto_requerido,
+              costo_adicional_repuesto, aprobado_por_cliente, fecha_aprobacion, metodo_aprobacion
+       FROM incidencias_servicio
+       WHERE servicio_id = $1 AND activo = TRUE AND costo_adicional_repuesto > 0`,
+      [id]
+    );
+
+    const incidenciasConCosto = incidenciasRes.rows;
+
+    // Si tiene alguna incidencia con costo pendiente de aprobación/resolución, bloquear entrega
+    const incidenciasPendientes = incidenciasConCosto.filter(
+      (inc) => inc.aprobado_por_cliente !== true && !inc.fecha_aprobacion
+    );
+
+    if (incidenciasPendientes.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        ok: false,
+        message: `No se puede liquidar ni entregar la orden porque tiene ${incidenciasPendientes.length} costo(s)/repuesto(s) adicional(es) pendiente(s) de aprobación por parte del cliente. Debe aprobar o rechazar el presupuesto primero.`
+      });
+    }
+
+    // Sumar solo los costos de repuestos expresamente aprobados
+    const repuestosAprobados = incidenciasConCosto.filter(
+      (inc) => inc.aprobado_por_cliente === true
+    );
+    const sumaRepuestosAprobados = repuestosAprobados.reduce(
+      (acc, inc) => acc + parseFloat(inc.costo_adicional_repuesto || 0),
+      0
+    );
+
+    // 3. Cálculo financiero estricto
+    const costoBasePactado = parseFloat(order.costo_final_confirmado) > 0
+      ? parseFloat(order.costo_final_confirmado)
+      : (parseFloat(order.costo_previsto) || 0);
+
+    const montoDescuento = parseFloat(order.monto_descuento) || 0;
+    const montoAnticipo = parseFloat(order.monto_anticipo) || 0;
+
+    // Total = (costoBase || costo_previsto) + suma_repuestos_aprobados - monto_descuento
+    const totalDefinitivo = Math.max(0, (costoBasePactado + sumaRepuestosAprobados) - montoDescuento);
+    // Balance = Total - monto_anticipo
+    const balancePendiente = Math.max(0, totalDefinitivo - montoAnticipo);
+
+    // 4. Validar cobro si hay balance pendiente
+    const montoRecibidoParam = req.body.monto_recibido !== undefined && req.body.monto_recibido !== null
+      ? parseFloat(req.body.monto_recibido)
+      : null;
+    const metodoPago = req.body.metodo_pago ? String(req.body.metodo_pago).trim() : 'Efectivo';
+    const notasEntrega = req.body.notas_entrega ? String(req.body.notas_entrega).trim() : '';
+
+    let cambioDevuelto = 0;
+    if (balancePendiente > 0) {
+      if (montoRecibidoParam === null || isNaN(montoRecibidoParam)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          ok: false,
+          message: `La orden tiene un saldo pendiente de liquidación de RD$ ${balancePendiente.toFixed(2)}. Debe ingresar el monto recibido del cliente.`
+        });
+      }
+
+      if (montoRecibidoParam < balancePendiente) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          ok: false,
+          message: `El monto recibido (RD$ ${montoRecibidoParam.toFixed(2)}) es menor que el balance adeudado (RD$ ${balancePendiente.toFixed(2)}).`
+        });
+      }
+
+      cambioDevuelto = Math.max(0, montoRecibidoParam - balancePendiente);
+    }
+
+    // 5. Obtener ID del estado 'ENTREGADO' (orden_flujo 7)
+    const estadoEntregadoRes = await client.query(
+      "SELECT id, codigo_estado, nombre_estado, color_badge, orden_flujo FROM estados_servicio WHERE codigo_estado = 'ENTREGADO' OR orden_flujo = 7 LIMIT 1"
+    );
+
+    if (estadoEntregadoRes.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(500).json({
+        ok: false,
+        message: 'No se encontró el estado "ENTREGADO" en el catálogo del sistema.'
+      });
+    }
+
+    const estadoEntregado = estadoEntregadoRes.rows[0];
+
+    // 6. Actualizar servicios_recepcion con las columnas dedicadas de entrega
+    const finalMetodoPago = balancePendiente > 0 ? metodoPago : null;
+    const finalMontoLiquidado = balancePendiente;
+    const finalMontoRecibido = balancePendiente > 0 ? (montoRecibidoParam || 0) : 0;
+    const finalCambioDevuelto = balancePendiente > 0 ? cambioDevuelto : 0;
+    const finalObservacionesEntrega = notasEntrega || null;
+
+    await client.query(
+      `UPDATE servicios_recepcion
+       SET estado_actual_id = $1,
+           fecha_entrega_real = NOW(),
+           costo_final_confirmado = $2,
+           usuario_entrega_id = $3,
+           metodo_pago_entrega = $4,
+           monto_liquidado = $5,
+           monto_recibido_entrega = $6,
+           cambio_devuelto_entrega = $7,
+           observaciones_entrega = $8,
+           updated_at = NOW()
+       WHERE id = $9`,
+      [
+        estadoEntregado.id,
+        totalDefinitivo,
+        usuarioId,
+        finalMetodoPago,
+        finalMontoLiquidado,
+        finalMontoRecibido,
+        finalCambioDevuelto,
+        finalObservacionesEntrega,
+        id
+      ]
+    );
+
+    // 7. Registrar en historial_estados la transición oficial a ENTREGADO
+    await client.query(
+      `INSERT INTO historial_estados (servicio_id, estado_id, usuario_id, nota_cambio, fecha_registro)
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [id, estadoEntregado.id, usuarioId, 'Equipo entregado y liquidado al cliente.']
+    );
+
+    await client.query('COMMIT');
+
+    return res.status(200).json({
+      ok: true,
+      success: true,
+      message: 'Equipo entregado y liquidado exitosamente.',
+      data: {
+        id,
+        codigo_ticket: order.codigo_ticket,
+        estado_actual_id: estadoEntregado.id,
+        estado: estadoEntregado.nombre_estado,
+        codigo_estado: estadoEntregado.codigo_estado,
+        estado_color: estadoEntregado.color_badge,
+        orden_flujo: estadoEntregado.orden_flujo,
+        costo_final_confirmado: totalDefinitivo,
+        fecha_entrega_real: new Date().toISOString(),
+        usuario_entrega_id: usuarioId,
+        metodo_pago_entrega: finalMetodoPago,
+        monto_liquidado: finalMontoLiquidado,
+        monto_recibido_entrega: finalMontoRecibido,
+        cambio_devuelto_entrega: finalCambioDevuelto,
+        observaciones_entrega: finalObservacionesEntrega,
+        desglose_liquidacion: {
+          costo_base: costoBasePactado,
+          suma_repuestos_aprobados: sumaRepuestosAprobados,
+          repuestos_aprobados: repuestosAprobados,
+          monto_descuento: montoDescuento,
+          total: totalDefinitivo,
+          monto_anticipo: montoAnticipo,
+          balance_liquidado: balancePendiente,
+          monto_recibido: finalMontoRecibido,
+          cambio_devuelto: finalCambioDevuelto,
+          metodo_pago: finalMetodoPago || 'Previo / Anticipo'
+        }
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error en liquidarYEntregarServicio:', error);
+    return res.status(500).json({
+      ok: false,
+      success: false,
+      message: 'Error al procesar la liquidación y entrega de la orden de servicio.'
+    });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   createServicio,
   getServicios,
@@ -1962,5 +2232,6 @@ module.exports = {
   uploadFotosServicio,
   getIncidenciasServicio,
   createIncidenciaServicio,
-  updateAprobacionIncidencia
+  updateAprobacionIncidencia,
+  liquidarYEntregarServicio
 };

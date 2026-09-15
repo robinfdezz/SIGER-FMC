@@ -179,6 +179,12 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | `condiciones_garantia`| TEXT | SÍ | Términos y exclusiones de garantía |
 | `fecha_entrega_estimada`| DATE | SÍ | Fecha estimada de entrega |
 | `fecha_entrega_real`| TIMESTAMPTZ | SÍ | Fecha y hora en que se entregó el equipo |
+| `usuario_entrega_id`| INT | SÍ | FK -> `datos_trabajadores(id)` ON DELETE RESTRICT (Usuario que despacha/entrega) |
+| `metodo_pago_entrega`| VARCHAR(50) | SÍ | Método de pago para liquidar la orden ('Efectivo', 'Tarjeta', 'Transferencia') |
+| `monto_liquidado` | NUMERIC(10,2)| NO | Saldo neto cobrado al retirar (Default: 0.00) |
+| `monto_recibido_entrega`| NUMERIC(10,2)| NO | Monto monetario entregado por el cliente al retirar (Default: 0.00) |
+| `cambio_devuelto_entrega`| NUMERIC(10,2)| NO | Devuelta o cambio entregado al cliente (Default: 0.00) |
+| `observaciones_entrega`| TEXT | SÍ | Notas finales y pruebas de conformidad al momento del despacho |
 | `created_at` | TIMESTAMPTZ | SÍ | Timestamp de creación |
 | `updated_at` | TIMESTAMPTZ | SÍ | Timestamp de actualización |
 | `activo` | BOOLEAN | NO | Estado lógico (Default: TRUE) |
@@ -186,8 +192,10 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 > **Restricciones Check y Llaves Foráneas (`servicios_recepcion`):**
 > - `chk_identificacion_cliente`: `(cliente_id IS NOT NULL) OR (nombre_cliente IS NOT NULL)`
 > - `chk_prioridad`: `prioridad IN ('baja', 'media', 'alta', 'urgente')`
+> - `chk_metodo_pago_entrega`: `metodo_pago_entrega IS NULL OR metodo_pago_entrega IN ('Efectivo', 'Tarjeta', 'Transferencia')`
 > - `chk_servicio_no_autoreferencia`: `CHECK (id != servicio_origen_id)`
 > - `fk_servicio_garantia_origen`: `FOREIGN KEY (servicio_origen_id) REFERENCES servicios_recepcion(id) ON UPDATE CASCADE ON DELETE RESTRICT`
+> - `fk_servicio_usuario_entrega`: `FOREIGN KEY (usuario_entrega_id) REFERENCES datos_trabajadores(id) ON DELETE RESTRICT`
 
 #### Esquema JSONB: `datos_acceso_equipo` (Credenciales y Seguridad del Equipo)
 Estructura persistida para resguardar el método de desbloqueo configurado en `DeviceSecurityPicker.jsx` y renderizado en comprobantes / stickers:

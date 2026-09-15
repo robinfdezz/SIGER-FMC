@@ -139,3 +139,13 @@ export const updateAprobacionIncidencia = async (id, incidenciaId, data) => {
   const response = await api.patch(`/servicios/${id}/incidencias/${incidenciaId}/aprobacion`, data);
   return response.data;
 };
+
+/**
+ * Liquidar y entregar equipo al cliente
+ * @param {number|string} id - ID del servicio
+ * @param {Object} data - { monto_recibido, metodo_pago, notas_entrega }
+ */
+export const liquidarYEntregarServicio = async (id, data = {}) => {
+  const response = await api.post(`/servicios/${id}/entregar`, data);
+  return response.data;
+};

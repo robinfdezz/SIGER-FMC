@@ -17,7 +17,8 @@ const {
   uploadFotosServicio,
   getIncidenciasServicio,
   createIncidenciaServicio,
-  updateAprobacionIncidencia
+  updateAprobacionIncidencia,
+  liquidarYEntregarServicio
 } = require('../controllers/servicios.controller');
 
 // ── Ruta pública para consulta / tracking de ticket vía QR ──
@@ -55,6 +56,9 @@ router.post('/:id/tecnicos', assignTecnicoServicio);
 
 // DELETE /api/servicios/:id/tecnicos/:tecnicoId - Remover técnico colaborador
 router.delete('/:id/tecnicos/:tecnicoId', removeTecnicoServicio);
+
+// POST /api/servicios/:id/entregar - Liquidación y entrega de equipo al cliente
+router.post('/:id/entregar', liquidarYEntregarServicio);
 
 // POST /api/servicios
 router.post('/', createServicio);

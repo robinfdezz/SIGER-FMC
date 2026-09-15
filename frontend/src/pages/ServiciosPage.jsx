@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import PostCreacionModal from '../components/servicios/PostCreacionModal';
+import EntregaServicioModal from '../components/servicios/EntregaServicioModal';
 import Select from '../components/common/Select';
 import Badge from '../components/common/Badge';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
@@ -40,7 +41,8 @@ import {
   Wrench,
   ClipboardCheck,
   CheckCircle2,
-  Inbox
+  Inbox,
+  PackageCheck
 } from 'lucide-react';
 
 const extractArray = (res) => {
@@ -153,7 +155,7 @@ export const ServiciosPage = () => {
   const { user: currentUser } = useAuth();
   const userRole = String(currentUser?.rol_nombre || currentUser?.rol || '').toLowerCase();
   const isSuperAdmin = userRole === 'superadmin';
-  const isTecnico = userRole === 'tecnico';
+  const isTecnico = userRole === 'tecnico' || userRole.includes('tecnic') || Number(currentUser?.rol_id) === 4;
 
   // Datos de empresa y sucursal para reimpresión
   const [companyData, setCompanyData] = useState(null);
@@ -191,6 +193,9 @@ export const ServiciosPage = () => {
   // Modal de reimpresión
   const [ordenAImprimir, setOrdenAImprimir] = useState(null);
   const [showPostCreacion, setShowPostCreacion] = useState(false);
+
+  // Modal de liquidación y entrega
+  const [ordenParaEntregar, setOrdenParaEntregar] = useState(null);
 
   // Debounce de búsqueda (300ms)
   useEffect(() => {
@@ -786,7 +791,17 @@ export const ServiciosPage = () => {
 
                       {/* Columna 7: Acciones */}
                       <td className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-center align-middle">
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {(Number(orden.orden_flujo) === 6 || orden.codigo_estado === 'LISTO_ENTREGA') && !isTecnico && (
+                            <button
+                              type="button"
+                              onClick={() => setOrdenParaEntregar(orden)}
+                              className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
+                              title="Liquidar y entregar equipo"
+                            >
+                              <PackageCheck size={16} />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleImprimirClick(orden)}
@@ -848,6 +863,31 @@ export const ServiciosPage = () => {
         orden={ordenAImprimir}
         companyData={companyData}
         branchData={branchData}
+      />
+
+      {/* Modal de Liquidación y Entrega */}
+      <EntregaServicioModal
+        isOpen={Boolean(ordenParaEntregar)}
+        onClose={() => setOrdenParaEntregar(null)}
+        orden={ordenParaEntregar}
+        onSuccess={(ordenEntregada) => {
+          setOrdenes((prev) =>
+            prev.map((o) =>
+              o.id === ordenEntregada.id
+                ? {
+                    ...o,
+                    ...ordenEntregada,
+                    estado: 'Entregado al Cliente',
+                    orden_flujo: 7,
+                    codigo_estado: 'ENTREGADO',
+                    costo_final_confirmado: ordenEntregada.costo_final_confirmado,
+                    fecha_entrega_real: ordenEntregada.fecha_entrega_real
+                  }
+                : o
+            )
+          );
+          fetchOrdenes(pagination.page || 1);
+        }}
       />
     </DashboardLayout>
   );

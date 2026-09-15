@@ -17,9 +17,11 @@ import {
   Watch,
   Package,
   Inbox,
-  AlertTriangle
+  AlertTriangle,
+  PackageCheck
 } from 'lucide-react';
 import InlineConfirmButton from '../common/InlineConfirmButton';
+import { useAuth } from '../../context/AuthContext';
 
 const formatTimeAgo = (dateString) => {
   if (!dateString) return 'Reciente';
@@ -90,6 +92,8 @@ const getNextAction = (ordenFlujo) => {
       return { label: 'A Control Calidad', nextOrden: 5 };
     case 5:
       return { label: 'Marcar Listo', nextOrden: 6 };
+    case 6:
+      return { label: 'Entregar Equipo', nextOrden: 7, isEntrega: true };
     default:
       return null;
   }
@@ -100,6 +104,7 @@ export const TallerCard = ({
   onSelect,
   onQuickAdvance,
   onSelfAssign,
+  onEntregar,
   currentUserId,
   currentUserRole,
   allEstados = []
@@ -128,8 +133,23 @@ export const TallerCard = ({
   );
   const hasPendingCosts = pendingCostsCount > 0;
 
+  // Roles y Permisos Canónicos
+  const { user: authUser } = useAuth();
+  const effectiveRole = currentUserRole || authUser?.rol_nombre || authUser?.rol || '';
+  const normalizedRole = String(effectiveRole).trim().toLowerCase();
+  const isTecnico = normalizedRole === 'tecnico' || normalizedRole.includes('tecnic') || Number(authUser?.rol_id) === 4;
+  const canDeliver = !isTecnico;
+
+  // Visibilidad del botón de acción rápida (prohibido entregar para perfil Técnico)
+  const isActionVisible = nextAction?.isEntrega ? canDeliver : Boolean(nextEstadoObj);
+
   const handleAdvance = (e) => {
     e.stopPropagation();
+    if (nextAction?.isEntrega) {
+      if (!canDeliver) return;
+      if (onEntregar) onEntregar(orden);
+      return;
+    }
     if (!hasTecnicos || hasPendingCosts) return;
     if (nextEstadoObj && onQuickAdvance) {
       onQuickAdvance(orden, nextEstadoObj);
@@ -145,10 +165,9 @@ export const TallerCard = ({
 
   const tecnicosList = Array.isArray(orden.tecnicos) ? orden.tecnicos : [];
   const hasTecnicos = tecnicosList.length > 0;
-  const isAlreadyAssigned = hasTecnicos && tecnicosList.some((t) => t.id === currentUserId);
+  const isAlreadyAssigned = hasTecnicos && tecnicosList.some((t) => t.id === (currentUserId || authUser?.id));
 
   // Roles administrativos/recepción no pueden autoasignarse como técnicos
-  const normalizedRole = String(currentUserRole || '').toLowerCase();
   const isAdministrativeOrReception = ['secretaria', 'recepcionista', 'recepcion', 'cajero'].some((r) =>
     normalizedRole.includes(r)
   );
@@ -262,27 +281,33 @@ export const TallerCard = ({
           )}
         </div>
 
-        {/* Botón de acción rápida si tiene siguiente paso operativo */}
-        {nextEstadoObj && (
+        {/* Botón de acción rápida si tiene siguiente paso operativo o entrega */}
+        {isActionVisible && (
           <button
             type="button"
-            disabled={!hasTecnicos || hasPendingCosts}
+            disabled={nextAction?.isEntrega ? false : (!hasTecnicos || hasPendingCosts)}
             onClick={handleAdvance}
             title={
-              hasPendingCosts
+              nextAction?.isEntrega
+                ? 'Liquidar y Entregar Equipo al Cliente'
+                : hasPendingCosts
                 ? `Bloqueado: Existen ${pendingCostsCount} costo(s) adicional(es) pendiente(s) de aprobación por el cliente.`
                 : !hasTecnicos
                 ? 'Debe asignar al menos un técnico responsable antes de avanzar de estado'
                 : ''
             }
             className={`w-full mt-0.5 py-1.5 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-              !hasTecnicos || hasPendingCosts
+              nextAction?.isEntrega
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer'
+                : !hasTecnicos || hasPendingCosts
                 ? 'bg-neutral-100/50 dark:bg-neutral-800/40 text-neutral-400 dark:text-neutral-500 cursor-not-allowed opacity-60'
                 : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 group-hover:border-neutral-300 dark:group-hover:border-neutral-600 cursor-pointer'
             }`}
           >
             <span>{nextAction.label}</span>
-            {hasPendingCosts ? (
+            {nextAction?.isEntrega ? (
+              <PackageCheck size={14} className="shrink-0" />
+            ) : hasPendingCosts ? (
               <span className="text-[10px] font-normal text-amber-600 dark:text-amber-400 font-inter">
                 (Costo pendiente)
               </span>
