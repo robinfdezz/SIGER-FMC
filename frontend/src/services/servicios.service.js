@@ -109,3 +109,33 @@ export const removeTecnicoServicio = async (id, tecnicoId) => {
   const response = await api.delete(`/servicios/${id}/tecnicos/${tecnicoId}`);
   return response.data;
 };
+
+/**
+ * Obtener incidencias y hallazgos técnicos de una orden
+ * @param {number|string} id
+ */
+export const getIncidenciasServicio = async (id) => {
+  const response = await api.get(`/servicios/${id}/incidencias`);
+  return response.data;
+};
+
+/**
+ * Registrar una nueva incidencia técnica
+ * @param {number|string} id
+ * @param {Object} data - { tipo_incidencia, descripcion, repuesto_requerido, costo_adicional_repuesto, fotos }
+ */
+export const createIncidenciaServicio = async (id, data) => {
+  const response = await api.post(`/servicios/${id}/incidencias`, data);
+  return response.data;
+};
+
+/**
+ * Actualizar estado de aprobación del cliente para una incidencia
+ * @param {number|string} id - ID del servicio
+ * @param {number|string} incidenciaId - ID de la incidencia
+ * @param {Object} data - { aprobado_por_cliente: boolean, metodo_aprobacion: string }
+ */
+export const updateAprobacionIncidencia = async (id, incidenciaId, data) => {
+  const response = await api.patch(`/servicios/${id}/incidencias/${incidenciaId}/aprobacion`, data);
+  return response.data;
+};

@@ -14,7 +14,10 @@ const {
   assignTecnicoServicio,
   removeTecnicoServicio,
   validarGarantiaTicket,
-  uploadFotosServicio
+  uploadFotosServicio,
+  getIncidenciasServicio,
+  createIncidenciaServicio,
+  updateAprobacionIncidencia
 } = require('../controllers/servicios.controller');
 
 // ── Ruta pública para consulta / tracking de ticket vía QR ──
@@ -31,6 +34,15 @@ router.get('/', getServicios);
 
 // GET /api/servicios/validar-garantia/:codigoTicket - Validar vigencia de garantía
 router.get('/validar-garantia/:codigoTicket', validarGarantiaTicket);
+
+// GET /api/servicios/:id/incidencias - Listar incidencias y hallazgos técnicos
+router.get('/:id/incidencias', getIncidenciasServicio);
+
+// POST /api/servicios/:id/incidencias - Registrar nueva incidencia técnica
+router.post('/:id/incidencias', createIncidenciaServicio);
+
+// PATCH /api/servicios/:id/incidencias/:incidenciaId/aprobacion - Actualizar aprobación de cliente de una incidencia
+router.patch('/:id/incidencias/:incidenciaId/aprobacion', updateAprobacionIncidencia);
 
 // GET /api/servicios/:id
 router.get('/:id', getServicioById);

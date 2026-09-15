@@ -3,21 +3,35 @@ import { Camera, Trash2, Plus, Loader2 } from 'lucide-react';
 import { uploadFotosRecepcion } from '../../services/servicios.service';
 import { sileo } from 'sileo';
 
-const MAX_PHOTOS = 5;
+const DEFAULT_MAX_PHOTOS = 5;
 
 /**
  * DevicePhotoUploader
- * Galería dinámica de evidencias fotográficas (hasta 5 fotos).
+ * Galería dinámica de evidencias fotográficas.
  * Permite selección individual/múltiple o Drag & Drop con subida inmediata a Cloudinary.
  *
- * @param {string[]} value    - URLs de fotos cargadas
- * @param {Function} onChange - Callback con el nuevo array de URLs
+ * @param {string[]|Object[]} value - URLs u objetos de fotos cargadas
+ * @param {Function} onChange       - Callback con el nuevo array de objetos {url, public_id}
+ * @param {number} maxPhotos        - Cantidad máxima de fotos permitidas (default 5)
+ * @param {string} title            - Título de la cabecera
+ * @param {string} description      - Subtítulo explicativo
+ * @param {React.Component} icon    - Icono temático del bloque
+ * @param {string} className        - Clases CSS adicionales para el contenedor
  */
-const DevicePhotoUploader = ({ value = [], onChange }) => {
+const DevicePhotoUploader = ({
+  value = [],
+  onChange,
+  maxPhotos = DEFAULT_MAX_PHOTOS,
+  title = 'Fotografías / Evidencias de Recepción',
+  description = null,
+  icon: HeaderIcon = Camera,
+  className = ''
+}) => {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
+  const MAX_PHOTOS = maxPhotos;
   const currentPhotos = Array.isArray(value) ? value.filter(Boolean) : [];
 
   const handleFiles = async (files) => {
@@ -106,19 +120,19 @@ const DevicePhotoUploader = ({ value = [], onChange }) => {
   };
 
   return (
-    <div className="p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
+    <div className={`p-5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4 ${className}`.trim()}>
       {/* Cabecera */}
       <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800/80 pb-3">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
-            <Camera size={16} />
+            <HeaderIcon size={16} />
           </div>
           <div>
             <h4 className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 uppercase tracking-wider font-outfit">
-              Fotografías / Evidencias de Recepción
+              {title}
             </h4>
             <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter mt-0.5">
-              Hasta 5 fotos del dispositivo. JPG, PNG o WEBP, máx. 5MB cada una.
+              {description || `Hasta ${MAX_PHOTOS} fotos del dispositivo. JPG, PNG o WEBP, máx. 5MB cada una.`}
             </p>
           </div>
         </div>

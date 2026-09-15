@@ -592,7 +592,7 @@ const getServicioById = async (req, res) => {
       '  c.telefono AS telefono_cliente_reg,\n' +
       '  COALESCE((SELECT TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id ORDER BY ta.id ASC LIMIT 1), \'Sin asignar\') AS tecnico_nombre,\n' +
       '  COALESCE((SELECT json_agg(json_build_object(\'id\', dt_tec.id, \'nombre_completo\', TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)))) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), \'[]\'::json) AS tecnicos,\n' +
-      '  COALESCE((SELECT json_agg(json_build_object(\'id\', ef.id, \'url\', ef.url_foto, \'url_foto\', ef.url_foto, \'public_id\', ef.public_id, \'tipo_evidencia\', ef.tipo_evidencia, \'fecha_subida\', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE), \'[]\'::json) AS fotos,\n' +
+      '  COALESCE((SELECT json_agg(json_build_object(\'id\', ef.id, \'url\', ef.url_foto, \'url_foto\', ef.url_foto, \'public_id\', ef.public_id, \'tipo_evidencia\', ef.tipo_evidencia, \'fecha_subida\', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE AND ef.incidencia_id IS NULL AND ef.tipo_evidencia != \'INCIDENCIA\'), \'[]\'::json) AS fotos,\n' +
       '  COALESCE((\n' +
       '    SELECT json_agg(\n' +
       '      json_build_object(\n' +
@@ -612,7 +612,44 @@ const getServicioById = async (req, res) => {
       '    LEFT JOIN estados_servicio es_h ON es_h.id = he.estado_id\n' +
       '    LEFT JOIN datos_trabajadores dt_h ON dt_h.id = he.usuario_id\n' +
       '    WHERE he.servicio_id = sr.id\n' +
-      '  ), \'[]\'::json) AS historial_estados\n' +
+      '  ), \'[]\'::json) AS historial_estados,\n' +
+      '  COALESCE((\n' +
+      '    SELECT json_agg(\n' +
+      '      json_build_object(\n' +
+      '        \'id\', inc.id,\n' +
+      '        \'servicio_id\', inc.servicio_id,\n' +
+      '        \'tipo_incidencia\', inc.tipo_incidencia,\n' +
+      '        \'descripcion\', inc.descripcion,\n' +
+      '        \'repuesto_requerido\', inc.repuesto_requerido,\n' +
+      '        \'costo_adicional_repuesto\', inc.costo_adicional_repuesto,\n' +
+      '        \'aprobado_por_cliente\', inc.aprobado_por_cliente,\n' +
+      '        \'fecha_aprobacion\', inc.fecha_aprobacion,\n' +
+      '        \'metodo_aprobacion\', inc.metodo_aprobacion,\n' +
+      '        \'estado_aprobacion\', CASE WHEN inc.aprobado_por_cliente = TRUE THEN \'APROBADO\' WHEN inc.fecha_aprobacion IS NOT NULL THEN \'RECHAZADO\' ELSE \'PENDIENTE\' END,\n' +
+      '        \'rechazado_por_cliente\', (inc.aprobado_por_cliente = FALSE AND inc.fecha_aprobacion IS NOT NULL),\n' +
+      '        \'fecha_registro\', inc.fecha_registro,\n' +
+      '        \'usuario_id\', inc.usuario_id,\n' +
+      '        \'usuario_nombre\', TRIM(CONCAT(dt_inc.nombre, \' \', dt_inc.apellido)),\n' +
+      '        \'fotos\', COALESCE((\n' +
+      '          SELECT json_agg(\n' +
+      '            json_build_object(\n' +
+      '              \'id\', ef_inc.id,\n' +
+      '              \'url\', ef_inc.url_foto,\n' +
+      '              \'url_foto\', ef_inc.url_foto,\n' +
+      '              \'public_id\', ef_inc.public_id,\n' +
+      '              \'tipo_evidencia\', ef_inc.tipo_evidencia,\n' +
+      '              \'fecha_subida\', ef_inc.fecha_subida\n' +
+      '            ) ORDER BY ef_inc.id ASC\n' +
+      '          )\n' +
+      '          FROM evidencias_fotograficas ef_inc\n' +
+      '          WHERE ef_inc.incidencia_id = inc.id AND ef_inc.activo = TRUE\n' +
+      '        ), \'[]\'::json)\n' +
+      '      ) ORDER BY inc.fecha_registro DESC, inc.id DESC\n' +
+      '    )\n' +
+      '    FROM incidencias_servicio inc\n' +
+      '    LEFT JOIN datos_trabajadores dt_inc ON dt_inc.id = inc.usuario_id\n' +
+      '    WHERE inc.servicio_id = sr.id AND inc.activo = TRUE\n' +
+      '  ), \'[]\'::json) AS incidencias\n' +
       'FROM servicios_recepcion sr\n' +
       'LEFT JOIN estados_servicio es ON es.id = sr.estado_actual_id\n' +
       'LEFT JOIN categorias_dispositivos cd ON cd.id = sr.categoria_id\n' +
@@ -1329,6 +1366,384 @@ const removeTecnicoServicio = async (req, res) => {
   }
 };
 
+// ============================================================
+// GET /api/servicios/:id/incidencias — Listar incidencias de una orden
+// ============================================================
+const getIncidenciasServicio = async (req, res) => {
+  try {
+    const pool = getPool();
+    const id = parseInt(req.params.id, 10);
+    if (!id || id < 1) {
+      return res.status(400).json({ ok: false, message: 'ID de orden inválido.' });
+    }
+
+    const query = `
+      SELECT
+        inc.id,
+        inc.servicio_id,
+        inc.tipo_incidencia,
+        inc.descripcion,
+        inc.repuesto_requerido,
+        inc.costo_adicional_repuesto,
+        inc.aprobado_por_cliente,
+        inc.fecha_aprobacion,
+        inc.metodo_aprobacion,
+        CASE WHEN inc.aprobado_por_cliente = TRUE THEN 'APROBADO' WHEN inc.fecha_aprobacion IS NOT NULL THEN 'RECHAZADO' ELSE 'PENDIENTE' END AS estado_aprobacion,
+        (inc.aprobado_por_cliente = FALSE AND inc.fecha_aprobacion IS NOT NULL) AS rechazado_por_cliente,
+        inc.fecha_registro,
+        inc.usuario_id,
+        TRIM(CONCAT(dt.nombre, ' ', dt.apellido)) AS usuario_nombre,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object(
+              'id', ef.id,
+              'url', ef.url_foto,
+              'url_foto', ef.url_foto,
+              'public_id', ef.public_id,
+              'tipo_evidencia', ef.tipo_evidencia,
+              'fecha_subida', ef.fecha_subida
+            ) ORDER BY ef.id ASC
+          )
+          FROM evidencias_fotograficas ef
+          WHERE ef.incidencia_id = inc.id AND ef.activo = TRUE
+        ), '[]'::json) AS fotos
+      FROM incidencias_servicio inc
+      LEFT JOIN datos_trabajadores dt ON dt.id = inc.usuario_id
+      WHERE inc.servicio_id = $1 AND inc.activo = TRUE
+      ORDER BY inc.fecha_registro DESC, inc.id DESC
+    `;
+
+    const result = await pool.query(query, [id]);
+    return res.status(200).json({ ok: true, data: result.rows });
+  } catch (error) {
+    console.error('❌ Error en getIncidenciasServicio:', error);
+    return res.status(500).json({ ok: false, message: 'Error al consultar las incidencias del servicio.' });
+  }
+};
+
+// ============================================================
+// POST /api/servicios/:id/incidencias — Registrar incidencia técnica
+// ============================================================
+const createIncidenciaServicio = async (req, res) => {
+  const pool = getPool();
+  const client = await pool.connect();
+
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id || id < 1) {
+      return res.status(400).json({ ok: false, message: 'ID de orden inválido.' });
+    }
+
+    const {
+      tipo_incidencia,
+      descripcion,
+      repuesto_requerido,
+      costo_adicional_repuesto,
+      aprobado_por_cliente,
+      metodo_aprobacion,
+      fotos
+    } = req.body;
+
+    const tiposPermitidos = ['Imprevisto', 'Aviso al Cliente', 'Pieza Extra', 'Hallazgo Tecnico'];
+    if (!tipo_incidencia || !tiposPermitidos.includes(tipo_incidencia)) {
+      return res.status(400).json({
+        ok: false,
+        message: `El tipo de incidencia es obligatorio y debe ser uno de: ${tiposPermitidos.join(', ')}.`
+      });
+    }
+
+    if (isBlank(descripcion)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'La descripción de la incidencia es obligatoria.'
+      });
+    }
+
+    // Verificar que la orden exista y esté activa
+    const ordenRes = await client.query(
+      'SELECT id, codigo_ticket FROM servicios_recepcion WHERE id = $1 AND activo = TRUE',
+      [id]
+    );
+    if (ordenRes.rowCount === 0) {
+      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada.' });
+    }
+
+    const repuestoFinal = isBlank(repuesto_requerido) ? null : String(repuesto_requerido).trim();
+    const costoFinal = toDecimal(costo_adicional_repuesto, 0.00);
+    const usuarioId = req.user?.id || null;
+
+    const metodosPermitidos = ['Presencial', 'Llamada', 'WhatsApp', 'Correo', 'Otro'];
+    const isAprobado = Boolean(
+      aprobado_por_cliente === true ||
+      aprobado_por_cliente === 'true' ||
+      aprobado_por_cliente === 1 ||
+      aprobado_por_cliente === '1'
+    );
+    const metodoFinal = isAprobado
+      ? (metodosPermitidos.includes(metodo_aprobacion) ? metodo_aprobacion : 'Presencial')
+      : null;
+    const fechaAprobacionFinal = isAprobado ? new Date() : null;
+
+    await client.query('BEGIN');
+
+    const insertIncQuery = `
+      INSERT INTO incidencias_servicio (
+        servicio_id,
+        tipo_incidencia,
+        descripcion,
+        repuesto_requerido,
+        costo_adicional_repuesto,
+        aprobado_por_cliente,
+        fecha_aprobacion,
+        metodo_aprobacion,
+        activo,
+        usuario_id,
+        fecha_registro
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, $9, NOW())
+      RETURNING *
+    `;
+
+    const incRes = await client.query(insertIncQuery, [
+      id,
+      tipo_incidencia,
+      String(descripcion).trim(),
+      repuestoFinal,
+      costoFinal,
+      isAprobado,
+      fechaAprobacionFinal,
+      metodoFinal,
+      usuarioId
+    ]);
+
+    const nuevaIncidencia = incRes.rows[0];
+
+    // Procesar evidencias fotográficas vinculadas
+    const rawFotos = Array.isArray(fotos)
+      ? fotos
+      : (Array.isArray(req.body.evidencias_fotograficas) ? req.body.evidencias_fotograficas : []);
+
+    const fotosValidas = rawFotos
+      .filter(Boolean)
+      .map(item => {
+        if (typeof item === 'object' && item !== null) {
+          const url = String(item.url || item.url_foto || item.secure_url || '').trim();
+          const public_id = item.public_id ? String(item.public_id).trim() : null;
+          return url ? { url, public_id } : null;
+        }
+        if (typeof item === 'string' && item.trim().length > 0) {
+          return { url: item.trim(), public_id: null };
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    for (const f of fotosValidas) {
+      await client.query(
+        `INSERT INTO evidencias_fotograficas (
+          servicio_id,
+          incidencia_id,
+          url_foto,
+          public_id,
+          tipo_evidencia,
+          usuario_id,
+          activo,
+          fecha_subida
+        ) VALUES ($1, $2, $3, $4, 'INCIDENCIA', $5, TRUE, NOW())`,
+        [id, nuevaIncidencia.id, f.url, f.public_id, usuarioId]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    // Consultar el registro recién insertado con usuario y fotos
+    const finalRes = await pool.query(
+      `SELECT
+        inc.id,
+        inc.servicio_id,
+        inc.tipo_incidencia,
+        inc.descripcion,
+        inc.repuesto_requerido,
+        inc.costo_adicional_repuesto,
+        inc.aprobado_por_cliente,
+        inc.fecha_aprobacion,
+        inc.metodo_aprobacion,
+        CASE WHEN inc.aprobado_por_cliente = TRUE THEN 'APROBADO' WHEN inc.fecha_aprobacion IS NOT NULL THEN 'RECHAZADO' ELSE 'PENDIENTE' END AS estado_aprobacion,
+        (inc.aprobado_por_cliente = FALSE AND inc.fecha_aprobacion IS NOT NULL) AS rechazado_por_cliente,
+        inc.fecha_registro,
+        inc.usuario_id,
+        TRIM(CONCAT(dt.nombre, ' ', dt.apellido)) AS usuario_nombre,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object(
+              'id', ef.id,
+              'url', ef.url_foto,
+              'url_foto', ef.url_foto,
+              'public_id', ef.public_id,
+              'tipo_evidencia', ef.tipo_evidencia,
+              'fecha_subida', ef.fecha_subida
+            ) ORDER BY ef.id ASC
+          )
+          FROM evidencias_fotograficas ef
+          WHERE ef.incidencia_id = inc.id AND ef.activo = TRUE
+        ), '[]'::json) AS fotos
+      FROM incidencias_servicio inc
+      LEFT JOIN datos_trabajadores dt ON dt.id = inc.usuario_id
+      WHERE inc.id = $1`,
+      [nuevaIncidencia.id]
+    );
+
+    return res.status(201).json({
+      ok: true,
+      success: true,
+      message: 'Incidencia técnica registrada exitosamente.',
+      data: finalRes.rows[0]
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error en createIncidenciaServicio:', error);
+    return res.status(500).json({
+      ok: false,
+      success: false,
+      message: 'Error al registrar la incidencia de servicio.'
+    });
+  } finally {
+    client.release();
+  }
+};
+
+// ============================================================
+// PATCH /api/servicios/:id/incidencias/:incidenciaId/aprobacion — Actualizar aprobación del cliente
+// ============================================================
+const updateAprobacionIncidencia = async (req, res) => {
+  try {
+    const pool = getPool();
+    const servicioId = parseInt(req.params.id, 10);
+    const incidenciaId = parseInt(req.params.incidenciaId, 10);
+
+    if (!servicioId || servicioId < 1 || !incidenciaId || incidenciaId < 1) {
+      return res.status(400).json({ ok: false, message: 'IDs de orden o incidencia inválidos.' });
+    }
+
+    const {
+      aprobado_por_cliente,
+      rechazado,
+      rechazado_por_cliente,
+      estado_aprobacion,
+      accion,
+      metodo_aprobacion
+    } = req.body;
+
+    // Verificar que la incidencia exista para este servicio
+    const checkRes = await pool.query(
+      'SELECT id, servicio_id, costo_adicional_repuesto FROM incidencias_servicio WHERE id = $1 AND servicio_id = $2 AND activo = TRUE',
+      [incidenciaId, servicioId]
+    );
+
+    if (checkRes.rowCount === 0) {
+      return res.status(404).json({ ok: false, message: 'Incidencia técnica no encontrada para esta orden.' });
+    }
+
+    const metodosPermitidos = ['Presencial', 'Llamada', 'WhatsApp', 'Correo', 'Otro'];
+    let isAprobado = false;
+    let metodoFinal = null;
+    let fechaAprobacionFinal = null;
+    let message = '';
+
+    const isExplicitReject = Boolean(
+      estado_aprobacion === 'RECHAZADO' ||
+      rechazado === true ||
+      rechazado_por_cliente === true ||
+      accion === 'rechazar'
+    );
+
+    const isExplicitApprove = Boolean(
+      !isExplicitReject && (
+        estado_aprobacion === 'APROBADO' ||
+        aprobado_por_cliente === true ||
+        aprobado_por_cliente === 'true' ||
+        aprobado_por_cliente === 1 ||
+        aprobado_por_cliente === '1' ||
+        accion === 'aprobar'
+      )
+    );
+
+    if (isExplicitReject) {
+      isAprobado = false;
+      metodoFinal = metodosPermitidos.includes(metodo_aprobacion) ? metodo_aprobacion : 'Llamada';
+      fechaAprobacionFinal = new Date();
+      message = 'Rechazo del presupuesto registrado exitosamente.';
+    } else if (isExplicitApprove) {
+      isAprobado = true;
+      metodoFinal = metodosPermitidos.includes(metodo_aprobacion) ? metodo_aprobacion : 'WhatsApp';
+      fechaAprobacionFinal = new Date();
+      message = 'Aprobación del cliente registrada exitosamente.';
+    } else {
+      // Restablecer a pendiente
+      isAprobado = false;
+      metodoFinal = null;
+      fechaAprobacionFinal = null;
+      message = 'Estado de aprobación restablecido a pendiente.';
+    }
+
+    await pool.query(
+      `UPDATE incidencias_servicio
+       SET aprobado_por_cliente = $1,
+           metodo_aprobacion = $2,
+           fecha_aprobacion = $3
+       WHERE id = $4 AND servicio_id = $5`,
+      [isAprobado, metodoFinal, fechaAprobacionFinal, incidenciaId, servicioId]
+    );
+
+    // Retornar la incidencia actualizada con datos completos
+    const updatedRes = await pool.query(
+      `SELECT
+        inc.id,
+        inc.servicio_id,
+        inc.tipo_incidencia,
+        inc.descripcion,
+        inc.repuesto_requerido,
+        inc.costo_adicional_repuesto,
+        inc.aprobado_por_cliente,
+        inc.fecha_aprobacion,
+        inc.metodo_aprobacion,
+        CASE WHEN inc.aprobado_por_cliente = TRUE THEN 'APROBADO' WHEN inc.fecha_aprobacion IS NOT NULL THEN 'RECHAZADO' ELSE 'PENDIENTE' END AS estado_aprobacion,
+        (inc.aprobado_por_cliente = FALSE AND inc.fecha_aprobacion IS NOT NULL) AS rechazado_por_cliente,
+        inc.fecha_registro,
+        inc.usuario_id,
+        TRIM(CONCAT(dt.nombre, ' ', dt.apellido)) AS usuario_nombre,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object(
+              'id', ef.id,
+              'url', ef.url_foto,
+              'url_foto', ef.url_foto,
+              'public_id', ef.public_id,
+              'tipo_evidencia', ef.tipo_evidencia,
+              'fecha_subida', ef.fecha_subida
+            ) ORDER BY ef.id ASC
+          )
+          FROM evidencias_fotograficas ef
+          WHERE ef.incidencia_id = inc.id AND ef.activo = TRUE
+        ), '[]'::json) AS fotos
+      FROM incidencias_servicio inc
+      LEFT JOIN datos_trabajadores dt ON dt.id = inc.usuario_id
+      WHERE inc.id = $1`,
+      [incidenciaId]
+    );
+
+    return res.status(200).json({
+      ok: true,
+      success: true,
+      message,
+      data: updatedRes.rows[0]
+    });
+  } catch (error) {
+    console.error('❌ Error en updateAprobacionIncidencia:', error);
+    return res.status(500).json({ ok: false, message: 'Error al actualizar la aprobación de la incidencia.' });
+  }
+};
+
 module.exports = {
   createServicio,
   getServicios,
@@ -1339,5 +1754,8 @@ module.exports = {
   assignTecnicoServicio,
   removeTecnicoServicio,
   validarGarantiaTicket,
-  uploadFotosServicio
+  uploadFotosServicio,
+  getIncidenciasServicio,
+  createIncidenciaServicio,
+  updateAprobacionIncidencia
 };
