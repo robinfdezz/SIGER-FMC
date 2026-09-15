@@ -4,6 +4,7 @@ import Modal from '../common/Modal';
 import Button from '../common/Button';
 import Select from '../common/Select';
 import Badge from '../common/Badge';
+import InlineConfirmButton from '../common/InlineConfirmButton';
 import {
   X,
   Calendar,
@@ -1377,17 +1378,15 @@ export const FichaTecnicaModal = ({
                     )}
 
                     {!isCurrentUserAssigned && (
-                      <Button
-                        type="button"
+                      <InlineConfirmButton
                         variant="primary"
-                        size="sm"
-                        disabled={isManagingTecnicos}
+                        text="Unirme"
+                        confirmText="¿Unirte?"
                         icon={UserPlus}
-                        onClick={() => handleAddTecnico(currentUserId)}
-                        className="h-[38px] px-3.5 text-xs font-semibold shrink-0"
-                      >
-                        Unirme
-                      </Button>
+                        disabled={isManagingTecnicos}
+                        isLoading={isManagingTecnicos}
+                        onConfirm={() => handleAddTecnico(currentUserId)}
+                      />
                     )}
                   </div>
                 )}

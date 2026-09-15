@@ -18,6 +18,7 @@ import {
   Package,
   Inbox
 } from 'lucide-react';
+import InlineConfirmButton from '../common/InlineConfirmButton';
 
 const formatTimeAgo = (dateString) => {
   if (!dateString) return 'Reciente';
@@ -218,14 +219,13 @@ export const TallerCard = ({
 
           {/* Botón rápido "Unirme como técnico" si no está asignado */}
           {!isAlreadyAssigned && onSelfAssign && (
-            <button
-              type="button"
-              onClick={handleJoin}
-              className="w-full py-1 px-2 rounded-lg bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-800 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 flex items-center justify-center gap-1 transition-colors"
-            >
-              <UserPlus size={11} className="text-red-500" />
-              <span>Unirme a ésta orden</span>
-            </button>
+            <InlineConfirmButton
+              variant="card"
+              text="Unirme a ésta orden"
+              confirmText="¿Unirte?"
+              icon={UserPlus}
+              onConfirm={() => onSelfAssign(orden.id)}
+            />
           )}
         </div>
 
