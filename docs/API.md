@@ -826,56 +826,178 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
   }
   ```
 
-### 4.1 Registrar Incidencia / Repuesto Adicional
-- **Ruta:** `POST /api/incidencias`
+### 5.7 Listar Órdenes para Tablero de Taller
+- **Ruta:** `GET /api/servicios/taller`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`, `Secretaria`)
+- **Descripción:** Obtiene las órdenes activas en taller agrupadas y filtradas para la mesa de trabajo (`BancoTrabajoPage.jsx`), ordenadas por prioridad y fecha de ingreso.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "servicios": [
+      {
+        "id": 1,
+        "codigo_ticket": "FMC-2026-0001",
+        "marca_equipo": "Samsung",
+        "modelo_equipo": "Galaxy S23 Ultra",
+        "falla_reportada": "Pantalla dañada",
+        "prioridad": "alta",
+        "estado_id": 2,
+        "estado_nombre": "En Diagnóstico",
+        "tecnicos_asignados": [ { "id": 4, "nombre": "Carlos Técnico" } ]
+      }
+    ]
+  }
+  ```
+
+---
+
+### 5.8 Actualizar Estado Técnico en Taller
+- **Ruta:** `PATCH /api/servicios/:id/estado`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`)
 - **Body (JSON):**
   ```json
   {
-    "servicio_id": 1,
+    "estado_id": 3,
+    "nota": "Se procedió al desensamble. Diagnóstico confirmado: cambio de pantalla.",
+    "tecnico_id": 4
+  }
+  ```
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Estado del servicio actualizado correctamente",
+    "servicio": { ... }
+  }
+  ```
+
+---
+
+### 5.9 Gestión de Técnicos en Taller
+- **Asignar Técnico:** `POST /api/servicios/:id/tecnicos`
+  - **Body (JSON):** `{ "tecnico_id": 4 }`
+  - **Respuesta Exitosa (`200 OK`):** `{ "ok": true, "message": "Técnico asignado exitosamente" }`
+- **Remover Técnico:** `DELETE /api/servicios/:id/tecnicos/:tecnicoId`
+  - **Respuesta Exitosa (`200 OK`):** `{ "ok": true, "message": "Técnico desasignado exitosamente" }`
+
+---
+
+### 5.10 Registrar Incidencia o Hallazgo Técnico
+- **Ruta:** `POST /api/servicios/:id/incidencias`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`)
+- **Body (JSON):**
+  ```json
+  {
     "tipo_incidencia": "Pieza Extra",
     "descripcion": "Flex de carga sulfatado no detecta cargador rápido.",
     "repuesto_requerido": "Flex Pin de Carga iPhone 13 Original",
-    "costo_adicional_repuesto": 1200.00
+    "costo_adicional_repuesto": 1200.00,
+    "aprobado_por_cliente": true,
+    "metodo_aprobacion": "WhatsApp",
+    "fotos": [
+      {
+        "url": "https://res.cloudinary.com/.../evidencia1.webp",
+        "public_id": "siger-fmc/evidencias-tickets/evidencia1"
+      }
+    ]
   }
   ```
+- **Aislamiento Fotográfico:** Las fotos enviadas en `fotos` se asocian en `evidencias_fotograficas` con `tipo_evidencia = 'INCIDENCIA'` e `incidencia_id` asignado, manteniéndolas estrictamente separadas de las fotos de recepción.
 - **Respuesta Exitosa (`201 Created`):**
   ```json
   {
-    "success": true,
-    "message": "Incidencia registrada exitosamente.",
-    "data": {
-      "id": 1,
-      "aprobado_por_cliente": false
+    "ok": true,
+    "message": "Incidencia registrada correctamente",
+    "incidencia": {
+      "id": 5,
+      "servicio_id": 1,
+      "tipo_incidencia": "Pieza Extra",
+      "descripcion": "Flex de carga sulfatado...",
+      "repuesto_requerido": "Flex Pin de Carga iPhone 13 Original",
+      "costo_adicional_repuesto": 1200.00,
+      "aprobado_por_cliente": true,
+      "fecha_aprobacion": "2026-09-14T18:30:00.000Z",
+      "metodo_aprobacion": "WhatsApp",
+      "usuario_nombre": "Carlos Técnico",
+      "fotos": [ ... ]
     }
   }
   ```
 
 ---
 
-### 4.2 Aprobar o Rechazar Incidencia
-- **Ruta:** `PATCH /api/incidencias/:id/aprobacion`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`)
-- **Body (JSON):**
+### 5.11 Listar Incidencias de una Orden
+- **Ruta:** `GET /api/servicios/:id/incidencias`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`, `Secretaria`)
+- **Respuesta Exitosa (`200 OK`):**
   ```json
   {
-    "aprobado_por_cliente": true
+    "ok": true,
+    "incidencias": [
+      {
+        "id": 5,
+        "servicio_id": 1,
+        "tipo_incidencia": "Pieza Extra",
+        "descripcion": "Flex de carga sulfatado...",
+        "repuesto_requerido": "Flex Pin de Carga iPhone 13 Original",
+        "costo_adicional_repuesto": 1200.00,
+        "aprobado_por_cliente": true,
+        "estado_aprobacion": "APROBADO",
+        "rechazado_por_cliente": false,
+        "fecha_aprobacion": "2026-09-14T18:30:00.000Z",
+        "metodo_aprobacion": "WhatsApp",
+        "usuario_nombre": "Carlos Técnico",
+        "fotos": [ ... ]
+      }
+    ]
   }
   ```
 
 ---
 
-### 4.3 Subir Evidencia Fotográfica
-- **Ruta:** `POST /api/evidencias`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`)
-- **Body (JSON / Multipart):**
+### 5.12 Actualizar Ciclo de Aprobación/Rechazo de Incidencia
+- **Ruta:** `PATCH /api/servicios/:id/incidencias/:incidenciaId/aprobacion`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Acción de Aprobación (JSON):**
   ```json
   {
-    "servicio_id": 1,
-    "incidencia_id": null,
-    "url_foto": "https://res.cloudinary.com/fmc/image/upload/v1234/evidencia_1.jpg",
-    "tipo_evidencia": "Estado Inicial",
-    "descripcion": "Golpe en esquina inferior derecha al recibir."
+    "aprobado": true,
+    "metodo_aprobacion": "WhatsApp"
+  }
+  ```
+- **Acción de Rechazo (JSON):**
+  ```json
+  {
+    "aprobado": false,
+    "estado_aprobacion": "RECHAZADO",
+    "metodo_aprobacion": "Llamada"
+  }
+  ```
+- **Acción de Reinicio a Pendiente (JSON):**
+  ```json
+  {
+    "accion": "reset"
+  }
+  ```
+- **Comportamiento en la Base de Datos:**
+  - Al aprobar: `aprobado_por_cliente = TRUE`, `fecha_aprobacion = NOW()`, `metodo_aprobacion = :metodo`.
+  - Al rechazar: `aprobado_por_cliente = FALSE`, `fecha_aprobacion = NOW()`, `metodo_aprobacion = :metodo`.
+  - En la respuesta se computan automáticamente `estado_aprobacion` (`'APROBADO' | 'RECHAZADO' | 'PENDIENTE'`) y `rechazado_por_cliente` (booleano).
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Aprobación de la incidencia actualizada exitosamente",
+    "incidencia": {
+      "id": 5,
+      "aprobado_por_cliente": false,
+      "estado_aprobacion": "RECHAZADO",
+      "rechazado_por_cliente": true,
+      "fecha_aprobacion": "2026-09-14T19:00:00.000Z",
+      "metodo_aprobacion": "Llamada",
+      "fotos": [ ... ]
+    }
   }
   ```
 

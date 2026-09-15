@@ -8,8 +8,43 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
-### Planned
-- Módulo de Banco de Trabajo y Diagnóstico Técnico.
+### Planned (PENDIENTE / PRÓXIMO SPRINT - FASE SIGUIENTE - NO INICIADA)
+- **Modal de Entrega Final y Cierre de Orden [NO INICIADO]:**
+  - *Aclaración:* Esta funcionalidad se encuentra completamente pendiente y programada para el siguiente sprint de desarrollo (aún no ha iniciado su codificación).
+  - Desglose y liquidación de balance final (Costo inicial + Incidencias aprobadas - Anticipos pagados - Descuentos aplicados).
+  - Captura y persistencia de evidencias fotográficas de salida (`tipo_evidencia = 'ENTREGA'`).
+  - Validación de firma digital del cliente y emisión de comprobante de entrega y póliza de garantía.
+
+---
+
+## [0.7.0] - 2026-09-14
+
+### Added
+- **Módulo de Taller Técnico y Banco de Trabajo (`BancoTrabajoPage.jsx`, `TallerCard.jsx`, `AnimatedTabs.jsx`):**
+  - **Mesa de Trabajo Dinámica:** Vista de gestión técnica organizada por fases de taller con selector animado de pestañas (`AnimatedTabs`) que muestra contadores en tiempo real por estado operativo (`Recibido`, `En Diagnóstico`, `En Reparación`, `Esperando Repuesto`, `Listo para Entrega`).
+  - **Tarjetas de Taller (`TallerCard.jsx`):** Visualización de equipos en banco con código de ticket, cliente, dispositivo, técnico asignado, nivel de prioridad y acceso directo con un clic a la Ficha Técnica.
+- **Ficha Técnica Integral del Equipo (`FichaTecnicaModal.jsx`):**
+  - **Auditoría de Datos Iniciales:** Resumen del equipo, cliente, fecha de ingreso, fallas reportadas y checklist de recepción.
+  - **Transición de Estados con Validación:** Formulario para actualizar el estado técnico (`POST /api/servicios/:id/estados`) con notas de avance técnico y asignación del técnico responsable.
+  - **Gestión Multi-Técnico:** Asignación y desasignación reactiva de múltiples técnicos de taller (`POST /api/servicios/:id/tecnicos` y `DELETE /api/servicios/:id/tecnicos/:tecnicoId`).
+  - **Bitácora Unificada ("HISTÓRICO EN TALLER"):** Línea de tiempo que entrelaza cronológicamente las transiciones de estado con los hallazgos técnicos en orden descendente (del más reciente al más antiguo) con contenedor scroleable independiente (`max-h-[480px]`).
+- **Módulo de Incidencias y Hallazgos Técnicos (Backend & Frontend):**
+  - **Endpoints Relacionales (`servicios.controller.js`, `servicios.routes.js`):**
+    * `POST /api/servicios/:id/incidencias`: Registro transaccional en `incidencias_servicio` (tipo, descripción, repuesto, costo adicional) y vinculación a `evidencias_fotograficas` (`tipo_evidencia = 'INCIDENCIA'`).
+    * `GET /api/servicios/:id/incidencias`: Consulta de incidencias activas con datos del autor técnico y galería multimedia.
+    * `GET /api/servicios/:id`: Enriquecido con subconsultas JSON agregadas para incidencias, técnicos asignados y fotos.
+  - **Aislamiento Estricto de Fotos:** Separación inequívoca entre fotos de recepción inicial (`tipo_evidencia = 'RECEPCION'`) y fotos vinculadas a incidencias técnicas específicas (`tipo_evidencia = 'INCIDENCIA'`).
+  - **Visor Lightbox Multimedia:** Visualizador de imágenes ampliado a pantalla completa con portal React (`createPortal`) integrado tanto en incidencias como en el histórico.
+- **Ciclo de Vida de Aprobación y Rechazo de Costo Extra por Incidencias:**
+  - **Endpoint de Resolución (`PATCH /api/servicios/:id/incidencias/:incidenciaId/aprobacion`):** Admite resolución de aprobación (`aprobado: true`) o rechazo formal (`estado_aprobacion: 'RECHAZADO'`, `aprobado_por_cliente = FALSE`, `fecha_aprobacion = NOW()`), con registro del canal de contacto (*WhatsApp*, *Llamada*, *Presencial*).
+  - **Tratamiento del Rechazo:** Presentación del costo adicional tachado (`line-through`) con indicación explícita de descarte del total a cobrar, y botón para reconsiderar en caso de que el cliente cambie de opinión.
+  - **Diseño Inline Sobrio:** Retiro de píldoras pesadas en favor de metadatos limpios, selectores segmentados compactos y botones institucionales `Button.jsx` (botón de confirmación en rojo institucional).
+- **Homologación Visual y Vectorial del Patrón de Desbloqueo (`PatternLock.jsx` & `LabelPreview.jsx`):**
+  - **Ficha Técnica (Modo Pantalla):** Rediseño de `PatternLockSvg` homologado 1:1 con el diseñador de recepción (`DeviceSecurityPicker`): cuadrícula 3x3 con números de paso del trazo (1, 2, 3...) en blanco dentro de círculos rojos (`fill="#ef4444"`), halo suave y trazos rojos continuos.
+  - **Etiquetas Térmicas (Modo Compacto):** Cuadrícula 3x3 numerada en paleta estrictamente monocromática de alto contraste (negro `#111827` sobre blanco) para etiquetas adhesivas, asegurando legibilidad sin tramas de escala de grises en impresoras de 58mm y 80mm.
+  - **Corrección de Desbordamiento y Envoltura (`wrap`):** Eliminación de truncamiento (`truncate`) en ambas variantes, aplicando `break-all whitespace-normal flex-wrap text-center` para que las secuencias largas quiebren suavemente de renglón y se mantengan perfectamente centradas sin generar puntos suspensivos (`...`).
+  - **Eliminación de Rótulos Redundantes:** Retiro de los textos `"Patrón: X puntos"` y `"PATRÓN"` para una estética limpia.
+  - **Prevención de Solapamiento en `LabelPreview.jsx`:** Contenedor derecho acotado a `w-20 sm:w-24 max-w-[96px]` y columna izquierda con `flex-1 min-w-0 pr-2` para garantizar holgura total a los datos del cliente y evitar cortes en el borde inferior.
 
 ---
 

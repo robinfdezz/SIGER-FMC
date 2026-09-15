@@ -315,9 +315,9 @@ Inspección ocular y funcional realizada durante la apertura de la orden:
 | `descripcion` | TEXT | NO | Detalle del problema o novedad |
 | `repuesto_requerido`| VARCHAR(150)| SÍ | Repuesto o componente necesario |
 | `costo_adicional_repuesto`| NUMERIC(10,2)| NO | Costo extra del repuesto (Default: 0.00) |
-| `aprobado_por_cliente`| BOOLEAN | NO | Aprobación del cliente (Default: FALSE) |
-| `fecha_aprobacion`| TIMESTAMPTZ | SÍ | Timestamp en que el cliente aprueba el costo extra |
-| `metodo_aprobacion`| VARCHAR(30) | SÍ | Medio de confirmación ('Presencial', 'Llamada', 'WhatsApp', 'Correo', 'Otro') |
+| `aprobado_por_cliente`| BOOLEAN | NO | Aprobación del cliente: TRUE (aprobado), FALSE (pendiente o rechazado) (Default: FALSE) |
+| `fecha_aprobacion`| TIMESTAMPTZ | SÍ | Timestamp en que el cliente resuelve (aprueba o rechaza expresamente) el costo extra |
+| `metodo_aprobacion`| VARCHAR(30) | SÍ | Medio de confirmación/notificación ('Presencial', 'Llamada', 'WhatsApp', 'Correo', 'Otro') |
 | `fecha_registro`| TIMESTAMPTZ | SÍ | Timestamp de registro (CURRENT_TIMESTAMP) |
 | `activo` | BOOLEAN | NO | Estado lógico (Default: TRUE) |
 

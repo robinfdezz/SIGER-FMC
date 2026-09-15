@@ -58,8 +58,9 @@ Cada orden de servicio transita de manera estructurada a través de 8 estados se
 ## 5. Módulos y Entidades Clave
 * **`clientes`:** Directorio único de clientes con documento de identidad (Cédula/RNC), contactos y dirección.
 * **`servicios_recepcion`:** Registro maestro de la orden de reparación, especificaciones del equipo y costos.
-* **`incidencias_servicio`:** Registro de imprevistos, piezas extra y costos adicionales surgidos durante el diagnóstico/reparación.
-* **`evidencias_fotograficas`:** Registro fotográfico del estado de entrada, fallas detectadas y resultado final.
+* **Banco de Trabajo Técnico (`/taller` / `BancoTrabajoPage.jsx`):** Tablero operativo de taller con tarjetas de servicio (`TallerCard.jsx`) y filtrado por estado mediante pestañas animadas (`AnimatedTabs.jsx`). Incluye la **Ficha Técnica Modal (`FichaTecnicaModal.jsx`)** para transición de estados, asignación multi-técnico y visualización gráfica del patrón/PIN de acceso.
+* **`incidencias_servicio`:** Registro de imprevistos, piezas extra y costos adicionales surgidos durante el diagnóstico o la reparación, con ciclo de vida completo de autorización del cliente (Aprobado o Rechazado formalmente por WhatsApp, Llamada o Presencial).
+* **`evidencias_fotograficas`:** Registro fotográfico en Cloudinary con aislamiento estricto entre fotos de recepción inicial (`tipo_evidencia = 'RECEPCION'`) y evidencias técnicas de incidencias (`tipo_evidencia = 'INCIDENCIA'`).
 * **`categorias_dispositivos`:** Clasificación de equipos atendidos (Smartphone, Tablet/iPad, Laptop, Consola de Videojuegos, Smartwatch, Otros).
 * **Portal de Seguimiento Público (`EstadoOrdenPage.jsx`):** Consulta web pública en tiempo real (`/estado` y `/estado/:codigo`) accesible vía escaneo de código QR generado por `TicketQR.jsx` con enlace dinámico corporativo.
 

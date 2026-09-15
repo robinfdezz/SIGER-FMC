@@ -181,19 +181,48 @@ Cada orden de servicio técnico en la tabla `servicios_recepcion` sigue un flujo
 ### 4.2 Trazabilidad, Incidencias y Evidencias
 
 - **Historial Inmutable (`historial_estados`):** Cada cambio de estado genera un registro automático con `servicio_id`, `estado_id`, `usuario_id`, `nota_cambio` y `fecha_registro`.
-- **Gestión de Incidencias (`incidencias_servicio`):** Registra novedades durante la reparación (`Hallazgo Tecnico`, `Pieza Extra`, `Aviso al Cliente`, `Imprevisto`), costo adicional del repuesto y estado de aprobación (`aprobado_por_cliente`).
-- **Galería Multimedia (`evidencias_fotograficas`):** Registro de fotos antes, durante y después de la reparación vinculadas al ticket o a una incidencia particular.
+- **Módulo de Incidencias Técnicas (`incidencias_servicio`):**
+  - Permite documentar hallazgos durante el desensamble (`Hallazgo Tecnico`, `Pieza Extra`, `Aviso al Cliente`, `Imprevisto`), costos adicionales de repuestos y técnico autor.
+  - **Aislamiento Fotográfico Estricto:** Las fotografías subidas a Cloudinary se segregan por su columna `tipo_evidencia` e `incidencia_id` en `evidencias_fotograficas`. Las fotos de recepción inicial (`tipo_evidencia = 'RECEPCION'`) no se mezclan con las evidencias técnicas de una incidencia (`tipo_evidencia = 'INCIDENCIA'`).
+  - **Ciclo de Vida de Autorización del Cliente:**
+    * **Aprobación:** Si el cliente autoriza el costo extra, se registra `aprobado_por_cliente = TRUE`, `fecha_aprobacion = NOW()` y el canal informado (`metodo_aprobacion` entre `'WhatsApp'`, `'Llamada'`, `'Presencial'`). Este costo se suma al total consolidado a cobrar.
+    * **Rechazo Explícito:** Si el cliente declina el costo adicional, se registra `aprobado_por_cliente = FALSE`, `fecha_aprobacion = NOW()` y `estado_aprobacion = 'RECHAZADO'`. En la interfaz, el costo se tacha (`line-through`) y se excluye del balance financiero, preservando la posibilidad de reconsideración.
+    * **Pendiente:** Si la incidencia tiene costo extra y aún no ha sido respondida, se marca como `'PENDIENTE'`, bloqueando el cierre financiero hasta su resolución.
 - **Seguimiento Público:** Los clientes pueden consultar en tiempo real el progreso de su dispositivo introduciendo su `codigo_ticket` sin requerir inicio de sesión.
 
-### 4.3 Arquitectura de Vistas: Flujo por Etapas (Stepper) vs. Modales Atómicos
+### 4.3 Arquitectura de Taller y Ficha Técnica (`BancoTrabajoPage.jsx`, `FichaTecnicaModal.jsx`)
 
-Para optimizar la experiencia de usuario y la confiabilidad operativa, el frontend divide las interacciones según su complejidad:
+1. **Mesa de Trabajo Técnica (`/taller` / `BancoTrabajoPage.jsx`):**
+   - Panel de control para técnicos con filtrado en tiempo real y pestañas animadas (`AnimatedTabs.jsx`) que reflejan la distribución de equipos en cada fase del taller (`Recibido`, `En Diagnóstico`, `En Reparación`, `Esperando Repuesto`, `Listo para Entrega`).
+   - Tarjetas técnicas (`TallerCard.jsx`) con información sintetizada del cliente, equipo, técnico asignado y prioridad.
+2. **Ficha Técnica Modal (`FichaTecnicaModal.jsx`):**
+   - Modal interactivo de alta densidad informativa dividido en 4 cuadrantes funcionales:
+     * **Datos del Dispositivo y Recepción:** Resumen de cliente, fallas, accesorios y checklist de entrada.
+     * **Acceso y Seguridad:** Renderizado adaptativo de contraseñas, PIN numérico o patrón gráfico mediante `UnlockMethodView`.
+     * **Actualización de Estado y Multi-Técnicos:** Formulario de transición con notas técnicas y endpoints de asignación (`POST/DELETE /api/servicios/:id/tecnicos`).
+     * **Incidencias y Línea de Tiempo Unificada:** Registro dinámico de hallazgos con cargador de fotos y un contenedor de trayectoria scroleable independiente (`max-h-[480px]`) que fusiona en orden descendente los hitos de estado y las incidencias.
 
-1. **Rutas Dedicadas con Stepper (`/tickets/nuevo`):**
-   - La recepción y apertura de tickets se estructura en una página independiente con asistente por pasos (`Stepper.jsx`) y migas de pan (`Breadcrumbs.jsx`).
-   - Ventajas arquitectónicas: Garantiza compatibilidad nativa con el historial de navegación (botones atrás/adelante del navegador), previene pérdidas accidentales de datos extensos y permite validaciones modulares por etapa (Cliente/Equipo -> Diagnóstico/Checklist -> Presupuesto/Condiciones).
-2. **Modales Atómicos y de Confirmación (`Modal.jsx`, `ConfirmModal.jsx`):**
-   - Acciones puntuales que no requieren salir de la tabla o vista actual (ej. creación rápida de un nuevo cliente desde un selector, edición de datos de trabajadores, o confirmación modal obligatoria para activar/desactivar cuentas y registrar repuestos extras).
+### 4.4 Arquitectura de Credenciales de Seguridad y Patrón de Desbloqueo (`PatternLock.jsx`)
+
+Para visualizar de manera segura el acceso al equipo, el componente `UnlockMethodView` y `PatternLockSvg` manejan dos variantes vectoriales especializadas:
+1. **Variante Pantalla / Ficha Técnica (`variant="reception"`):**
+   - Homologada 1:1 con el diseñador de recepción (`DeviceSecurityPicker.jsx`): cuadrícula 3x3 de 144px con círculos rojos (`fill="#ef4444"`), números de paso en blanco (1, 2, 3...) dentro de cada nodo, halo exterior translúcido y trazos conectores continuos.
+   - Píldora inferior estilizada con `break-all whitespace-normal flex-wrap text-center` que permite envolver secuencias largas sin cortar la información con puntos suspensivos (`...`).
+2. **Variante Etiqueta Térmica (`LabelPreview.jsx` & `StickerTermico.jsx`):**
+   - Diseñada para rotuladoras e impresoras térmicas de 58mm y 80mm.
+   - **Paleta Estrictamente Monocromática:** Trazos y círculos en negro sólido (`#111827`) con números blancos sobre fondo blanco puro, evitando cualquier color rojo para prevenir tramas de escala de grises o manchas borrosas al imprimir.
+   - **Contenedor Acotado:** Dimensiones restringidas a `w-20 sm:w-24 max-w-[96px]` con secuencia numérica en píldora micro `wrap` centrada, asegurando convivencia limpia con la columna de datos del cliente (`flex-1 min-w-0 pr-2`).
+
+### 4.5 PENDIENTE / PRÓXIMO SPRINT (FASE SIGUIENTE - NO INICIADA): Modal de Entrega Final
+
+> [!NOTE]
+> **Estado de Implementación:** PENDIENTE / NO INICIADA. Esta funcionalidad corresponde al siguiente sprint de desarrollo y actualmente **no está implementada** en el código activo. No debe considerarse una característica existente hasta que se desarrolle en la siguiente fase.
+
+Una vez validados al 100% la recepción, el taller técnico, las incidencias y las credenciales de acceso, la fase proyectada para el siguiente ciclo operativo consistirá en el **Modal de Entrega Final y Cierre de Orden**:
+1. **Liquidación Consolidada:** Cálculo del saldo final a pagar:
+   $$\text{Balance} = \text{Costo Inicial} + \sum(\text{Incidencias Aprobadas}) - \text{Anticipos} - \text{Descuentos}$$
+2. **Evidencias Fotográficas de Salida:** Registro fotográfico obligatorio del equipo reparado y encendido (`tipo_evidencia = 'ENTREGA'`).
+3. **Firma de Conformidad y Salida:** Validación de la firma digital del cliente y transición al estado final `ENTREGADO`, generando el comprobante de salida y activando la póliza de garantía.
 
 ---
 

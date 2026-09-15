@@ -47,6 +47,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { UnlockMethodView } from '../common/PatternLock';
+import { stripEmojis } from '../../utils/stripEmojis';
 import {
   getServicioById,
   assignTecnicoServicio,
@@ -712,11 +713,11 @@ export const FichaTecnicaModal = ({
                 </div>
 
                 {/* Tarjeta de Seguridad (PIN / Patrón de desbloqueo) */}
-                <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 flex flex-col items-center justify-center text-center gap-1.5">
+                <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 flex flex-col items-center justify-between text-center gap-2">
                   <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500">
                     Acceso al Equipo
                   </span>
-                  <div className="my-auto py-1">
+                  <div className="my-auto py-1 w-full flex items-center justify-center">
                     <UnlockMethodView datosAcceso={orden.datos_acceso_equipo} />
                   </div>
                 </div>
@@ -764,7 +765,7 @@ export const FichaTecnicaModal = ({
                     <input
                       type="text"
                       value={notaCambio}
-                      onChange={(e) => setNotaCambio(e.target.value)}
+                      onChange={(e) => setNotaCambio(stripEmojis(e.target.value, false))}
                       placeholder="Ej: Se reemplazó conector de carga..."
                       className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:border-red-500 focus:ring-red-500/20 transition-colors"
                     />
@@ -822,7 +823,7 @@ export const FichaTecnicaModal = ({
                         <input
                           type="text"
                           value={repuestoRequerido}
-                          onChange={(e) => setRepuestoRequerido(e.target.value)}
+                          onChange={(e) => setRepuestoRequerido(stripEmojis(e.target.value, false))}
                           placeholder="Ej: Pantalla OLED, Batería, Flex..."
                           className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:border-red-500 focus:ring-red-500/20 transition-colors"
                         />
@@ -910,7 +911,7 @@ export const FichaTecnicaModal = ({
                       <textarea
                         rows={2}
                         value={descripcionIncidencia}
-                        onChange={(e) => setDescripcionIncidencia(e.target.value)}
+                        onChange={(e) => setDescripcionIncidencia(stripEmojis(e.target.value, false))}
                         placeholder="Describe detalladamente el daño no previsto, anomalía detectada o hallazgo técnico..."
                         required
                         className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:border-red-500 focus:ring-red-500/20 transition-colors resize-none leading-relaxed"

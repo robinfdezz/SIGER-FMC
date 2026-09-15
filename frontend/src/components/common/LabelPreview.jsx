@@ -182,7 +182,12 @@ export const LabelPreview = ({
 
   const deviceText = [mergedData.marca_equipo, mergedData.modelo_equipo].filter(Boolean).join(' ');
   const showUnlock = Boolean(incluir_metodo_desbloqueo);
-  const unlockSize = isPrintable ? (isCompact ? 34 : (effectiveHeightMm <= 30 ? 38 : 46)) : qrSize;
+  const unlockSize = useMemo(() => {
+    if (isPrintable) {
+      return isCompact ? 34 : (effectiveHeightMm <= 30 ? 38 : 44);
+    }
+    return isCompact ? 44 : (effectiveHeightMm <= 30 ? 48 : 56);
+  }, [isPrintable, isCompact, effectiveHeightMm]);
 
   const nombre = (incluir_cliente ? (mergedData.cliente_nombre || mergedData.nombre_cliente || '') : '').trim();
   const tel = (incluir_telefono ? (mergedData.cliente_telefono || mergedData.telefono_cliente || '') : '').trim();
@@ -265,7 +270,7 @@ export const LabelPreview = ({
         {/* Cuerpo del Sticker: Info del Cliente, Dispositivo y Método de Desbloqueo / QR */}
         <div className="flex items-center justify-between gap-2 overflow-hidden flex-1 min-h-0">
           {/* Columna Izquierda: Datos del cliente, equipo, falla y técnico */}
-          <div className="flex-1 min-w-0 flex flex-col justify-between h-full space-y-0.5">
+          <div className="flex-1 min-w-0 pr-2 flex flex-col justify-between h-full space-y-0.5">
             {/* Cliente y Teléfono */}
             {Boolean(textoCliente) && (
               <div className="flex items-center gap-1 min-w-0 truncate">
@@ -306,11 +311,11 @@ export const LabelPreview = ({
 
           {/* Renderizado del Código QR o Método de Desbloqueo (Alineado a la derecha, shrink-0) */}
           {showQr ? (
-            <div className="shrink-0 flex items-center justify-end">
+            <div className="w-20 sm:w-24 max-w-[96px] shrink-0 flex items-center justify-end">
               <div className="p-0.5 rounded border border-neutral-200 bg-white flex items-center justify-center">
                 <QRCodeSVG
                   value={trackingUrl}
-                  size={unlockSize}
+                  size={Math.min(unlockSize, 56)}
                   level="M"
                   bgColor="#ffffff"
                   fgColor="#000000"
@@ -319,11 +324,12 @@ export const LabelPreview = ({
               </div>
             </div>
           ) : showUnlock ? (
-            <div className="shrink-0 flex items-center justify-end">
+            <div className="w-20 sm:w-24 max-w-[96px] shrink-0 flex items-center justify-end">
               <UnlockMethodView
                 datosAcceso={mergedData.datos_acceso}
                 size={unlockSize}
                 isPrintable={isPrintable}
+                variant="compact"
                 className={isPrintable ? 'shadow-none border-neutral-300' : ''}
               />
             </div>
