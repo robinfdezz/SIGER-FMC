@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { getServicioByTicket } from '../services/servicios.service';
 import { getCompanyPublicProfile } from '../services/configuracion.service';
+import { useTheme } from '../context/ThemeContext';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import Badge from '../components/common/Badge';
@@ -22,57 +24,47 @@ import {
   ShieldCheck,
   ArrowRight,
   ClipboardCheck,
-  Receipt,
   Building2,
   User,
-  CheckCircle,
   AlertTriangle,
-  Minus
+  Minus,
+  ClipboardPaste
 } from 'lucide-react';
+import { MorphIcon } from 'morphicons/react';
+import { Sun, Moon } from 'lucide';
 
-const CHECKLIST_LABELS = {
-  enciende: 'Enciende',
-  pantalla: 'Pantalla / Imagen',
-  tactil: 'Táctil',
-  puerto_carga: 'Puerto de Carga',
-  camara_frontal: 'Cámara Frontal',
-  camara_trasera: 'Cámara Trasera',
-  auricular: 'Auricular / Altavoz',
-  microfono: 'Micrófono',
-  botones: 'Botones Físicos',
-  sim_senal: 'Lector SIM / Señal',
-  golpes_tapa: 'Golpes / Tapa Trasera'
-};
+import DeviceChecklistPicker from '../components/servicios/DeviceChecklistPicker';
+import ServiceTimeline from '../components/servicios/ServiceTimeline';
 
 // Progresión cromática cálida institucional (Mamey / Naranja -> Rojo Corporativo)
 const WARM_CHROMATIC_PALETTE = {
   RECIBIDO: {
-    hex: '#F59E0B', // Amber / Mamey
+    hex: '#F59E0B',
     tailText: 'text-amber-500 dark:text-amber-400',
     tailBorder: 'border-amber-500'
   },
   EN_DIAGNOSTICO: {
-    hex: '#F97316', // Orange / Mamey intenso
+    hex: '#F97316',
     tailText: 'text-orange-500 dark:text-orange-400',
     tailBorder: 'border-orange-500'
   },
   ESPERA_REPUESTO: {
-    hex: '#EA580C', // Naranja tostado / quemado
+    hex: '#EA580C',
     tailText: 'text-orange-600 dark:text-orange-400',
     tailBorder: 'border-orange-600'
   },
   EN_REPARACION: {
-    hex: '#EF4444', // Rojo coral / Bermellón
+    hex: '#EF4444',
     tailText: 'text-red-500 dark:text-red-400',
     tailBorder: 'border-red-500'
   },
   LISTO_ENTREGA: {
-    hex: '#DC2626', // Rojo vivo corporativo
+    hex: '#DC2626',
     tailText: 'text-red-600 dark:text-red-400',
     tailBorder: 'border-red-600'
   },
   ENTREGADO: {
-    hex: '#B91C1C', // Rojo profundo final
+    hex: '#B91C1C',
     tailText: 'text-red-700 dark:text-red-400',
     tailBorder: 'border-red-700'
   },
@@ -83,10 +75,22 @@ const WARM_CHROMATIC_PALETTE = {
   }
 };
 
+const formatFechaLegible = (isoString) => {
+  if (!isoString) return null;
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('es-DO', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+};
+
 export const EstadoOrdenPage = () => {
   const { codigo } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { isDark, toggleTheme } = useTheme();
 
   const codeFromUrl = (codigo || searchParams.get('codigo') || '').trim().toUpperCase();
 
@@ -95,8 +99,9 @@ export const EstadoOrdenPage = () => {
   const [error, setError] = useState(null);
   const [orden, setOrden] = useState(null);
   const [companyLogo, setCompanyLogo] = useState(null);
+  const [activePhoto, setActivePhoto] = useState(null);
 
-  // Cargar logotipo de la empresa en el cliente público
+  // Cargar logotipo oficial de Cloudinary en la vista pública
   useEffect(() => {
     let isMounted = true;
     (async () => {
@@ -168,6 +173,18 @@ export const EstadoOrdenPage = () => {
     const text = e.clipboardData?.getData('text') || '';
     const clean = text.toUpperCase().replace(/[^A-Z0-9-]/g, '');
     setInputCode(clean);
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard?.readText();
+      if (text) {
+        const clean = text.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+        setInputCode(clean);
+      }
+    } catch (err) {
+      console.warn('No se pudo acceder al portapapeles:', err);
+    }
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -287,59 +304,129 @@ export const EstadoOrdenPage = () => {
 
   const { steps: timelineSteps, activeIndex: currentStepIndex } = buildTimelineSteps(orden);
 
-  // Cálculos económicos para la tarjeta de Balance
-  const costoTotal = Number(orden?.costo_final_confirmado || orden?.costo_previsto || 0);
-  const anticipo = Number(orden?.monto_anticipo || 0);
-  const descuento = Number(orden?.monto_descuento || 0);
-  const balancePendiente = Math.max(0, costoTotal - anticipo - descuento);
-  const estaLiquidado = balancePendiente <= 0 || orden?.codigo_estado === 'ENTREGADO';
-
-  // Nota de diagnóstico técnico (si existe en historial o recepción)
-  const notaDiagnostico =
-    orden?.historial_estados?.find(
-      (h) => (h.codigo_estado === 'EN_DIAGNOSTICO' || h.codigo_estado === 'EN_REPARACION') && h.nota_cambio
-    )?.nota_cambio ||
-    orden?.observaciones_recepcion ||
-    null;
-
   // Determinar si la vista está vacía / en espera de búsqueda
   const isVistaInicial = !orden && !loading && !error;
+
+  // Fecha estimada normalizada
+  const fechaEstimadaRaw = orden?.fecha_estimada_entrega || orden?.fecha_entrega_estimada;
+  const fechaEstimadaFormateada = formatFechaLegible(fechaEstimadaRaw);
+  const fechaIngresoFormateada = formatFechaLegible(orden?.created_at);
+
+  // Lista de técnicos asignados normalizada
+  const tecnicosList = Array.isArray(orden?.tecnicos) && orden.tecnicos.length > 0
+    ? orden.tecnicos
+    : (orden?.tecnico_nombre && orden.tecnico_nombre !== 'Sin asignar'
+        ? [{ id: 1, nombre_completo: orden.tecnico_nombre }]
+        : []);
+
+  // Fotos de ingreso / recepción
+  const fotosArray = useMemo(() => {
+    return (orden?.fotos || orden?.fotos_recepcion || []).filter(
+      (f) => !f.incidencia_id && (f.tipo_evidencia === 'RECEPCION' || !f.tipo_evidencia || f.tipo_evidencia !== 'INCIDENCIA')
+    );
+  }, [orden]);
+
+  // Fotos de entrega (si hubiere)
+  const fotosEntrega = useMemo(() => {
+    return (orden?.fotos || []).filter((f) => f.tipo_evidencia === 'ENTREGA');
+  }, [orden]);
+
+  // Historial de eventos públicos para ServiceTimeline
+  const historialPublico = useMemo(() => {
+    if (!orden) return [];
+    const base = Array.isArray(orden.historial_estados) && orden.historial_estados.length > 0
+      ? orden.historial_estados
+      : [
+          {
+            id: 'inicio',
+            estado_id: orden.estado_id,
+            nombre_estado: orden.estado || 'Recibido en Taller',
+            codigo_estado: orden.codigo_estado,
+            orden_flujo: orden.orden_flujo || 1,
+            nota_cambio: null,
+            fecha_registro: orden.created_at
+          }
+        ];
+
+    return base
+      .map((item, idx) => {
+        const isReceptionEvent =
+          Number(item.orden_flujo) === 1 ||
+          String(item.codigo_estado || '').toUpperCase().includes('RECIB') ||
+          item.id === 'inicio' ||
+          idx === 0;
+
+        const isEntregaEvent =
+          Number(item.orden_flujo) === 7 ||
+          String(item.codigo_estado || '').toUpperCase().includes('ENTREG');
+
+        let itemFotos = Array.isArray(item.fotos) && item.fotos.length > 0 ? item.fotos : [];
+        if (itemFotos.length === 0) {
+          if (isReceptionEvent) {
+            itemFotos = fotosArray;
+          } else if (isEntregaEvent) {
+            itemFotos = fotosEntrega;
+          }
+        }
+
+        return {
+          ...item,
+          tipo_evento: 'ESTADO',
+          fotos: itemFotos,
+          _timelineKey: `pub-estado-${item.id || idx}`,
+          _sortTime: new Date(item.fecha_registro || orden.created_at || 0).getTime()
+        };
+      })
+      .sort((a, b) => b._sortTime - a._sortTime);
+  }, [orden, fotosArray, fotosEntrega]);
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-[#121214] text-neutral-900 dark:text-neutral-100 flex flex-col font-inter selection:bg-red-500 selection:text-white transition-colors duration-200">
       {/* ─────────────────────────────────────────────────────────────
-          1. HEADER PÚBLICO LIMPIO (Únicamente Logo y Subtítulo)
+          1. HEADER PÚBLICO CON LOGO Y TOGGLE DE TEMA
       ───────────────────────────────────────────────────────────── */}
-      <header className="border-b border-neutral-200/80 dark:border-neutral-800 bg-white/90 dark:bg-[#18181b]/90 backdrop-blur-md sticky top-0 z-20">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <header className="border-b border-neutral-200/80 dark:border-neutral-800 bg-white/90 dark:bg-[#18181b]/90 backdrop-blur-md sticky top-0 z-20 transition-colors">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {companyLogo ? (
               <img
                 src={companyLogo}
                 alt="Logotipo Oficial"
-                className="h-9 w-auto max-w-[160px] object-contain"
+                className={`h-8 sm:h-9 w-auto max-w-[130px] sm:max-w-[160px] object-contain transition-all duration-200 ${
+                  isDark ? 'brightness-0 invert' : ''
+                }`}
                 onError={() => setCompanyLogo(null)}
               />
             ) : (
-              <div className="flex items-center">
-                <img src={logoFmcBlack} alt="FMC" className="h-8 w-auto dark:hidden" />
-                <img src={logoFmcWhite} alt="FMC" className="h-8 w-auto hidden dark:block" />
-              </div>
+              <img
+                src={isDark ? logoFmcWhite : logoFmcBlack}
+                alt="FMC"
+                className="h-7 sm:h-8 w-auto object-contain transition-all duration-200"
+              />
             )}
-
-            <div className="border-l border-neutral-200 dark:border-neutral-800 pl-3">
-              <span className="text-[10px] sm:text-[11px] text-neutral-500 dark:text-neutral-400 font-semibold tracking-wider uppercase font-inter">
-                Portal de Consulta y Seguimiento
-              </span>
-            </div>
           </div>
+
+          {/* Toggle de Modo Oscuro / Claro (Idéntico a Sidebar y Dashboard) */}
+          <button
+            onClick={toggleTheme}
+            type="button"
+            aria-label={isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
+            title={isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
+            className="w-10 h-10 flex items-center justify-center rounded-lg aspect-square text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer shrink-0"
+          >
+            <MorphIcon
+              icon={isDark ? Moon : Sun}
+              size={20}
+              className={isDark ? "text-red-500" : "text-zinc-600 dark:text-zinc-400"}
+            />
+          </button>
         </div>
       </header>
 
       {/* ─────────────────────────────────────────────────────────────
           CONTENIDO PRINCIPAL
       ───────────────────────────────────────────────────────────── */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 flex flex-col justify-center">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-center">
         {/* Bloque de Bienvenida y Buscador: Centrado en pantalla vacía, o arriba al tener datos */}
         <section
           className={`w-full transition-all duration-500 ease-out ${
@@ -348,12 +435,12 @@ export const EstadoOrdenPage = () => {
               : 'pt-6 sm:pt-8 pb-4 text-center max-w-2xl mx-auto'
           }`}
         >
-          {/* TÍTULO DINÁMICO */}
+          {/* TÍTULO DINÁMICO RESPONSIVO */}
           {orden ? (
-            <div className="max-w-xl mx-auto space-y-1.5 mb-6">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-outfit text-neutral-900 dark:text-white tracking-tight">
+            <div className="max-w-xl mx-auto space-y-1.5 mb-6 px-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold font-outfit text-neutral-900 dark:text-white tracking-tight">
                 Consultando el ticket:
-                <span className="block font-mono text-red-600 dark:text-red-500 select-all mt-1 sm:mt-1.5 text-2xl sm:text-3xl lg:text-4xl">
+                <span className="block font-mono text-red-600 dark:text-red-500 select-all mt-1 sm:mt-1.5 text-xl sm:text-2xl md:text-3xl font-black break-all">
                   #{orden.codigo_ticket}
                 </span>
               </h1>
@@ -362,7 +449,7 @@ export const EstadoOrdenPage = () => {
               </p>
             </div>
           ) : (
-            <div className="max-w-xl mx-auto space-y-2 mb-6">
+            <div className="max-w-xl mx-auto space-y-2 mb-6 px-1">
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-outfit text-neutral-900 dark:text-white tracking-tight">
                 Consulta el Estado de tu Equipo
               </h1>
@@ -372,19 +459,31 @@ export const EstadoOrdenPage = () => {
             </div>
           )}
 
-          {/* BUSCADOR CON BUTTON REUTILIZABLE */}
-          <form onSubmit={handleSearch} className="w-full max-w-md mx-auto flex items-center gap-2">
-            <div className="flex-1">
+          {/* BUSCADOR ADAPTATIVO: Columna en móvil, fila en pantallas mayores */}
+          <form
+            onSubmit={handleSearch}
+            className="w-full max-w-md mx-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5"
+          >
+            <div className="flex-1 w-full relative flex items-center">
               <Input
                 id="ticket-search-input"
                 value={inputCode}
                 onChange={handleInputChange}
                 onPaste={handleInputPaste}
                 placeholder="Ej: FMC-SFM-6XQB-W33K"
-                className="font-mono text-sm sm:text-base uppercase tracking-wider !py-2.5 !px-4"
+                className="font-mono text-sm sm:text-base uppercase tracking-wider !py-2.5 !pl-4 !pr-11 w-full"
                 autoComplete="off"
                 autoFocus={isVistaInicial}
               />
+              <button
+                type="button"
+                onClick={handlePasteFromClipboard}
+                className="absolute right-2.5 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/80 transition-colors cursor-pointer shrink-0 focus:outline-hidden"
+                title="Pegar código desde el portapapeles"
+                aria-label="Pegar código desde el portapapeles"
+              >
+                <ClipboardPaste size={17} />
+              </button>
             </div>
 
             <Button
@@ -394,11 +493,19 @@ export const EstadoOrdenPage = () => {
               isLoading={loading}
               icon={ArrowRight}
               iconPosition="right"
-              className="!h-[42px] px-5 text-xs sm:text-sm font-semibold shrink-0"
+              className="!h-[44px] sm:!h-[42px] px-6 text-sm font-semibold w-full sm:w-auto shrink-0 justify-center"
             >
               Consultar
             </Button>
           </form>
+
+          {/* Mensaje de Error Inline y Minimalista con separación adecuada */}
+          {!loading && error && (
+            <div className="mt-5 sm:mt-6 flex items-center justify-center gap-1.5 text-sm font-medium text-rose-600 dark:text-rose-400 animate-fade-in font-inter text-center">
+              <AlertCircle size={16} className="shrink-0" />
+              <span>Ticket no encontrado. Verifica el código e intenta nuevamente.</span>
+            </div>
+          )}
         </section>
 
         {/* Estado de Carga */}
@@ -411,25 +518,14 @@ export const EstadoOrdenPage = () => {
           </div>
         )}
 
-        {/* Mensaje de Error */}
-        {!loading && error && (
-          <div className="max-w-lg mx-auto mb-8 p-4 sm:p-5 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 flex items-start gap-3.5 text-red-800 dark:text-red-300 animate-fade-in">
-            <AlertCircle size={20} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-            <div className="space-y-1 text-xs sm:text-sm">
-              <p className="font-semibold font-outfit">Ticket no encontrado</p>
-              <p className="text-red-700 dark:text-red-400/90 font-inter leading-relaxed">{error}</p>
-            </div>
-          </div>
-        )}
-
         {/* ─────────────────────────────────────────────────────────────
-            3. TRACKER VISUAL DESACOPLADO (Flotando sobre el fondo general)
+            2. TRACKER VISUAL DESACOPLADO CON DESPLAZAMIENTO SUAVE EN MÓVIL
         ───────────────────────────────────────────────────────────── */}
         {!loading && orden && (
-          <div className="space-y-8 pb-12 animate-fade-in">
-            {/* Stepper horizontal liberado de la caja blanca */}
-            <div className="w-full my-6 sm:my-8 px-2 select-none">
-              <div className="flex items-start justify-between relative">
+          <div className="space-y-6 pb-12 animate-fade-in">
+            {/* Stepper horizontal liberado con scroll suave en pantallas estrechas */}
+            <div className="w-full my-6 sm:my-8 overflow-x-auto no-scrollbar pb-3 pt-1 px-1 select-none">
+              <div className="min-w-[540px] sm:min-w-0 w-full flex items-start justify-between relative">
                 {timelineSteps.map((s, index) => {
                   const isCompleted = index < currentStepIndex;
                   const isCurrent = index === currentStepIndex;
@@ -450,22 +546,20 @@ export const EstadoOrdenPage = () => {
                           {/* Paso Completado: Tono cálido correspondiente con Check */}
                           {isCompleted && (
                             <div
-                              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full text-white flex items-center justify-center shadow-xs transition-transform hover:scale-105"
+                              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full text-white flex items-center justify-center shadow-xs"
                               style={{ backgroundColor: colorStage.hex }}
                             >
                               <Check size={18} strokeWidth={2.8} />
                             </div>
                           )}
 
-                          {/* Paso Activo / En Curso: Borde y pulso en el color de su etapa */}
+                          {/* Paso Activo / En Curso: Aro nítido sin relleno blanquecino ni sombras */}
                           {isCurrent && (
                             <div
-                              className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 flex items-center justify-center animate-pulse"
+                              className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 bg-transparent flex items-center justify-center animate-pulse"
                               style={{
                                 borderColor: colorStage.hex,
-                                backgroundColor: `${colorStage.hex}18`,
-                                color: colorStage.hex,
-                                boxShadow: `0 0 14px ${colorStage.hex}35`
+                                color: colorStage.hex
                               }}
                             >
                               <StepIcon size={18} />
@@ -481,14 +575,12 @@ export const EstadoOrdenPage = () => {
                         </div>
 
                         {/* Título y Subtítulo centrado */}
-                        <div className="mt-2.5 px-1 max-w-[120px] sm:max-w-[150px]">
+                        <div className="mt-2.5 px-1 max-w-[110px] sm:max-w-[140px]">
                           <p
                             className="text-xs sm:text-sm font-semibold font-outfit leading-tight transition-colors"
                             style={{
                               color: isCurrent
                                 ? colorStage.hex
-                                : isCompleted
-                                ? undefined
                                 : undefined
                             }}
                           >
@@ -535,7 +627,7 @@ export const EstadoOrdenPage = () => {
             </div>
 
             {/* ─────────────────────────────────────────────────────────────
-                4. CUADRÍCULA DE TARJETAS DETALLADAS (2x2)
+                3. TARJETAS DETALLADAS HOMOLOGADAS Y RESPONSIVAS
             ───────────────────────────────────────────────────────────── */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Tarjeta 1: Dispositivo en Servicio */}
@@ -561,55 +653,51 @@ export const EstadoOrdenPage = () => {
                   )}
                 </div>
 
-                <div className="space-y-3.5 text-xs sm:text-sm font-inter">
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-3.5 font-inter">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
-                      <span className="text-neutral-400 block text-[11px] uppercase tracking-wider font-semibold">
-                        Marca y Modelo
+                      <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block mb-1">
+                        Marca / Modelo
                       </span>
-                      <span className="font-semibold text-neutral-900 dark:text-neutral-100 font-inter text-sm block mt-0.5">
+                      <span className="text-sm font-bold text-neutral-800 dark:text-neutral-100 font-inter block leading-normal break-words">
                         {[orden.marca_equipo, orden.modelo_equipo].filter(Boolean).join(' ')}
                       </span>
                     </div>
+
                     <div>
-                      <span className="text-neutral-400 block text-[11px] uppercase tracking-wider font-semibold">
+                      <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block mb-1">
                         IMEI / N° de Serie
                       </span>
-                      <span className="font-mono text-neutral-800 dark:text-neutral-200 block mt-0.5">
-                        {orden.num_serie_imei || 'No especificado'}
-                      </span>
+                      {orden.num_serie_imei ? (
+                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-100 font-inter tabular-nums tracking-wide block leading-normal break-all">
+                          {orden.num_serie_imei}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-neutral-400 dark:text-neutral-500 font-normal font-inter block leading-normal">
+                          No registrado
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-100 dark:border-neutral-800/80 space-y-1">
-                    <span className="text-neutral-400 block text-[11px] uppercase tracking-wider font-semibold">
+                  <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1">
+                    <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block">
                       Falla Declarada por el Cliente
                     </span>
-                    <p className="text-neutral-800 dark:text-neutral-200 font-medium leading-relaxed text-xs">
+                    <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 leading-relaxed">
                       {orden.falla_reportada || 'Revisión general'}
                     </p>
                   </div>
 
-                  {notaDiagnostico && (
-                    <div className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 space-y-1">
-                      <span className="text-blue-600 dark:text-blue-400 block text-[11px] uppercase tracking-wider font-semibold">
-                        Diagnóstico Técnico / Observaciones
-                      </span>
-                      <p className="text-neutral-800 dark:text-neutral-200 leading-relaxed text-xs">
-                        {notaDiagnostico}
-                      </p>
-                    </div>
-                  )}
-
                   {(orden.accesorios_recibidos || orden.accesorios) && (
-                    <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-100 dark:border-neutral-800/80 space-y-1">
-                      <div className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400">
+                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1">
+                      <div className="flex items-center gap-1.5 text-neutral-400 dark:text-neutral-500">
                         <Package size={13} className="shrink-0" />
-                        <span className="text-[11px] uppercase tracking-wider font-semibold">
+                        <span className="uppercase tracking-wider text-xs font-semibold block">
                           Accesorios Recibidos
                         </span>
                       </div>
-                      <p className="text-neutral-700 dark:text-neutral-300 font-medium text-xs leading-relaxed">
+                      <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 leading-relaxed">
                         {orden.accesorios_recibidos || orden.accesorios}
                       </p>
                     </div>
@@ -626,180 +714,109 @@ export const EstadoOrdenPage = () => {
                   </h3>
                 </div>
 
-                <div className="space-y-3.5 text-xs sm:text-sm font-inter">
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-3.5 font-inter">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
-                      <span className="text-neutral-400 block text-[11px] uppercase tracking-wider font-semibold">
+                      <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block mb-1">
                         Fecha de Ingreso
                       </span>
-                      <span className="font-medium text-neutral-800 dark:text-neutral-200 block mt-0.5">
-                        {orden.created_at
-                          ? new Date(orden.created_at).toLocaleDateString('es-DO', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric'
-                            })
-                          : '—'}
+                      <span className="text-sm font-bold text-neutral-800 dark:text-neutral-100 font-inter tabular-nums block leading-normal">
+                        {fechaIngresoFormateada || '—'}
                       </span>
                     </div>
 
                     <div>
-                      <span className="text-neutral-400 block text-[11px] uppercase tracking-wider font-semibold">
-                        Fecha Estimada de Entrega
+                      <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block mb-1">
+                        Fecha Est. Entrega
                       </span>
-                      <span className="font-medium text-neutral-800 dark:text-neutral-200 block mt-0.5">
-                        {orden.fecha_entrega_real
-                          ? new Date(orden.fecha_entrega_real).toLocaleDateString('es-DO', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric'
-                            })
-                          : orden.fecha_entrega_estimada
-                          ? new Date(orden.fecha_entrega_estimada).toLocaleDateString('es-DO', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric'
-                            })
-                          : 'Por definir según diagnóstico'}
-                      </span>
+                      {fechaEstimadaFormateada ? (
+                        <span className="text-sm font-bold text-neutral-800 dark:text-neutral-100 font-inter tabular-nums block leading-normal">
+                          {fechaEstimadaFormateada}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-neutral-400 dark:text-neutral-500 font-normal font-inter block leading-normal">
+                          Pendiente de confirmación
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-100 dark:border-neutral-800/80 space-y-1">
-                    <div className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400">
+                  {/* Técnicos Asignados (Soporte Múltiple con envoltorio flex) */}
+                  <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-neutral-400 dark:text-neutral-500">
                       <User size={13} className="shrink-0" />
-                      <span className="text-[11px] uppercase tracking-wider font-semibold">
-                        Técnico Asignado
+                      <span className="uppercase tracking-wider text-xs font-semibold block">
+                        {tecnicosList.length > 1 ? 'Técnicos Asignados' : 'Técnico Asignado'}
                       </span>
                     </div>
-                    <span className="text-neutral-800 dark:text-neutral-200 font-semibold text-xs block">
-                      {orden.tecnico_nombre || 'Especialista en taller asignado'}
-                    </span>
+
+                    {tecnicosList.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {tecnicosList.map((tec, idx) => (
+                          <span
+                            key={tec.id || idx}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-neutral-100 dark:bg-neutral-800/90 text-neutral-800 dark:text-neutral-200 border border-neutral-200/80 dark:border-neutral-700/80 shadow-2xs max-w-full truncate"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                            <span className="truncate">{tec.nombre_completo || `${tec.nombre} ${tec.apellido}`}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-neutral-400 dark:text-neutral-500 font-normal font-inter block">
+                        Pendiente de asignación
+                      </span>
+                    )}
                   </div>
 
-                  <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-100 dark:border-neutral-800/80 space-y-1">
-                    <div className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400">
+                  {/* Sucursal Responsable */}
+                  <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1">
+                    <div className="flex items-center gap-1.5 text-neutral-400 dark:text-neutral-500">
                       <Building2 size={13} className="shrink-0" />
-                      <span className="text-[11px] uppercase tracking-wider font-semibold">
+                      <span className="uppercase tracking-wider text-xs font-semibold block">
                         Sucursal Responsable
                       </span>
                     </div>
-                    <span className="text-neutral-800 dark:text-neutral-200 font-semibold text-xs block">
+                    <span className="text-sm font-bold text-neutral-800 dark:text-neutral-100 font-inter block break-words">
                       {orden.sucursal || 'Sucursal Principal'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Tarjeta 3: Checklist de Recepción */}
-              <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
+              {/* Tarjeta 3: Checklist de Recepción (Full Width con rejilla responsiva) */}
+              <div className="md:col-span-2 p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-3 border-b border-neutral-100 dark:border-neutral-800">
                   <div className="flex items-center gap-2">
                     <ClipboardCheck size={18} className="text-red-500 shrink-0" />
                     <h3 className="text-sm font-bold font-outfit text-neutral-900 dark:text-neutral-100">
                       Checklist de Recepción
                     </h3>
                   </div>
-                  <span className="text-[11px] text-neutral-400 font-medium">Estado inicial</span>
-                </div>
-
-                {orden.checklist_entrada && Object.keys(orden.checklist_entrada).length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(orden.checklist_entrada).map(([key, val]) => {
-                      const label = CHECKLIST_LABELS[key] || key.replace(/_/g, ' ');
-                      const isOk = val === 'ok' || val === true || val === 'bueno';
-                      const isFalla = val === 'falla' || val === false || val === 'malo';
-
-                      return (
-                        <div
-                          key={key}
-                          className={`flex items-center justify-between p-2 rounded-xl border text-xs font-medium ${
-                            isOk
-                              ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300'
-                              : isFalla
-                              ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200/60 dark:border-rose-800/40 text-rose-800 dark:text-rose-300'
-                              : 'bg-neutral-50 dark:bg-neutral-900/40 border-neutral-200/50 dark:border-neutral-800 text-neutral-500'
-                          }`}
-                        >
-                          <span className="truncate pr-1">{label}</span>
-                          {isOk ? (
-                            <CheckCircle size={13} className="text-emerald-500 shrink-0" />
-                          ) : isFalla ? (
-                            <AlertTriangle size={13} className="text-rose-500 shrink-0" />
-                          ) : (
-                            <Minus size={13} className="text-neutral-400 shrink-0" />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="py-6 text-center text-xs text-neutral-400 font-inter">
-                    Inspección estándar sin observaciones críticas registradas.
-                  </div>
-                )}
-              </div>
-
-              {/* Tarjeta 4: Balance / Pago */}
-              <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
-                  <div className="flex items-center gap-2">
-                    <Receipt size={18} className="text-red-500 shrink-0" />
-                    <h3 className="text-sm font-bold font-outfit text-neutral-900 dark:text-neutral-100">
-                      Balance y Cotización
-                    </h3>
-                  </div>
-
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                      estaLiquidado
-                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800'
-                        : anticipo > 0
-                        ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800'
-                        : 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800'
-                    }`}
-                  >
-                    {estaLiquidado ? 'Liquidado' : anticipo > 0 ? 'Abono Parcial' : 'Pendiente'}
+                  <span className="uppercase tracking-wider text-[11px] sm:text-xs font-semibold text-neutral-400 dark:text-neutral-500">
+                    Inspección Inicial de Hardware
                   </span>
                 </div>
 
-                <div className="space-y-3 font-inter">
-                  <div className="flex items-center justify-between text-xs sm:text-sm py-1 border-b border-neutral-100 dark:border-neutral-800/60">
-                    <span className="text-neutral-500 dark:text-neutral-400">Presupuesto Acordado:</span>
-                    <span className="font-semibold text-neutral-900 dark:text-neutral-100 font-mono">
-                      RD$ {costoTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
+                <DeviceChecklistPicker
+                  value={orden.checklist_entrada}
+                  readOnly={true}
+                  centered={true}
+                  badgeVariant="minimal"
+                  showCard={false}
+                  showHeader={false}
+                />
+              </div>
 
-                  <div className="flex items-center justify-between text-xs sm:text-sm py-1 border-b border-neutral-100 dark:border-neutral-800/60">
-                    <span className="text-neutral-500 dark:text-neutral-400">Abono Inicial (Anticipo):</span>
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
-                      RD$ {anticipo.toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-
-                  {descuento > 0 && (
-                    <div className="flex items-center justify-between text-xs sm:text-sm py-1 border-b border-neutral-100 dark:border-neutral-800/60">
-                      <span className="text-neutral-500 dark:text-neutral-400">Descuento Especial:</span>
-                      <span className="font-semibold text-amber-600 dark:text-amber-400 font-mono">
-                        - RD$ {descuento.toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between text-sm sm:text-base pt-2 font-bold">
-                    <span className="text-neutral-800 dark:text-neutral-200">Balance Pendiente:</span>
-                    <span
-                      className={`font-mono text-base sm:text-lg ${
-                        balancePendiente > 0
-                          ? 'text-red-600 dark:text-red-400'
-                          : 'text-emerald-600 dark:text-emerald-400'
-                      }`}
-                    >
-                      RD$ {balancePendiente.toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
+              {/* Tarjeta 4: Historial de Avance en Taller (Línea de Tiempo Pública) */}
+              <div className="md:col-span-2">
+                <ServiceTimeline
+                  events={historialPublico}
+                  isPublic={true}
+                  title="Historial de Avance"
+                  onPhotoClick={setActivePhoto}
+                  maxHeight="max-h-[520px]"
+                />
               </div>
             </div>
           </div>
@@ -810,13 +827,42 @@ export const EstadoOrdenPage = () => {
           FOOTER INSTITUCIONAL
       ───────────────────────────────────────────────────────────── */}
       <footer className="border-t border-neutral-200/80 dark:border-neutral-800 py-6 text-center text-xs text-neutral-400 font-inter mt-auto">
-        <div className="max-w-5xl mx-auto px-4 space-y-1">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-1">
           <p>© {new Date().getFullYear()} Franyer Mobile Center. Todos los derechos reservados.</p>
           <p className="text-[11px] text-neutral-400/80">
             Los tiempos de reparación pueden variar según disponibilidad de repuestos y complejidad técnica.
           </p>
         </div>
       </footer>
+
+      {/* Modal Lightbox de Foto Pública */}
+      {activePhoto &&
+        createPortal(
+          <div
+            onClick={() => setActivePhoto(null)}
+            className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md cursor-pointer animate-fade-in"
+          >
+            <button
+              type="button"
+              onClick={() => setActivePhoto(null)}
+              className="absolute top-4 right-4 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer z-10"
+              title="Cerrar visor"
+            >
+              <X size={22} />
+            </button>
+            <div
+              className="relative max-w-4xl max-h-[90vh] rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={activePhoto}
+                alt="Evidencia ampliada"
+                className="w-auto h-auto max-w-full max-h-[85vh] object-contain rounded-xl"
+              />
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

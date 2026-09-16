@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ShieldCheck, RotateCcw, Lock, Hash, Type, Unlock } from 'lucide-react';
 import { Eye, EyeOff } from 'lucide';
 import { MorphIcon } from 'morphicons/react';
+import { normalizePattern } from '../common/PatternLock';
 
 // ────────────────────────────────────────────────────────────────
 // MÉTODOS DE DESBLOQUEO
@@ -14,19 +15,20 @@ const METODOS = [
 ];
 
 // ────────────────────────────────────────────────────────────────
-// SUB-COMPONENTE: Cuadrícula de Patrón Android 3x3
+// SUB-COMPONENTE: Cuadrícula de Patrón Android 3x3 (Nodos 1 a 9 estándar)
+//  1  2  3  (fila 0: col 0, 1, 2)
+//  4  5  6  (fila 1: col 0, 1, 2)
+//  7  8  9  (fila 2: col 0, 1, 2)
 // ────────────────────────────────────────────────────────────────
 const GRID_SIZE = 240;
 const NODE_R    = 18;
-const POSITIONS = [
-  [0, 0], [1, 0], [2, 0],
-  [0, 1], [1, 1], [2, 1],
-  [0, 2], [1, 2], [2, 2],
-];
+const NODES_1_TO_9 = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-const nodeCenter = (col, row) => {
+const nodeCenter = (id) => {
   const step = GRID_SIZE / 3;
   const offset = step / 2;
+  const col = (id - 1) % 3;
+  const row = Math.floor((id - 1) / 3);
   return { x: col * step + offset, y: row * step + offset };
 };
 
@@ -48,11 +50,10 @@ const PatternGrid = ({ pattern, onChange }) => {
   };
 
   const getNodeAt = ({ x, y }) => {
-    for (let idx = 0; idx < 9; idx++) {
-      const [col, row] = POSITIONS[idx];
-      const c = nodeCenter(col, row);
+    for (const id of NODES_1_TO_9) {
+      const c = nodeCenter(id);
       const dist = Math.hypot(x - c.x, y - c.y);
-      if (dist <= NODE_R * 1.4) return idx;
+      if (dist <= NODE_R * 1.4) return id;
     }
     return null;
   };
@@ -109,18 +110,15 @@ const PatternGrid = ({ pattern, onChange }) => {
   // Dibuja las líneas del patrón
   const lines = [];
   for (let i = 0; i < pattern.length - 1; i++) {
-    const [c1, r1] = POSITIONS[pattern[i]];
-    const [c2, r2] = POSITIONS[pattern[i + 1]];
-    const a = nodeCenter(c1, r1);
-    const b = nodeCenter(c2, r2);
+    const a = nodeCenter(pattern[i]);
+    const b = nodeCenter(pattern[i + 1]);
     lines.push(<line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" opacity="0.7" />);
   }
 
   // Línea hacia la posición actual del puntero
   if (livePos && pattern.length > 0) {
     const last = pattern[pattern.length - 1];
-    const [lc, lr] = POSITIONS[last];
-    const lp = nodeCenter(lc, lr);
+    const lp = nodeCenter(last);
     lines.push(<line key="live" x1={lp.x} y1={lp.y} x2={livePos.x} y2={livePos.y} stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeDasharray="4 3" opacity="0.5" />);
   }
 
@@ -136,12 +134,12 @@ const PatternGrid = ({ pattern, onChange }) => {
         onTouchMove={onMove}
       >
         {lines}
-        {POSITIONS.map(([col, row], idx) => {
-          const { x, y } = nodeCenter(col, row);
-          const active   = isActive(idx);
-          const order    = active ? activeOrder(idx) : null;
+        {NODES_1_TO_9.map((id) => {
+          const { x, y } = nodeCenter(id);
+          const active   = isActive(id);
+          const order    = active ? activeOrder(id) : null;
           return (
-            <g key={idx}>
+            <g key={id}>
               {/* Círculo exterior (halo) cuando está activo */}
               {active && (
                 <circle cx={x} cy={y} r={NODE_R * 1.5} fill="#ef444420" />
@@ -225,8 +223,9 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
     const rawVal = value?.valor ?? value?.patron;
     const currentMetodo = value?.metodo || value?.tipo || 'ninguno';
 
-    if (currentMetodo === 'patron' && Array.isArray(rawVal)) {
-      setPattern(rawVal);
+    if (currentMetodo === 'patron') {
+      const normalized = normalizePattern(value);
+      setPattern(normalized.nodes);
       setInputVal('');
     } else if (currentMetodo === 'pin' || currentMetodo === 'contrasena') {
       setInputVal(typeof rawVal === 'string' ? rawVal : (typeof rawVal === 'number' ? String(rawVal) : ''));
@@ -237,7 +236,7 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
       setInputVal('');
       setShowSecret(false);
     }
-  }, [value?.metodo, value?.tipo, value?.valor, value?.patron]);
+  }, [value?.metodo, value?.tipo, value?.valor, value?.patron, value?.base]);
 
   const handleMetodoChange = (id) => {
     setPattern([]);
@@ -246,13 +245,20 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
     if (id === 'ninguno') {
       onChange({ metodo: 'ninguno', tipo: 'ninguno', valor: null, patron: [] });
     } else {
-      onChange({ metodo: id, tipo: id, valor: id === 'patron' ? [] : '', patron: [] });
+      onChange({ metodo: id, tipo: id, valor: id === 'patron' ? [] : '', patron: [], base: id === 'patron' ? 1 : undefined });
     }
   };
 
   const handlePatternChange = (newPattern) => {
     setPattern(newPattern);
-    onChange({ metodo: 'patron', tipo: 'patron', valor: newPattern, patron: newPattern });
+    const textSequence = newPattern.join('-');
+    onChange({
+      metodo: 'patron',
+      tipo: 'patron',
+      valor: textSequence,
+      patron: newPattern,
+      base: 1
+    });
   };
 
   const handlePinChange = (e) => {

@@ -14,21 +14,32 @@ import { Unlock, Hash, KeyRound } from 'lucide-react';
 export const normalizePattern = (raw) => {
   if (!raw) return { nodes: [], text: '' };
 
+  // Si ya es un objeto normalizado previamente
+  if (raw && typeof raw === 'object' && Array.isArray(raw.nodes) && typeof raw.text === 'string') {
+    return raw;
+  }
+
   let arr = [];
-  if (Array.isArray(raw)) {
+  let isExplicitBase1 = false;
+  let isExplicitBase0 = false;
+
+  if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+    if (raw.base === 1) isExplicitBase1 = true;
+    if (raw.base === 0) isExplicitBase0 = true;
+    if (typeof raw.valor === 'string' && raw.valor.includes('-')) {
+      arr = raw.valor.split('-');
+      isExplicitBase1 = true;
+    } else {
+      arr = raw.patron || raw.valor || [];
+    }
+  } else if (Array.isArray(raw)) {
     arr = raw;
-  } else if (typeof raw === 'object' && raw !== null) {
-    arr = raw.patron || raw.valor || [];
   } else if (typeof raw === 'string') {
     const trimmed = raw.trim();
     if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
       try {
         const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          arr = parsed;
-        } else if (typeof parsed === 'object' && parsed !== null) {
-          arr = parsed.patron || parsed.valor || [];
-        }
+        return normalizePattern(parsed);
       } catch {
         arr = trimmed.split(/[-,\s]+/);
       }
@@ -45,12 +56,31 @@ export const normalizePattern = (raw) => {
 
   if (numArr.length === 0) return { nodes: [], text: '' };
 
-  // Detectar base 0 (0..8). Si contiene 0 o algún valor <= 8 con presencia de 0
+  // Detección precisa de base 0 (0..8) vs base 1 (1..9):
+  // - Si contiene 0 -> 100% base 0.
+  // - Si contiene 9 -> 100% base 1.
+  // - Si es explícito base 1 o viene de un string con guiones -> base 1.
+  // - Si es explícito base 0 -> base 0.
+  // - Si todos los números son <= 8 y provienen de un objeto de datos de acceso de recepción
+  //   sin base explícita, se trata del formato heredado 0..8 de DeviceSecurityPicker.
   const hasZero = numArr.includes(0);
-  const maxVal = Math.max(...numArr);
-  const isZeroBased = hasZero || (maxVal <= 8 && numArr.some((n) => n === 0));
+  const hasNine = numArr.includes(9);
 
-  // Convertir a base 1 (1..9)
+  let isZeroBased = false;
+  if (isExplicitBase1 || hasNine) {
+    isZeroBased = false;
+  } else if (isExplicitBase0 || hasZero) {
+    isZeroBased = true;
+  } else {
+    const maxVal = Math.max(...numArr);
+    if (maxVal <= 8) {
+      if (typeof raw === 'object' && (raw?.metodo === 'patron' || raw?.tipo === 'patron' || raw?.patron)) {
+        isZeroBased = true;
+      }
+    }
+  }
+
+  // Convertir a base 1 (1..9) estándar
   const nodes1to9 = numArr
     .map((n) => (isZeroBased ? n + 1 : n))
     .filter((n) => n >= 1 && n <= 9);
@@ -306,7 +336,7 @@ export const UnlockMethodView = ({
 
   if (metodoAcceso === 'patron') {
     const rawPattern = datos?.patron ?? datos?.valor;
-    const { nodes, text } = normalizePattern(rawPattern || [0, 1, 4, 7, 8]);
+    const { nodes, text } = normalizePattern(datos || rawPattern || [0, 1, 4, 7, 8]);
     const displayText = text || '1-2-5-8-9';
 
     if (isCompact) {

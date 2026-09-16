@@ -61,6 +61,8 @@ import {
 } from '../../services/servicios.service';
 import { getWorkers } from '../../services/workers.service';
 import DevicePhotoUploader from '../servicios/DevicePhotoUploader';
+import DeviceChecklistPicker from '../servicios/DeviceChecklistPicker';
+import ServiceTimeline from '../servicios/ServiceTimeline';
 import { sileo } from 'sileo';
 
 const TIPOS_INCIDENCIA = [
@@ -577,8 +579,11 @@ export const FichaTecnicaModal = ({
   const countPendientes = checklistDisplayItems.filter(
     ({ key }) => normalizeChecklistState(checklistData?.[key]) === 'sin_revisar'
   ).length;
-  const fotosArray = (orden?.fotos || []).filter(
+  const fotosArray = (orden?.fotos || orden?.fotos_recepcion || []).filter(
     (f) => !f.incidencia_id && (f.tipo_evidencia === 'RECEPCION' || !f.tipo_evidencia || f.tipo_evidencia !== 'INCIDENCIA')
+  );
+  const fotosEntrega = (orden?.fotos || []).filter(
+    (f) => f.tipo_evidencia === 'ENTREGA'
   );
   const tecnicosList = Array.isArray(orden?.tecnicos) ? orden.tecnicos : [];
   const isCurrentUserAssigned = tecnicosList.some((t) => t.id === effectiveUserId);
@@ -695,13 +700,35 @@ export const FichaTecnicaModal = ({
         }
       ];
 
-  // Eventos de cambios de estado
-  const estadosEvents = baseEstados.map((item, idx) => ({
-    ...item,
-    tipo_evento: 'ESTADO',
-    _timelineKey: `estado-${item.id || idx}`,
-    _sortTime: new Date(item.fecha_registro || orden?.created_at || 0).getTime()
-  }));
+  // Eventos de cambios de estado (asociando evidencias fotográficas de recepción y entrega)
+  const estadosEvents = baseEstados.map((item, idx) => {
+    const isReceptionEvent =
+      Number(item.orden_flujo) === 1 ||
+      String(item.codigo_estado || '').toUpperCase().includes('RECIB') ||
+      item.id === 'inicio' ||
+      idx === 0;
+
+    const isEntregaEvent =
+      Number(item.orden_flujo) === 7 ||
+      String(item.codigo_estado || '').toUpperCase().includes('ENTREG');
+
+    let itemFotos = Array.isArray(item.fotos) && item.fotos.length > 0 ? item.fotos : [];
+    if (itemFotos.length === 0) {
+      if (isReceptionEvent) {
+        itemFotos = fotosArray;
+      } else if (isEntregaEvent) {
+        itemFotos = fotosEntrega;
+      }
+    }
+
+    return {
+      ...item,
+      tipo_evento: 'ESTADO',
+      fotos: itemFotos,
+      _timelineKey: `estado-${item.id || idx}`,
+      _sortTime: new Date(item.fecha_registro || orden?.created_at || 0).getTime()
+    };
+  });
 
   // Eventos de incidencias y hallazgos técnicos
   const incidenciasEvents = (Array.isArray(incidencias) ? incidencias : []).map((item, idx) => ({
@@ -1592,7 +1619,7 @@ export const FichaTecnicaModal = ({
                 )}
               </div>
 
-              {/* Checklist de Recepción */}
+              {/* Checklist de Recepción Centralizado con Badge */}
               {checklistData && Object.keys(checklistData).length > 0 && (
                 <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-3">
                   <div className="flex items-center justify-between gap-2">
@@ -1601,337 +1628,21 @@ export const FichaTecnicaModal = ({
                     </span>
                   </div>
 
-                  {/* Grid / Flex de chips */}
-                  <div className="flex flex-wrap gap-2">
-                    {checklistDisplayItems.map(({ key, label }) => {
-                      const estado = normalizeChecklistState(checklistData[key]);
-                      const style = CHECKLIST_STATE_STYLES[estado] || CHECKLIST_STATE_STYLES.sin_revisar;
-                      const { chip, Icon } = style;
-                      return (
-                        <div
-                          key={key}
-                          className={`flex items-center gap-1.5 rounded-xl py-2 px-3.5 text-xs font-semibold select-none border ${chip}`}
-                        >
-                          <Icon size={11} className="shrink-0" />
-                          <span>{label}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Resumen de contadores */}
-                  <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-neutral-200/60 dark:border-neutral-800/80 text-xs font-inter text-neutral-500 dark:text-neutral-400">
-                    <span className="flex items-center gap-1.5">
-                      <Minus size={12} className="text-neutral-400 shrink-0" />
-                      <span>Sin revisar:</span> <b className="font-bold text-neutral-800 dark:text-neutral-200">{countPendientes}</b>
-                    </span>
-                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle2 size={12} className="shrink-0" />
-                      <span>OK:</span> <b className="font-bold">{countOk}</b>
-                    </span>
-                    <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
-                      <AlertTriangle size={12} className="shrink-0" />
-                      <span>Con Falla:</span> <b className="font-bold">{countFalla}</b>
-                    </span>
-                  </div>
+                  <DeviceChecklistPicker
+                    value={checklistData}
+                    readOnly={true}
+                    showCard={false}
+                    showHeader={false}
+                  />
                 </div>
               )}
 
-              {/* Histórico en Taller (Línea de Tiempo) */}
-              <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-800 p-5 bg-white dark:bg-neutral-900/50 h-auto space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 flex items-center gap-1.5 font-outfit">
-                    <History size={14} className="text-red-500 shrink-0" />
-                    <span>Histórico en Taller</span>
-                    <strong className="text-neutral-700 dark:text-neutral-300 font-bold ml-1">
-                      {timelineEvents.length}
-                    </strong>
-                  </span>
-                </div>
-
-                {timelineEvents.length === 0 ? (
-                  <p className="text-xs text-neutral-400 dark:text-neutral-500 font-inter italic py-2">
-                    No hay eventos registrados en la bitácora técnica.
-                  </p>
-                ) : (
-                  <div className="max-h-[480px] overflow-y-auto overflow-x-hidden pr-2.5 pt-1 pb-2">
-                    <div className="relative pl-7 space-y-6">
-                      {timelineEvents.map((event, idx) => {
-                        const isLast = idx === timelineEvents.length - 1;
-                        const formattedDate = event.fecha_registro
-                          ? new Date(event.fecha_registro).toLocaleString('es-DO', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              hour12: true
-                            })
-                          : '—';
-
-                        if (event.tipo_evento === 'INCIDENCIA') {
-                          const incConfig = getIncidenciaTipoConfig(event.tipo_incidencia);
-                          const IncIcon = incConfig.icon;
-                          const extraCost = parseFloat(event.costo_adicional_repuesto || 0);
-                          const incFotos = Array.isArray(event.fotos)
-                            ? event.fotos.filter((f) => !f.incidencia_id || Number(f.incidencia_id) === Number(event.id))
-                            : [];
-
-                          return (
-                            <div key={event._timelineKey || idx} className="relative group">
-                              {/* Línea vertical conectora punteada/discontinua */}
-                              {!isLast && (
-                                <div className="absolute -left-[19px] top-3 -bottom-6 w-0 border-l-2 border-dashed border-neutral-300 dark:border-neutral-700" />
-                              )}
-
-                              {/* Nodo anillado hueco para incidencia */}
-                              <div
-                                className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-[#18181b] shrink-0 z-10"
-                                style={{ borderColor: incConfig.color || '#F59E0B' }}
-                              />
-
-                              {/* Contenido a la derecha del nodo: Incidencia con estructura abierta idéntica al estado */}
-                              <div className="space-y-1.5">
-                                {/* Cabecera abierta: Badge tipo de incidencia, usuario y fecha */}
-                                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                                  <div className="flex items-center gap-1.5">
-                                    <Badge
-                                      variant="minimal"
-                                      color={incConfig.color}
-                                      icon={IncIcon}
-                                      size="sm"
-                                      className="font-semibold text-xs"
-                                    >
-                                      {incConfig.label}
-                                    </Badge>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 text-[11px] text-neutral-400 dark:text-neutral-500 font-inter">
-                                    {event.usuario_nombre && (
-                                      <>
-                                        <span className="flex items-center gap-1 text-neutral-600 dark:text-neutral-300 font-medium">
-                                          <User size={11} className="shrink-0 text-neutral-400 dark:text-neutral-500" />
-                                          <span>{event.usuario_nombre}</span>
-                                        </span>
-                                        <span>·</span>
-                                      </>
-                                    )}
-                                    <span className="tabular-nums">{formattedDate}</span>
-                                  </div>
-                                </div>
-
-                                {/* Descripción en cápsula neutral como las notas de avance */}
-                                {event.descripcion && (
-                                  <p className="text-xs text-neutral-600 dark:text-neutral-300 font-inter leading-relaxed bg-neutral-50 dark:bg-neutral-800/40 rounded-xl p-2.5 border border-neutral-200/50 dark:border-neutral-800/60 whitespace-pre-wrap">
-                                    {event.descripcion}
-                                  </p>
-                                )}
-
-                                {/* Etiquetas de repuesto y costo adicional integradas discretamente */}
-                                {(event.repuesto_requerido || extraCost > 0) && (
-                                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-neutral-600 dark:text-neutral-400 font-inter pt-0.5">
-                                    {event.repuesto_requerido && (
-                                      <span className="inline-flex items-center gap-1.5">
-                                        <Wrench size={11} className="text-neutral-400 dark:text-neutral-500 shrink-0" />
-                                        <span>Repuesto:</span>
-                                        <strong className="text-neutral-700 dark:text-neutral-300 font-semibold">{event.repuesto_requerido}</strong>
-                                      </span>
-                                    )}
-                                    {event.repuesto_requerido && extraCost > 0 && (
-                                      <span className="text-neutral-300 dark:text-neutral-700 select-none">·</span>
-                                    )}
-                                    {extraCost > 0 && (() => {
-                                      const incIsAprobado = event.aprobado_por_cliente === true || event.estado_aprobacion === 'APROBADO';
-                                      const incIsRechazado = event.rechazado_por_cliente === true || event.estado_aprobacion === 'RECHAZADO' || (!event.aprobado_por_cliente && !!event.fecha_aprobacion);
-
-                                      if (incIsRechazado) {
-                                        return (
-                                          <>
-                                            <span
-                                              className="inline-flex items-center gap-1 text-neutral-400 dark:text-neutral-500 select-none"
-                                              title="Descartado del total a cobrar"
-                                            >
-                                              <span>Costo Extra:</span>
-                                              <strong className="line-through opacity-70">
-                                                RD$ {extraCost.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                              </strong>
-                                              <span className="text-[10px] text-rose-500 dark:text-rose-400 ml-0.5">
-                                                (Descartado)
-                                              </span>
-                                            </span>
-                                            <span className="text-neutral-300 dark:text-neutral-700 select-none">·</span>
-                                            <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">
-                                              <XCircle size={11} className="shrink-0" />
-                                              <span>Rechazado {event.metodo_aprobacion ? `(${event.metodo_aprobacion})` : ''}</span>
-                                            </span>
-                                          </>
-                                        );
-                                      }
-
-                                      if (incIsAprobado) {
-                                        return (
-                                          <>
-                                            <span className="inline-flex items-center gap-1">
-                                              <span>Costo Extra:</span>
-                                              <strong className="text-neutral-800 dark:text-neutral-200 font-semibold">
-                                                RD$ {extraCost.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                              </strong>
-                                            </span>
-                                            <span className="text-neutral-300 dark:text-neutral-700 select-none">·</span>
-                                            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-                                              <CheckCircle2 size={11} className="shrink-0" />
-                                              <span>Aprobado ({event.metodo_aprobacion || 'Cliente'})</span>
-                                            </span>
-                                          </>
-                                        );
-                                      }
-
-                                      return (
-                                        <>
-                                          <span className="inline-flex items-center gap-1">
-                                            <span>Costo Extra:</span>
-                                            <strong className="text-rose-600 dark:text-rose-400 font-semibold">
-                                              RD$ {extraCost.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </strong>
-                                          </span>
-                                          <span className="text-neutral-300 dark:text-neutral-700 select-none">·</span>
-                                          <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
-                                            <Clock size={11} className="shrink-0" />
-                                            <span>Pendiente Aprobación</span>
-                                          </span>
-                                        </>
-                                      );
-                                    })()}
-                                  </div>
-                                )}
-
-                                {/* Cuadrícula de fotos con misma apariencia homologada */}
-                                {incFotos.length > 0 && (
-                                  <div className="pt-2 space-y-2">
-                                    <span className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider flex items-center gap-1.5">
-                                      <ImageIcon size={13} />
-                                      <span>Evidencias Fotográficas ({incFotos.length})</span>
-                                    </span>
-                                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
-                                      {incFotos.map((foto, fIdx) => (
-                                        <div
-                                          key={foto.id || fIdx}
-                                          onClick={() => setActivePhoto(foto.url || foto.url_foto)}
-                                          className="aspect-square rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-800 cursor-pointer group/img relative bg-neutral-100 dark:bg-neutral-900 shadow-2xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all"
-                                          title="Ver imagen en tamaño completo"
-                                        >
-                                          <img
-                                            src={foto.url || foto.url_foto}
-                                            alt={`Evidencia ${fIdx + 1}`}
-                                            className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-200"
-                                          />
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // Hito de Cambio de Estado
-                        const estadoObj =
-                          (allEstados || []).find(
-                            (e) => String(e.id) === String(event.estado_id) || e.codigo_estado === event.codigo_estado
-                          ) || event;
-                        const estadoColor = event.color_badge || estadoObj.color_badge || '#6B7280';
-                        const estadoLabel = getEstadoLabel(estadoObj) || event.nombre_estado || event.estado || 'Estado Actualizado';
-                        const EstadoIcon = getEstadoIcon(estadoObj);
-                        const isInitialReception =
-                          event.id === 'inicio' ||
-                          Number(event.orden_flujo) === 1 ||
-                          String(event.codigo_estado).toUpperCase().includes('RECIB');
-                        const itemFotos =
-                          Array.isArray(event.fotos) && event.fotos.length > 0
-                            ? event.fotos.filter((f) => !f.incidencia_id && (f.tipo_evidencia === 'RECEPCION' || !f.tipo_evidencia || f.tipo_evidencia !== 'INCIDENCIA'))
-                            : isInitialReception
-                            ? fotosArray
-                            : [];
-
-                        return (
-                          <div key={event._timelineKey || idx} className="relative group">
-                            {/* Línea vertical conectora punteada/discontinua */}
-                            {!isLast && (
-                              <div className="absolute -left-[19px] top-3 -bottom-6 w-0 border-l-2 border-dashed border-neutral-300 dark:border-neutral-700" />
-                            )}
-
-                            {/* Nodo anillado hueco con borde del color del estado */}
-                            <div
-                              className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-[#18181b] shrink-0 z-10"
-                              style={{ borderColor: estadoColor }}
-                            />
-
-                            {/* Contenido a la derecha del nodo: Estado */}
-                            <div className="space-y-1.5">
-                              {/* Fila superior: Estado, Fecha/Hora y Técnico responsable */}
-                              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                                <div className="flex items-center gap-1.5">
-                                  <EstadoIcon size={13} className="shrink-0 stroke-[2.2]" style={{ color: estadoColor }} />
-                                  <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-neutral-100 font-outfit">
-                                    {estadoLabel}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center gap-2 text-[11px] text-neutral-400 dark:text-neutral-500 font-inter">
-                                  {event.usuario_nombre && (
-                                    <>
-                                      <span className="flex items-center gap-1 text-neutral-600 dark:text-neutral-300 font-medium">
-                                        <User size={11} className="shrink-0 text-neutral-400" />
-                                        <span>{event.usuario_nombre}</span>
-                                      </span>
-                                      <span>·</span>
-                                    </>
-                                  )}
-                                  <span className="tabular-nums">{formattedDate}</span>
-                                </div>
-                              </div>
-
-                              {/* Nota de avance / cambio */}
-                              {event.nota_cambio && (
-                                <p className="text-xs text-neutral-600 dark:text-neutral-300 font-inter leading-relaxed bg-neutral-50 dark:bg-neutral-800/40 rounded-xl p-2.5 border border-neutral-200/50 dark:border-neutral-800/60">
-                                  {event.nota_cambio}
-                                </p>
-                              )}
-
-                              {/* Evidencias fotográficas asociadas */}
-                              {itemFotos.length > 0 && (
-                                <div className="pt-2 space-y-2">
-                                  <span className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider flex items-center gap-1.5">
-                                    <ImageIcon size={13} />
-                                    <span>Evidencias Fotográficas ({itemFotos.length})</span>
-                                  </span>
-                                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
-                                    {itemFotos.map((foto, fIdx) => (
-                                      <div
-                                        key={fIdx}
-                                        onClick={() => setActivePhoto(foto.url || foto.url_foto)}
-                                        className="aspect-square rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-800 cursor-pointer group/img relative bg-neutral-100 dark:bg-neutral-900 shadow-2xs hover:border-neutral-300 dark:hover:border-neutral-700 transition-all"
-                                        title="Ver imagen en tamaño completo"
-                                      >
-                                        <img
-                                          src={foto.url || foto.url_foto}
-                                          alt={`Evidencia ${fIdx + 1}`}
-                                          className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-200"
-                                        />
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* Histórico en Taller (Línea de Tiempo Modular) */}
+              <ServiceTimeline
+                events={timelineEvents}
+                isPublic={false}
+                onPhotoClick={setActivePhoto}
+              />
             </>
           )}
       </Modal>

@@ -624,8 +624,8 @@ const getServicioById = async (req, res) => {
       '  TRIM(CONCAT(c.nombre, \' \', c.apellido)) AS nombre_cliente_reg,\n' +
       '  c.telefono AS telefono_cliente_reg,\n' +
       '  COALESCE((SELECT TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id ORDER BY ta.id ASC LIMIT 1), \'Sin asignar\') AS tecnico_nombre,\n' +
-      '  COALESCE((SELECT json_agg(json_build_object(\'id\', dt_tec.id, \'nombre_completo\', TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)))) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), \'[]\'::json) AS tecnicos,\n' +
       '  COALESCE((SELECT json_agg(json_build_object(\'id\', ef.id, \'url\', ef.url_foto, \'url_foto\', ef.url_foto, \'public_id\', ef.public_id, \'tipo_evidencia\', ef.tipo_evidencia, \'fecha_subida\', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE AND ef.incidencia_id IS NULL AND ef.tipo_evidencia != \'INCIDENCIA\'), \'[]\'::json) AS fotos,\n' +
+      '  COALESCE((SELECT json_agg(json_build_object(\'id\', ef.id, \'url\', ef.url_foto, \'url_foto\', ef.url_foto, \'public_id\', ef.public_id, \'tipo_evidencia\', ef.tipo_evidencia, \'fecha_subida\', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE AND ef.incidencia_id IS NULL AND (ef.tipo_evidencia = \'RECEPCION\' OR ef.tipo_evidencia IS NULL)), \'[]\'::json) AS fotos_recepcion,\n' +
       '  COALESCE((\n' +
       '    SELECT json_agg(\n' +
       '      json_build_object(\n' +
@@ -720,7 +720,7 @@ const getServicioByTicket = async (req, res) => {
       '  sr.falla_reportada, sr.observaciones_recepcion, sr.accesorios_recibidos, sr.accesorios_recibidos AS accesorios,\n' +
       '  sr.prioridad, sr.es_garantia, sr.checklist_entrada,\n' +
       '  sr.costo_previsto, sr.costo_final_confirmado, sr.monto_anticipo, sr.monto_descuento, sr.monto_liquidado,\n' +
-      '  sr.fecha_entrega_estimada, sr.fecha_entrega_real, sr.created_at, sr.updated_at,\n' +
+      '  sr.fecha_entrega_estimada, sr.fecha_entrega_estimada AS fecha_estimada_entrega, sr.fecha_entrega_real, sr.created_at, sr.updated_at,\n' +
       '  es.id AS estado_id, es.codigo_estado, es.nombre_estado AS estado, es.color_badge AS estado_color, es.orden_flujo,\n' +
       '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS nombre_cliente,\n' +
       '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS cliente_nombre,\n' +
@@ -736,8 +736,56 @@ const getServicioByTicket = async (req, res) => {
       '    ORDER BY ta.id ASC\n' +
       '    LIMIT 1\n' +
       '  ), \'Sin asignar\') AS tecnico_nombre,\n' +
+      '  COALESCE((\n' +
+      '    SELECT json_agg(\n' +
+      '      json_build_object(\n' +
+      '        \'id\', dt_tec.id,\n' +
+      '        \'nombre\', dt_tec.nombre,\n' +
+      '        \'apellido\', dt_tec.apellido,\n' +
+      '        \'nombre_completo\', TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)),\n' +
+      '        \'foto_perfil_url\', dt_tec.foto_perfil_url\n' +
+      '      ) ORDER BY ta.id ASC\n' +
+      '    )\n' +
+      '    FROM tecnicos_asignados ta\n' +
+      '    JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id\n' +
+      '    WHERE ta.servicio_id = sr.id\n' +
+      '  ), \'[]\'::json) AS tecnicos,\n' +
       '  (SELECT logo_url FROM datos_companhia LIMIT 1) AS logo_url,\n' +
       '  (SELECT nombre_empresa FROM datos_companhia LIMIT 1) AS nombre_empresa,\n' +
+      '  COALESCE((\n' +
+      '    SELECT json_agg(\n' +
+      '      json_build_object(\n' +
+      '        \'id\', ef.id,\n' +
+      '        \'url\', ef.url_foto,\n' +
+      '        \'url_foto\', ef.url_foto,\n' +
+      '        \'public_id\', ef.public_id,\n' +
+      '        \'tipo_evidencia\', ef.tipo_evidencia,\n' +
+      '        \'fecha_subida\', ef.fecha_subida\n' +
+      '      ) ORDER BY ef.id ASC\n' +
+      '    )\n' +
+      '    FROM evidencias_fotograficas ef\n' +
+      '    WHERE ef.servicio_id = sr.id\n' +
+      '      AND ef.activo = TRUE\n' +
+      '      AND ef.incidencia_id IS NULL\n' +
+      '      AND ef.tipo_evidencia != \'INCIDENCIA\'\n' +
+      '  ), \'[]\'::json) AS fotos,\n' +
+      '  COALESCE((\n' +
+      '    SELECT json_agg(\n' +
+      '      json_build_object(\n' +
+      '        \'id\', ef.id,\n' +
+      '        \'url\', ef.url_foto,\n' +
+      '        \'url_foto\', ef.url_foto,\n' +
+      '        \'public_id\', ef.public_id,\n' +
+      '        \'tipo_evidencia\', ef.tipo_evidencia,\n' +
+      '        \'fecha_subida\', ef.fecha_subida\n' +
+      '      ) ORDER BY ef.id ASC\n' +
+      '    )\n' +
+      '    FROM evidencias_fotograficas ef\n' +
+      '    WHERE ef.servicio_id = sr.id\n' +
+      '      AND ef.activo = TRUE\n' +
+      '      AND ef.incidencia_id IS NULL\n' +
+      '      AND (ef.tipo_evidencia = \'RECEPCION\' OR ef.tipo_evidencia IS NULL)\n' +
+      '  ), \'[]\'::json) AS fotos_recepcion,\n' +
       '  COALESCE((\n' +
       '    SELECT json_agg(\n' +
       '      json_build_object(\n' +
