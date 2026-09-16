@@ -658,8 +658,29 @@ const updateBranch = async (req, res) => {
   }
 };
 
+/**
+ * Obtener datos públicos de la empresa (nombre, logo) sin requerir autenticación.
+ * GET /api/configuracion/public-profile
+ */
+const getCompanyPublicProfile = async (req, res) => {
+  try {
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT nombre_empresa, logo_url, telefono_principal, correo_contacto FROM datos_companhia ORDER BY id ASC LIMIT 1'
+    );
+    if (result.rows.length === 0) {
+      return res.status(200).json({ ok: true, data: { nombre_empresa: 'Franyer Mobile Center', logo_url: null } });
+    }
+    return res.status(200).json({ ok: true, data: result.rows[0] });
+  } catch (error) {
+    console.error('❌ Error en getCompanyPublicProfile:', error);
+    return res.status(500).json({ ok: false, message: 'Error al consultar perfil público de empresa.' });
+  }
+};
+
 module.exports = {
   getCompanyProfile,
+  getCompanyPublicProfile,
   uploadCompanyLogo,
   updateCompanyProfile,
   getBranches,

@@ -5,11 +5,15 @@ const { checkRole } = require('../middlewares/roleMiddleware');
 const { upload, handleMulterErrors } = require('../middlewares/upload');
 const {
   getCompanyProfile,
+  getCompanyPublicProfile,
   uploadCompanyLogo,
   updateCompanyProfile,
   getBranches,
   updateBranch
 } = require('../controllers/configuracion.controller');
+
+// Ruta pública para consultar perfil de empresa (logotipo, nombre)
+router.get('/public-profile', getCompanyPublicProfile);
 
 // Todas las rutas de configuración requieren autenticación
 router.use(authMiddleware);

@@ -40,8 +40,8 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       const isLoginRequest = error.config?.url?.includes('/auth/login');
-      // Si la petición no proviene de /auth/login y la sesión expiró, limpiar storage y redirigir
-      if (!isLoginRequest && !window.location.pathname.includes('/login')) {
+      // Si la petición no proviene de /auth/login ni estamos en rutas públicas (/login, /estado) y la sesión expiró, limpiar storage y redirigir
+      if (!isLoginRequest && !window.location.pathname.includes('/login') && !window.location.pathname.includes('/estado')) {
         localStorage.removeItem('siger_token');
         sessionStorage.removeItem('siger_token');
         localStorage.removeItem('siger_user');

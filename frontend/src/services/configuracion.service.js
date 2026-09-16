@@ -1,6 +1,15 @@
 import api from './api';
 
 /**
+ * Obtener la información pública de la empresa (nombre y logotipo) sin requerir auth.
+ * @returns {Promise<Object>}
+ */
+export const getCompanyPublicProfile = async () => {
+  const response = await api.get('/configuracion/public-profile');
+  return response.data;
+};
+
+/**
  * Obtener la información de la empresa matriz.
  * @returns {Promise<Object>}
  */

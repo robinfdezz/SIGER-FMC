@@ -716,17 +716,48 @@ const getServicioByTicket = async (req, res) => {
 
     var result = await pool.query(
       'SELECT\n' +
-      '  sr.id, sr.codigo_ticket, sr.marca_equipo, sr.modelo_equipo,\n' +
-      '  sr.falla_reportada, sr.observaciones_recepcion, sr.accesorios_recibidos, sr.accesorios_recibidos AS accesorios, sr.prioridad, sr.es_garantia,\n' +
+      '  sr.id, sr.codigo_ticket, sr.marca_equipo, sr.modelo_equipo, sr.num_serie_imei,\n' +
+      '  sr.falla_reportada, sr.observaciones_recepcion, sr.accesorios_recibidos, sr.accesorios_recibidos AS accesorios,\n' +
+      '  sr.prioridad, sr.es_garantia, sr.checklist_entrada,\n' +
+      '  sr.costo_previsto, sr.costo_final_confirmado, sr.monto_anticipo, sr.monto_descuento, sr.monto_liquidado,\n' +
+      '  sr.fecha_entrega_estimada, sr.fecha_entrega_real, sr.created_at, sr.updated_at,\n' +
+      '  es.id AS estado_id, es.codigo_estado, es.nombre_estado AS estado, es.color_badge AS estado_color, es.orden_flujo,\n' +
       '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS nombre_cliente,\n' +
       '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS cliente_nombre,\n' +
       '  COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,\n' +
       '  COALESCE(sr.telefono_cliente, c.telefono) AS cliente_telefono,\n' +
-      '  sr.fecha_entrega_estimada, sr.created_at,\n' +
-      '  es.nombre_estado AS estado, es.color_badge AS estado_color\n' +
+      '  ds.nombre_sucursal AS sucursal,\n' +
+      '  ds.telefono AS sucursal_telefono,\n' +
+      '  COALESCE((\n' +
+      '    SELECT TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido))\n' +
+      '    FROM tecnicos_asignados ta\n' +
+      '    JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id\n' +
+      '    WHERE ta.servicio_id = sr.id\n' +
+      '    ORDER BY ta.id ASC\n' +
+      '    LIMIT 1\n' +
+      '  ), \'Sin asignar\') AS tecnico_nombre,\n' +
+      '  (SELECT logo_url FROM datos_companhia LIMIT 1) AS logo_url,\n' +
+      '  (SELECT nombre_empresa FROM datos_companhia LIMIT 1) AS nombre_empresa,\n' +
+      '  COALESCE((\n' +
+      '    SELECT json_agg(\n' +
+      '      json_build_object(\n' +
+      '        \'id\', he.id,\n' +
+      '        \'estado_id\', he.estado_id,\n' +
+      '        \'nombre_estado\', es_h.nombre_estado,\n' +
+      '        \'codigo_estado\', es_h.codigo_estado,\n' +
+      '        \'orden_flujo\', es_h.orden_flujo,\n' +
+      '        \'nota_cambio\', he.nota_cambio,\n' +
+      '        \'fecha_registro\', he.fecha_registro\n' +
+      '      ) ORDER BY he.fecha_registro ASC, he.id ASC\n' +
+      '    )\n' +
+      '    FROM historial_estados he\n' +
+      '    LEFT JOIN estados_servicio es_h ON es_h.id = he.estado_id\n' +
+      '    WHERE he.servicio_id = sr.id\n' +
+      '  ), \'[]\'::json) AS historial_estados\n' +
       'FROM servicios_recepcion sr\n' +
       'LEFT JOIN estados_servicio es ON es.id = sr.estado_actual_id\n' +
       'LEFT JOIN clientes c ON c.id = sr.cliente_id\n' +
+      'LEFT JOIN datos_sucursales ds ON ds.id = sr.sucursal_id\n' +
       'WHERE sr.codigo_ticket = $1 AND sr.activo = TRUE',
       [codigo]
     );
