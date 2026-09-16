@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS servicios_recepcion (
     datos_acceso_equipo jsonb NULL,
     falla_reportada TEXT NOT NULL,
     observaciones_recepcion TEXT NULL,
+    accesorios_recibidos TEXT NULL,
     checklist_entrada jsonb NULL,
     costo_previsto NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     monto_anticipo NUMERIC(10,2) NOT NULL DEFAULT 0.00,

@@ -154,11 +154,11 @@ const Badge = ({
 
   return (
     <span
-      className={`inline-flex items-center font-medium select-none tracking-normal ${baseClasses} ${colorClass} ${className}`}
+      className={`inline-flex items-center font-medium select-none tracking-normal leading-none ${baseClasses} ${colorClass} ${className}`}
       {...props}
     >
       {renderIndicator()}
-      {children && <span>{children}</span>}
+      {children && <span className="leading-none inline-flex items-center">{children}</span>}
     </span>
   );
 };

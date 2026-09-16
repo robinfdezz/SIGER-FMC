@@ -145,6 +145,7 @@ const INITIAL_FORM = {
   num_serie_imei: '',
   falla_reportada: '',
   observaciones_recepcion: '',
+  accesorios_recibidos: '',
   fotos_recepcion: [],
   datos_acceso_equipo: { metodo: 'ninguno', tipo: 'ninguno', valor: '', patron: [] },
   checklist_entrada: {},
@@ -621,6 +622,7 @@ export const NuevaOrdenPage = () => {
         num_serie_imei: form.num_serie_imei.trim() || null,
         falla_reportada: form.falla_reportada.trim(),
         observaciones_recepcion: form.observaciones_recepcion.trim() || null,
+        accesorios_recibidos: form.accesorios_recibidos?.trim() || null,
         datos_acceso_equipo: form.datos_acceso_equipo,
         checklist_entrada: form.checklist_entrada,
         fotos_recepcion: form.fotos_recepcion
@@ -1169,6 +1171,17 @@ export const NuevaOrdenPage = () => {
                       className={`${inputClass} resize-none`}
                     />
                   </div>
+
+                  <div>
+                    <label className={labelClass}>Accesorios Recibidos</label>
+                    <input
+                      type="text"
+                      value={form.accesorios_recibidos}
+                      onChange={(e) => set('accesorios_recibidos', e.target.value)}
+                      placeholder="Ej: Cable de carga original, cargador, funda/cover, caja, SIM tray..."
+                      className={inputClass}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1337,7 +1350,7 @@ export const NuevaOrdenPage = () => {
               <div className="p-5 rounded-2xl bg-neutral-50/70 dark:bg-neutral-800/30 border border-neutral-200/70 dark:border-neutral-800 space-y-4">
                 <SectionHeader
                   icon={Wrench}
-                  title="Técnicos Asignados (Opcional)"
+                  title="Técnicos Asignados"
                   subtitle="Asigna directamente a especialistas responsables de esta orden"
                 />
 

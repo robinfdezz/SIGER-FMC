@@ -292,6 +292,13 @@ export const TicketTermico = ({
                 Obs: {data.observaciones_recepcion || data.observaciones}
               </div>
             )}
+
+            {(data.accesorios_recibidos || data.accesorios) && (
+              <div className="text-[9.5px] text-neutral-800 break-words">
+                <span className="font-bold">Accesorios: </span>
+                <span>{data.accesorios_recibidos || data.accesorios}</span>
+              </div>
+            )}
           </div>
         )}
 

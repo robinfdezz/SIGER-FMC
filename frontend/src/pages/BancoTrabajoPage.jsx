@@ -86,7 +86,7 @@ const getColumnTitle = (estado) => {
 
   if (flujo === 1 || cod.includes('RECIB') || nom.includes('recib')) return 'Recibido';
   if (flujo === 2 || cod.includes('DIAGN') || nom.includes('diagn')) return 'En Diagnóstico';
-  if (flujo === 3 || cod.includes('ESPERA') || nom.includes('espera') || cod.includes('REPUESTO') || nom.includes('repuesto')) return 'Esperando Repuesto';
+  if (flujo === 3 || cod.includes('ESPERA') || nom.includes('espera') || cod.includes('REPUESTO') || nom.includes('repuesto')) return 'En repuesto';
   if (flujo === 4 || cod.includes('REPARAC') || nom.includes('reparac') || cod.includes('PROCESO') || nom.includes('proceso')) return 'En Reparación';
   if (flujo === 5 || cod.includes('CALIDAD') || nom.includes('calidad') || cod.includes('CONTROL') || nom.includes('control')) return 'Control de Calidad';
   if (flujo === 6 || cod.includes('LISTO') || nom.includes('listo')) return 'Listo para Entrega';
@@ -774,9 +774,16 @@ export const BancoTrabajoPage = () => {
                           <td className="py-3 px-3 align-middle font-mono font-bold text-neutral-900 dark:text-neutral-100">
                             <div>{ord.codigo_ticket}</div>
                             {ord.es_garantia && (
-                              <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-500 dark:text-red-400 leading-none mt-1">
-                                <ShieldCheck size={11} className="stroke-[2.2] shrink-0" />
-                                <span className="leading-none">GARANTÍA</span>
+                              <div className="mt-1">
+                                <Badge
+                                  variant="minimal"
+                                  color="danger"
+                                  icon={<ShieldCheck size={11} className="stroke-[2.2] shrink-0" />}
+                                  size="sm"
+                                  className="font-semibold text-[10px] tracking-wide leading-none"
+                                >
+                                  GARANTÍA
+                                </Badge>
                               </div>
                             )}
                           </td>

@@ -141,7 +141,7 @@ const getEstadoLabel = (estado) => {
 
   if (flujo === 1 || cod.includes('RECIB') || nom.includes('recib')) return 'Recibido';
   if (flujo === 2 || cod.includes('DIAGN') || nom.includes('diagn')) return 'En Diagnóstico';
-  if (flujo === 3 || cod.includes('ESPERA') || nom.includes('espera') || cod.includes('REPUESTO') || nom.includes('repuesto')) return 'Esperando Repuesto';
+  if (flujo === 3 || cod.includes('ESPERA') || nom.includes('espera') || cod.includes('REPUESTO') || nom.includes('repuesto')) return 'En repuesto';
   if (flujo === 4 || cod.includes('REPARAC') || nom.includes('reparac') || cod.includes('PROCESO') || nom.includes('proceso')) return 'En Reparación';
   if (flujo === 5 || cod.includes('CALIDAD') || nom.includes('calidad') || cod.includes('CONTROL') || nom.includes('control')) return 'Control de Calidad';
   if (flujo === 6 || cod.includes('LISTO') || nom.includes('listo')) return 'Listo para Entrega';
@@ -731,9 +731,15 @@ export const FichaTecnicaModal = ({
         }
         titleSlot={
           orden?.es_garantia ? (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-300/40 dark:border-amber-800/40 uppercase">
-              Garantía
-            </span>
+            <Badge
+              variant="minimal"
+              color="danger"
+              icon={<ShieldCheck size={11} className="stroke-[2.2] shrink-0" />}
+              size="sm"
+              className="font-semibold text-[10px] tracking-wide leading-none"
+            >
+              GARANTÍA
+            </Badge>
           ) : null
         }
         description={
@@ -1567,6 +1573,20 @@ export const FichaTecnicaModal = ({
                     </span>
                     <p className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">
                       {orden.observaciones_recepcion}
+                    </p>
+                  </div>
+                )}
+
+                {(orden.accesorios_recibidos || orden.accesorios) && (
+                  <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Package size={14} className="text-neutral-500 dark:text-neutral-400 shrink-0" />
+                      <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block">
+                        Accesorios Recibidos
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed font-medium">
+                      {orden.accesorios_recibidos || orden.accesorios}
                     </p>
                   </div>
                 )}

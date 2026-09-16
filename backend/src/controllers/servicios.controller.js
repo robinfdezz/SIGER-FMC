@@ -94,6 +94,8 @@ const createServicio = async (req, res) => {
       // Diagnostico
       falla_reportada,
       observaciones_recepcion,
+      accesorios_recibidos,
+      accesorios,
       checklist_entrada,
       // Economico
       costo_previsto,
@@ -262,13 +264,17 @@ const createServicio = async (req, res) => {
       : `${prefijoSucursal}${sufijoTicket}`;
 
     // ── 3. Insertar la orden de servicio ─────────────────────
+    const accesoriosFinal = isBlank(accesorios_recibidos)
+      ? (isBlank(accesorios) ? null : String(accesorios).trim())
+      : String(accesorios_recibidos).trim();
+
     var insertRes = await client.query(
       'INSERT INTO servicios_recepcion (\n' +
       '  codigo_ticket, sucursal_id, categoria_id, cliente_id,\n' +
       '  nombre_cliente, telefono_cliente, cedula_cliente, correo_cliente,\n' +
       '  usuario_recepcion_id, estado_actual_id, prioridad,\n' +
       '  marca_equipo, modelo_equipo, num_serie_imei, datos_acceso_equipo,\n' +
-      '  falla_reportada, observaciones_recepcion, checklist_entrada,\n' +
+      '  falla_reportada, observaciones_recepcion, accesorios_recibidos, checklist_entrada,\n' +
       '  costo_previsto, monto_anticipo, monto_descuento,\n' +
       '  tiempo_garantia, condiciones_garantia, fecha_entrega_estimada,\n' +
       '  servicio_origen_id, es_garantia\n' +
@@ -277,10 +283,10 @@ const createServicio = async (req, res) => {
       '  $5, $6, $7, $8,\n' +
       '  $9, $10, $11,\n' +
       '  $12, $13, $14, $15,\n' +
-      '  $16, $17, $18,\n' +
-      '  $19, $20, $21,\n' +
-      '  $22, $23, $24,\n' +
-      '  $25, $26\n' +
+      '  $16, $17, $18, $19,\n' +
+      '  $20, $21, $22,\n' +
+      '  $23, $24, $25,\n' +
+      '  $26, $27\n' +
       ') RETURNING *',
       [
         codigo_ticket,
@@ -300,6 +306,7 @@ const createServicio = async (req, res) => {
         datos_acceso_equipo && typeof datos_acceso_equipo === 'object' ? JSON.stringify(datos_acceso_equipo) : null,
         String(falla_reportada).trim(),
         isBlank(observaciones_recepcion) ? null : String(observaciones_recepcion).trim(),
+        accesoriosFinal,
         checklist_entrada && typeof checklist_entrada === 'object' ? JSON.stringify(checklist_entrada) : null,
         toDecimal(costo_previsto, 0.00),
         toDecimal(monto_anticipo, 0.00),
@@ -388,6 +395,8 @@ const createServicio = async (req, res) => {
         falla_reportada: nuevaOrden.falla_reportada,
         observaciones_recepcion: nuevaOrden.observaciones_recepcion,
         observaciones: nuevaOrden.observaciones_recepcion,
+        accesorios_recibidos: nuevaOrden.accesorios_recibidos,
+        accesorios: nuevaOrden.accesorios_recibidos,
         checklist_entrada: nuevaOrden.checklist_entrada,
         checklist_recepcion: nuevaOrden.checklist_entrada,
         datos_acceso_equipo: nuevaOrden.datos_acceso_equipo,
@@ -508,6 +517,8 @@ const getServicios = async (req, res) => {
       '  sr.falla_reportada,\n' +
       '  sr.observaciones_recepcion,\n' +
       '  sr.observaciones_recepcion AS observaciones,\n' +
+      '  sr.accesorios_recibidos,\n' +
+      '  sr.accesorios_recibidos AS accesorios,\n' +
       '  sr.checklist_entrada,\n' +
       '  sr.checklist_entrada AS checklist_recepcion,\n' +
       '  sr.costo_previsto,\n' +
@@ -601,6 +612,7 @@ const getServicioById = async (req, res) => {
       '  COALESCE(sr.telefono_cliente, c.telefono) AS cliente_telefono,\n' +
       '  sr.checklist_entrada AS checklist_recepcion,\n' +
       '  sr.observaciones_recepcion AS observaciones,\n' +
+      '  sr.accesorios_recibidos AS accesorios,\n' +
       '  es.nombre_estado AS estado,\n' +
       '  es.codigo_estado,\n' +
       '  es.orden_flujo,\n' +
@@ -705,7 +717,7 @@ const getServicioByTicket = async (req, res) => {
     var result = await pool.query(
       'SELECT\n' +
       '  sr.id, sr.codigo_ticket, sr.marca_equipo, sr.modelo_equipo,\n' +
-      '  sr.falla_reportada, sr.prioridad, sr.es_garantia,\n' +
+      '  sr.falla_reportada, sr.observaciones_recepcion, sr.accesorios_recibidos, sr.accesorios_recibidos AS accesorios, sr.prioridad, sr.es_garantia,\n' +
       '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS nombre_cliente,\n' +
       '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS cliente_nombre,\n' +
       '  COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,\n' +
@@ -974,6 +986,8 @@ const getServiciosTaller = async (req, res) => {
         sr.num_serie_imei,
         sr.falla_reportada,
         sr.observaciones_recepcion,
+        sr.accesorios_recibidos,
+        sr.accesorios_recibidos AS accesorios,
         sr.prioridad,
         sr.es_garantia,
         sr.datos_acceso_equipo,

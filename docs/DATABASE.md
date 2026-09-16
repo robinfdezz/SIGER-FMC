@@ -170,6 +170,7 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | `datos_acceso_equipo`| JSONB | SÍ | PIN, patrón o datos de acceso en formato JSON |
 | `falla_reportada`| TEXT | NO | Problema descrito al ingresar el equipo |
 | `observaciones_recepcion`| TEXT | SÍ | Detalles estéticos y condición inicial |
+| `accesorios_recibidos`| TEXT | SÍ | Accesorios dejados por el cliente al ingresar el equipo (cables, cargador, funda, caja, etc.) |
 | `checklist_entrada`| JSONB | SÍ | Inspección inicial en formato JSON |
 | `costo_previsto` | NUMERIC(10,2)| NO | Presupuesto inicial (Default: 0.00) |
 | `monto_anticipo` | NUMERIC(10,2)| NO | Abono o pago inicial dejado por el cliente (Default: 0.00) |
