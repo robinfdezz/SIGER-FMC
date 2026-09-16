@@ -314,7 +314,7 @@ export const ServiciosPage = () => {
     try {
       const res = await getServicioById(orden.id);
       if (res?.ok && res?.data) {
-        setOrdenAImprimir(res.data);
+        setOrdenAImprimir({ ...orden, ...res.data });
       } else {
         setOrdenAImprimir(orden);
       }

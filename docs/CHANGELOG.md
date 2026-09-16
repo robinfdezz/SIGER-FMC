@@ -8,14 +8,52 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
-### Planned (PENDIENTE / PRÓXIMO SPRINT - FASE SIGUIENTE - NO INICIADA)
-- **Modal de Entrega Final y Cierre de Orden [NO INICIADO]:**
-  - *Aclaración:* Esta funcionalidad se encuentra completamente pendiente y programada para el siguiente sprint de desarrollo (aún no ha iniciado su codificación).
-  - Desglose y liquidación de balance final (Costo inicial + Incidencias aprobadas - Anticipos pagados - Descuentos aplicados).
-  - Captura y persistencia de evidencias fotográficas de salida (`tipo_evidencia = 'ENTREGA'`).
-  - Validación de firma digital del cliente y emisión de comprobante de entrega y póliza de garantía.
-
 ---
+
+## [0.8.0] - 2026-09-15
+
+### Added
+- **Modal de Liquidación y Entrega de Equipos (`EntregaServicioModal.jsx`):**
+  - **Desglose Financiero Integral:** Cálculo automático de balance con costo base de mano de obra, suma de incidencias aprobadas con costo adicional, deducción de anticipos pagados y descuentos comerciales.
+  - **Multi-Método de Pago:** Soporte formal para cobro en `'Efectivo'`, `'Tarjeta'` y `'Transferencia'`.
+  - **Cálculo Reactivo de Cambio:** Cálculo en tiempo real de devuelta/cambio para cobros en efectivo con validación de suficiencia del importe entregado por el cliente.
+  - **Captura de Evidencias Fotográficas de Salida:** Integración de `DevicePhotoUploader.jsx` dentro del modal para registrar fotografías de entrega física del equipo reparado y encendido, persistidas atómicamente con `tipo_evidencia = 'ENTREGA'`.
+  - **Observaciones de Despacho:** Campo textual para asentar notas de conformidad del cliente al momento de retirar el dispositivo.
+- **Comprobante Térmico de Salida y Liquidación (`ReciboEntregaTermico.jsx`):**
+  - **Componente Modularizado:** Comprobante térmico POS nativo (80mm / 58mm) completamente desacoplado de `TicketTermico.jsx`.
+  - **Desglose Contable de Salida:** Cabecera fiscal de la sucursal emisora, datos del cliente y dispositivo, detalle de falla resuelta, detalle de mano de obra y de cada repuesto/incidencia aprobada, anticipo, total liquidado, importe recibido y cambio devuelto.
+  - **Póliza de Garantía y QR:** Bloque formal de días de vigencia, fecha exacta de expiración, términos de cobertura y código QR vectorial dinámico (`TicketQR.jsx`).
+  - **Integración con Configuración de Tickets:** Respeta las directivas y flags de `config_tickets` (`mostrar_cliente`, `mostrar_equipo`, `mostrar_falla`, `mostrar_observaciones`, `mostrar_costo_y_anticipo`, `imprimir_garantia`, `mostrar_mensaje_cortesia`, ancho de papel y regla de 2 copias con salto `@media print`).
+- **Modal Post-Entrega Homologado (`PostEntregaModal.jsx`):**
+  - Diálogo modal de confirmación post-despacho homologado visualmente respecto a `PostCreacionModal.jsx` con contenedor circular simétrico (`w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 mx-auto mb-4`), monto total cobrado y botón rojo primario a ancho completo para imprimir el recibo térmico con un clic.
+- **Persistencia Atómica en Base de Datos (`servicios_recepcion`):**
+  - Nuevas columnas DDL y lógica transaccional: `fecha_entrega_real`, `usuario_entrega_id` (FK `datos_trabajadores(id)`), `metodo_pago_entrega`, `monto_liquidado`, `monto_recibido_entrega`, `cambio_devuelto_entrega` y `observaciones_entrega`.
+  - Transición atómica al estado `ENTREGADO` (Orden 7) con asiento inmutable en `historial_estados` y almacenamiento en `evidencias_fotograficas`.
+- **Suite Automatizada de Pruebas de Aislamiento y Roles (`test_branch_isolation.js`):**
+  - 12/12 pruebas unitarias e integrales exitosas validando el aislamiento multi-sucursal y el cumplimiento estricto de las reglas de negocio por rol.
+
+### Changed
+- **Refinamiento Visual de la Bitácora Técnica ("HISTÓRICO EN TALLER" en `FichaTecnicaModal.jsx`):**
+  - Sustitución de la línea conectora vertical sólida por un trazo continuo punteado/discontinuo elegante (`border-l-2 border-dashed border-neutral-300 dark:border-neutral-700`).
+  - Reemplazo de los puntos sólidos por anillos huecos (*hollow rings*, `w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-[#18181b]`) con color dinámico en el borde perimetral sincronizado con el estado operativo o la naturaleza del evento técnico.
+- **Detección Normalizada de Órdenes Entregadas en Reimpresión (`ServiciosPage.jsx`, `PostCreacionModal.jsx`):**
+  - Normalización robusta e insensible a mayúsculas/minúsculas para evaluar si una orden ya fue despachada (`estadoNormalizado.includes('ENTREG') || orden_flujo === 7 || estado_id === 7 || fecha_entrega_real`).
+  - Al abrir el diálogo de reimpresión desde la tabla de tickets para una orden entregada, destaca prioritariamente el botón rojo "Recibo de Entrega y Liquidación" (montando `ReciboEntregaTermico`), manteniendo accesibles de forma secundaria el ticket de recepción y el sticker.
+- **Enriquecimiento de la Consulta `getServicioById`:**
+  - Inclusión explícita de `codigo_estado` y `orden_flujo` en el payload de detalle de servicio, garantizando la consistencia del estado en modales de impresión y vistas técnicas sin disparar consultas redundantes.
+
+### Fixed
+- **Homologación Visual y Corrección de Icono en `PostEntregaModal.jsx`:**
+  - Corrección del aplastamiento o deformación horizontal del contenedor del icono de check esmeralda superior.
+  - Eliminación de botones superfluos o redundantes ("WhatsApp" y "Finalizar") para proporcionar un flujo de caja enfocado y sin distracciones.
+- **Tratamiento Contable de Incidencias Rechazadas:**
+  - Garantía matemática y visual de exclusión del costo adicional de incidencias rechazadas en el total a liquidar, mostrándose tachadas (`line-through`) y con badge descriptivo.
+
+### Security
+- **Control Estricto de Roles en Taller (`checkTecnicoRol`):**
+  - **Validación Backend (HTTP 400):** Bloqueo estricto que rechaza cualquier intento de autoasignación o asignación técnica hacia colaboradores con roles administrativos (`SuperAdmin`, `Admin_Sucursal`) o de secretaría (`Secretaria`).
+  - **Filtro de Catálogo (`?solo_tecnicos=true`):** Filtrado específico en `/api/trabajadores` para que los desplegables de asignación en taller únicamente listen técnicos operativos activos.
+  - **Ocultamiento Condicional en UI:** En `TallerCard.jsx` y `FichaTecnicaModal.jsx`, los botones interactivos de autoasignación ("Asignarme") y selectores se ocultan condicionalmente si el usuario autenticado no posee el rol de Técnico.
 
 ## [0.7.0] - 2026-09-14
 

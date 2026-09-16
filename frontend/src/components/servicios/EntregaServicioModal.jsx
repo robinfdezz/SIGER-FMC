@@ -23,6 +23,9 @@ import Modal from '../common/Modal';
 import Button from '../common/Button';
 import { AnimatedTabs } from '../common/AnimatedTabs';
 import { getServicioById, liquidarYEntregarServicio } from '../../services/servicios.service';
+import { getCompanyProfile, getBranches } from '../../services/configuracion.service';
+import PostEntregaModal from './PostEntregaModal';
+import DevicePhotoUploader from './DevicePhotoUploader';
 import { useAuth } from '../../context/AuthContext';
 import { sileo } from 'sileo';
 
@@ -53,13 +56,32 @@ export const EntregaServicioModal = ({
   const isTecnico = userRole === 'tecnico' || userRole.includes('tecnic') || Number(currentUser?.rol_id) === 4;
 
   const [fullOrden, setFullOrden] = useState(null);
+  const [deliveredOrder, setDeliveredOrder] = useState(null);
+  const [companyData, setCompanyData] = useState(null);
+  const [branchData, setBranchData] = useState(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Formulario de cobro
+  // Formulario de cobro y evidencias
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [montoRecibido, setMontoRecibido] = useState('');
   const [notasEntrega, setNotasEntrega] = useState('');
+  const [fotosEntrega, setFotosEntrega] = useState([]);
+
+  // Cargar datos de empresa y sucursal para la impresión térmica
+  useEffect(() => {
+    if (isOpen) {
+      getCompanyProfile().then((r) => r.ok && setCompanyData(r.data)).catch(() => {});
+      getBranches().then((r) => {
+        if (!r.ok) return;
+        const branches = r.data || [];
+        const userBranch = branches.find((b) => b.id === currentUser?.sucursal_id) ||
+          (currentUser?.sucursal_nombre ? branches.find((b) => b.nombre_sucursal === currentUser.sucursal_nombre) : null) ||
+          branches[0];
+        setBranchData(userBranch);
+      }).catch(() => {});
+    }
+  }, [isOpen, currentUser?.sucursal_id, currentUser?.sucursal_nombre]);
 
   // Cargar detalles completos al abrir (para asegurar que las incidencias vengan pobladas)
   useEffect(() => {
@@ -77,9 +99,11 @@ export const EntregaServicioModal = ({
         .finally(() => setIsLoadingDetails(false));
     } else {
       setFullOrden(null);
+      setDeliveredOrder(null);
       setMontoRecibido('');
       setNotasEntrega('');
       setMetodoPago('Efectivo');
+      setFotosEntrega([]);
     }
   }, [isOpen, orden]);
 
@@ -168,7 +192,8 @@ export const EntregaServicioModal = ({
       const payload = {
         monto_recibido: finanzas.balance > 0 ? numMontoRecibido : 0,
         metodo_pago: finanzas.balance > 0 ? metodoPago : null,
-        notas_entrega: notasEntrega.trim() || null
+        notas_entrega: notasEntrega.trim() || null,
+        fotos_entrega: fotosEntrega
       };
 
       const res = await liquidarYEntregarServicio(activeOrder.id, payload);
@@ -178,10 +203,15 @@ export const EntregaServicioModal = ({
           title: 'Equipo Entregado',
           description: `La orden #${activeOrder.codigo_ticket} fue liquidada y entregada con éxito.`
         });
+        const mergedOrder = {
+          ...activeOrder,
+          ...res.data,
+          fecha_entrega_real: res.data.fecha_entrega_real || new Date().toISOString()
+        };
         if (onSuccess) {
-          onSuccess(res.data);
+          onSuccess(mergedOrder);
         }
-        onClose();
+        setDeliveredOrder(mergedOrder);
       } else {
         sileo.error({
           title: 'Error en entrega',
@@ -199,9 +229,15 @@ export const EntregaServicioModal = ({
     }
   };
 
+  const handlePostEntregaClose = () => {
+    setDeliveredOrder(null);
+    onClose();
+  };
+
   return (
-    <Modal
-      isOpen={isOpen}
+    <>
+      <Modal
+        isOpen={isOpen && !deliveredOrder}
       onClose={onClose}
       size="3xl"
       title={
@@ -373,6 +409,15 @@ export const EntregaServicioModal = ({
                 </div>
               </div>
             </div>
+
+            {/* Cargador de Evidencias de Salida / Entrega */}
+            <DevicePhotoUploader
+              value={fotosEntrega}
+              onChange={setFotosEntrega}
+              maxPhotos={4}
+              title="EVIDENCIAS DE SALIDA / ENTREGA (Opcional)"
+              description="Fotografías del equipo entregado conforme (pantalla encendida, empaque, etc.)"
+            />
           </div>
 
           {/* COLUMNA DERECHA: Cobro y Observaciones */}
@@ -484,6 +529,16 @@ export const EntregaServicioModal = ({
         </form>
       )}
     </Modal>
+
+    {/* Diálogo de éxito inmediato y post-entrega con impresión de recibo */}
+    <PostEntregaModal
+      isOpen={Boolean(deliveredOrder)}
+      onClose={handlePostEntregaClose}
+      orden={deliveredOrder}
+      companyData={companyData}
+      branchData={branchData}
+    />
+  </>
   );
 };
 

@@ -1659,13 +1659,16 @@ export const FichaTecnicaModal = ({
 
                           return (
                             <div key={event._timelineKey || idx} className="relative group">
-                              {/* Línea vertical conectora */}
+                              {/* Línea vertical conectora punteada/discontinua */}
                               {!isLast && (
-                                <div className="absolute -left-[19px] top-3.5 -bottom-6 w-0.5 bg-neutral-200 dark:bg-neutral-800" />
+                                <div className="absolute -left-[19px] top-3 -bottom-6 w-0 border-l-2 border-dashed border-neutral-300 dark:border-neutral-700" />
                               )}
 
-                              {/* Nodo circular para incidencia */}
-                              <div className="absolute -left-[23px] top-1.5 w-2.5 h-2.5 rounded-full ring-4 ring-white dark:ring-[#18181b] bg-amber-500 shrink-0 z-10" />
+                              {/* Nodo anillado hueco para incidencia */}
+                              <div
+                                className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-[#18181b] shrink-0 z-10"
+                                style={{ borderColor: incConfig.color || '#F59E0B' }}
+                              />
 
                               {/* Contenido a la derecha del nodo: Incidencia con estructura abierta idéntica al estado */}
                               <div className="space-y-1.5">
@@ -1833,15 +1836,15 @@ export const FichaTecnicaModal = ({
 
                         return (
                           <div key={event._timelineKey || idx} className="relative group">
-                            {/* Línea vertical conectora */}
+                            {/* Línea vertical conectora punteada/discontinua */}
                             {!isLast && (
-                              <div className="absolute -left-[19px] top-3.5 -bottom-6 w-0.5 bg-neutral-200 dark:bg-neutral-800" />
+                              <div className="absolute -left-[19px] top-3 -bottom-6 w-0 border-l-2 border-dashed border-neutral-300 dark:border-neutral-700" />
                             )}
 
-                            {/* Punto / Nodo circular con color del estado */}
+                            {/* Nodo anillado hueco con borde del color del estado */}
                             <div
-                              className="absolute -left-[23px] top-1.5 w-2.5 h-2.5 rounded-full ring-4 ring-white dark:ring-[#18181b] shrink-0 z-10"
-                              style={{ backgroundColor: estadoColor }}
+                              className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-[#18181b] shrink-0 z-10"
+                              style={{ borderColor: estadoColor }}
                             />
 
                             {/* Contenido a la derecha del nodo: Estado */}

@@ -197,6 +197,16 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 > - `fk_servicio_garantia_origen`: `FOREIGN KEY (servicio_origen_id) REFERENCES servicios_recepcion(id) ON UPDATE CASCADE ON DELETE RESTRICT`
 > - `fk_servicio_usuario_entrega`: `FOREIGN KEY (usuario_entrega_id) REFERENCES datos_trabajadores(id) ON DELETE RESTRICT`
 
+#### Columnas de Liquidación y Entrega de Equipos (`servicios_recepcion`)
+Para formalizar el cierre contable, la entrega física y la emisión de comprobantes de salida, la tabla gestiona los siguientes campos:
+1. `fecha_entrega_real` (`TIMESTAMPTZ`): Timestamp del momento exacto en que se concluye la liquidación en mostrador y se entrega el dispositivo al cliente.
+2. `usuario_entrega_id` (`INT`, FK -> `datos_trabajadores(id)`): Identificador del colaborador (personal administrativo o secretaría) que gestionó el cobro, entrega y comprobante de salida.
+3. `metodo_pago_entrega` (`VARCHAR(50)`): Medio de pago formal registrado para saldar el balance pendiente (`'Efectivo'`, `'Tarjeta'`, `'Transferencia'`).
+4. `monto_liquidado` (`NUMERIC(10,2)`): Balance neto cobrado al retirar el equipo ($\text{Mano de Obra} + \sum\text{Incidencias Aprobadas} - \text{Anticipos} - \text{Descuentos}$).
+5. `monto_recibido_entrega` (`NUMERIC(10,2)`): Monto monetario entregado por el cliente en caja (usado para transacciones en efectivo).
+6. `cambio_devuelto_entrega` (`NUMERIC(10,2)`): Importe monetario devuelto como cambio o devuelta ($\text{monto\_recibido\_entrega} - \text{monto\_liquidado}$).
+7. `observaciones_entrega` (`TEXT`): Notas finales de conformidad estética y técnica asentadas en el acto de entrega.
+
 #### Esquema JSONB: `datos_acceso_equipo` (Credenciales y Seguridad del Equipo)
 Estructura persistida para resguardar el método de desbloqueo configurado en `DeviceSecurityPicker.jsx` y renderizado en comprobantes / stickers:
 
@@ -333,6 +343,17 @@ Inspección ocular y funcional realizada durante la apertura de la orden:
 > - `chk_tipo_incidencia`: `tipo_incidencia IN ('Imprevisto', 'Aviso al Cliente', 'Pieza Extra', 'Hallazgo Tecnico')`
 > - `chk_metodo_aprobacion`: `metodo_aprobacion IS NULL OR metodo_aprobacion IN ('Presencial', 'Llamada', 'WhatsApp', 'Correo', 'Otro')`
 
+#### Comportamiento de Incidencias en la Liquidación y Cierre de Orden
+1. **Incidencias Aprobadas (`aprobado_por_cliente = TRUE`):**
+   - El `costo_adicional_repuesto` se suma de forma vinculante al balance liquidable del servicio:
+     $$\text{Total Liquidado} = \text{Costo Inicial} + \sum(\text{Costos Incidencias Aprobadas}) - \text{Anticipo} - \text{Descuento}$$
+   - Se reflejan detalladas en el desglose contable del `ReciboEntregaTermico`.
+2. **Incidencias Rechazadas (`aprobado_por_cliente = FALSE` Y `fecha_aprobacion IS NOT NULL`):**
+   - El costo extra es formalmente descartado y **no se incluye** en el total a liquidar.
+   - En la interfaz y en los históricos se presenta tachado (`line-through`) junto con un badge descriptivo de "Rechazado por Cliente", permitiendo opción de reconsideración si el cliente cambia de parecer.
+3. **Incidencias Pendientes (`costo_adicional_repuesto > 0` Y `fecha_aprobacion IS NULL`):**
+   - Indican que el cliente aún no ha emitido respuesta. Para garantizar la consistencia financiera, el sistema bloquea preventivamente la liquidación hasta que la novedad sea aprobada o rechazada formalmente.
+
 ### `evidencias_fotograficas` (Galería Multimedia)
 | Campo | Tipo | Nulo | Descripción |
 | :--- | :--- | :--- | :--- |
@@ -342,10 +363,15 @@ Inspección ocular y funcional realizada durante la apertura de la orden:
 | `usuario_id` | INT | NO | FK -> `datos_trabajadores(id)` ON UPDATE CASCADE ON DELETE RESTRICT |
 | `url_foto` | TEXT | NO | URL de la imagen en almacenamiento Cloudinary |
 | `public_id` | VARCHAR(150) | SÍ | ID único del archivo en Cloudinary para gestión y borrado |
-| `tipo_evidencia`| VARCHAR(150) | NO | Clasificación ('Estado Inicial', 'Falla Detectada', 'Incidencia', 'Finalizado') |
+| `tipo_evidencia`| VARCHAR(150) | NO | Clasificación canónica: `'RECEPCION'`, `'INCIDENCIA'`, `'ENTREGA'` |
 | `descripcion` | VARCHAR(150) | SÍ | Descripción o nota visual |
 | `fecha_subida` | TIMESTAMPTZ | SÍ | Timestamp de subida (CURRENT_TIMESTAMP) |
 | `activo` | BOOLEAN | NO | Estado lógico (Default: TRUE) |
+
+#### Clasificación Canónica de Evidencias (`tipo_evidencia`):
+- **`'RECEPCION'`:** Evidencias tomadas al ingresar el equipo (condición cosmética inicial, rayones, golpes, accesorios dejados).
+- **`'INCIDENCIA'`:** Fotografías técnicas adjuntas por el técnico de taller asociadas a un imprevisto, hallazgo o necesidad de repuesto (`incidencia_id`).
+- **`'ENTREGA'`:** Evidencias fotográficas de salida tomadas en mostrador al liquidar y despachar el equipo reparado (demostración funcional de pantalla encendida, entrega conforme en caja).
 
 ---
 

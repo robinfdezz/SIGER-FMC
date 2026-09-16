@@ -67,7 +67,21 @@ frontend/
 │   │   │   ├── Breadcrumbs.jsx  # Cabecera contextual (Módulo / Subsección)
 │   │   │   ├── Stepper.jsx      # Asistente visual por etapas (Checklist/Presupuesto)
 │   │   │   ├── Modal.jsx        # Ventana modal atómica (Clientes, edición)
-│   │   │   └── ConfirmModal.jsx # Modal de confirmación de acciones críticas
+│   │   │   ├── ConfirmModal.jsx # Modal de confirmación de acciones críticas
+│   │   │   └── TicketQR.jsx     # Renderizado vectorial QR dinámico
+│   │   ├── servicios/       # Modales y comprobantes de recepción y despacho
+│   │   │   ├── EntregaServicioModal.jsx # Modal de liquidación y cobro de balance
+│   │   │   ├── PostEntregaModal.jsx     # Diálogo post-despacho y disparador de recibo
+│   │   │   ├── ReciboEntregaTermico.jsx # Comprobante térmico de salida y liquidación
+│   │   │   ├── TicketTermico.jsx        # Ticket térmico original de recepción
+│   │   │   ├── StickerTermico.jsx       # Etiqueta adhesiva térmica con QR
+│   │   │   ├── PostCreacionModal.jsx    # Diálogo post-creación y selector de reimpresión
+│   │   │   ├── DevicePhotoUploader.jsx  # Subida de evidencias a Cloudinary
+│   │   │   └── DeviceSecurityPicker.jsx # Diseñador de patrones y contraseñas
+│   │   ├── taller/          # Componentes de mesa de trabajo técnica
+│   │   │   ├── FichaTecnicaModal.jsx    # Ficha técnica, incidencias y timeline unificado
+│   │   │   ├── TallerCard.jsx           # Tarjeta de orden en banco de trabajo
+│   │   │   └── AnimatedTabs.jsx         # Selector animado de fases operativas
 │   │   ├── DashboardLayout.jsx  # Shell principal (Header + Sidebar + Menú móvil)
 │   │   ├── Navbar.jsx           # Header superior de 100% de ancho
 │   │   ├── Sidebar.jsx          # Barra lateral con 3 modos (expanded, hover, collapsed)
@@ -144,6 +158,11 @@ frontend/
 
 - **`checkRole(['SuperAdmin', ...])`:** Restringe endpoints según los roles declarados.
 - **`requireBranchAccess`:** Aplica filtrado automático `WHERE sucursal_id = req.user.sucursal_id` para trabajadores no administradores globales.
+- **Control Estricto de Roles en Taller (`checkTecnicoRol`):**
+  * **Validación Backend (HTTP 400):** La API (`servicios.controller.js`) valida que cualquier trabajador asignado como técnico a una orden posea indefectiblemente el rol `'Tecnico'`. Si un usuario con rol `'SuperAdmin'`, `'Admin_Sucursal'` o `'Secretaria'` intenta autoasignarse o ser asignado en `tecnicos_asignados`, la transacción se aborta con error HTTP 400 explicativo.
+  * **Filtro de Catálogo (`?solo_tecnicos=true`):** El endpoint `/api/trabajadores` soporta el flag `solo_tecnicos=true` para nutrir los selectores de la interfaz únicamente con personal técnico activo de la sucursal.
+  * **Ocultamiento Condicional en UI:** En `TallerCard.jsx` y `FichaTecnicaModal.jsx`, los controles de autoasignación rápida y selección técnica se renderizan condicionalmente según `user.rol_nombre === 'Tecnico'`.
+  * **Suite de Aislamiento y Roles (`test_branch_isolation.js`):** Conjunto de 12/12 pruebas automatizadas que verifican la impenetrabilidad del filtrado multi-sucursal y la inviolabilidad de las reglas de asignación técnica.
 
 ---
 
@@ -201,6 +220,7 @@ Cada orden de servicio técnico en la tabla `servicios_recepcion` sigue un flujo
      * **Acceso y Seguridad:** Renderizado adaptativo de contraseñas, PIN numérico o patrón gráfico mediante `UnlockMethodView`.
      * **Actualización de Estado y Multi-Técnicos:** Formulario de transición con notas técnicas y endpoints de asignación (`POST/DELETE /api/servicios/:id/tecnicos`).
      * **Incidencias y Línea de Tiempo Unificada:** Registro dinámico de hallazgos con cargador de fotos y un contenedor de trayectoria scroleable independiente (`max-h-[480px]`) que fusiona en orden descendente los hitos de estado y las incidencias.
+     * **Refinamiento Visual del Histórico:** Línea conectora punteada/discontinua (`border-l-2 border-dashed border-neutral-300 dark:border-neutral-700`) centrada en el eje vertical de los eventos, y nodos en forma de aros/anillos huecos (`w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-[#18181b]`) con color de borde sincronizado temáticamente según el estado operativo o tipo de novedad técnica.
 
 ### 4.4 Arquitectura de Credenciales de Seguridad y Patrón de Desbloqueo (`PatternLock.jsx`)
 
@@ -213,16 +233,53 @@ Para visualizar de manera segura el acceso al equipo, el componente `UnlockMetho
    - **Paleta Estrictamente Monocromática:** Trazos y círculos en negro sólido (`#111827`) con números blancos sobre fondo blanco puro, evitando cualquier color rojo para prevenir tramas de escala de grises o manchas borrosas al imprimir.
    - **Contenedor Acotado:** Dimensiones restringidas a `w-20 sm:w-24 max-w-[96px]` con secuencia numérica en píldora micro `wrap` centrada, asegurando convivencia limpia con la columna de datos del cliente (`flex-1 min-w-0 pr-2`).
 
-### 4.5 PENDIENTE / PRÓXIMO SPRINT (FASE SIGUIENTE - NO INICIADA): Modal de Entrega Final
+### 4.5 Módulo de Entrega Final, Liquidación y Comprobantes de Salida
 
-> [!NOTE]
-> **Estado de Implementación:** PENDIENTE / NO INICIADA. Esta funcionalidad corresponde al siguiente sprint de desarrollo y actualmente **no está implementada** en el código activo. No debe considerarse una característica existente hasta que se desarrolle en la siguiente fase.
+Arquitectura desacoplada en tres componentes especializados para la culminación y despacho formal del servicio técnico:
 
-Una vez validados al 100% la recepción, el taller técnico, las incidencias y las credenciales de acceso, la fase proyectada para el siguiente ciclo operativo consistirá en el **Modal de Entrega Final y Cierre de Orden**:
-1. **Liquidación Consolidada:** Cálculo del saldo final a pagar:
-   $$\text{Balance} = \text{Costo Inicial} + \sum(\text{Incidencias Aprobadas}) - \text{Anticipos} - \text{Descuentos}$$
-2. **Evidencias Fotográficas de Salida:** Registro fotográfico obligatorio del equipo reparado y encendido (`tipo_evidencia = 'ENTREGA'`).
-3. **Firma de Conformidad y Salida:** Validación de la firma digital del cliente y transición al estado final `ENTREGADO`, generando el comprobante de salida y activando la póliza de garantía.
+```
+┌──────────────────────────────┐
+│  EntregaServicioModal.jsx    │  Formulario de liquidación contable, selección de método
+│  (Desglose + DevicePhoto)    │  de pago, cálculo reactivo de devuelta y captura de fotos.
+└──────────────┬───────────────┘
+               │ Envío POST /api/servicios/:id/entregar
+               ▼
+┌──────────────────────────────┐
+│    PostEntregaModal.jsx      │  Diálogo modal simétrico post-despacho con icono de éxito,
+│  (Confirmación y Disparador) │  resumen monetario y botón rojo full-width de impresión.
+└──────────────┬───────────────┘
+               │ Montaje bajo demanda vía React Portal (#print-mount-point)
+               ▼
+┌──────────────────────────────┐
+│   ReciboEntregaTermico.jsx   │  Comprobante térmico oficial (58mm/80mm) con desglose
+│  (Impresión Térmica POS)     │  financiero, garantía, QR y firmas de conformidad.
+└──────────────────────────────┘
+```
+
+1. **Modal de Liquidación y Despacho (`EntregaServicioModal.jsx`):**
+   - **Consolidación Financiera:** Calcula el balance final liquidable:
+     $$\text{Balance} = \text{Costo Inicial} + \sum(\text{Incidencias Aprobadas}) - \text{Anticipos} - \text{Descuentos}$$
+   - **Manejo de Métodos de Pago:** Soporta `'Efectivo'`, `'Tarjeta'` y `'Transferencia'`. Para transacciones en efectivo, provee cálculo reactivo en tiempo real del cambio o devuelta según el monto recibido por el cliente.
+   - **Evidencias Fotográficas de Entrega (`DevicePhotoUploader.jsx`):** Permite adjuntar imágenes de salida del dispositivo (pantalla encendida, entrega en mostrador) procesadas y persistidas atómicamente con `tipo_evidencia = 'ENTREGA'`.
+   - **Transacción Atómica Backend (`liquidarYEntregarServicio`):** Actualiza `servicios_recepcion` con los datos del cajero (`usuario_entrega_id`), monto liquidado, método de pago, cambio devuelto, fecha real (`fecha_entrega_real = NOW()`), transición a estado `ENTREGADO` (Orden 7) en `historial_estados` y almacenamiento en `evidencias_fotograficas`.
+
+2. **Modal Post-Entrega Homologado (`PostEntregaModal.jsx`):**
+   - Proporciones visuales homologadas 1:1 con `PostCreacionModal.jsx`:
+     * Contenedor superior circular simétrico (`w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 mx-auto mb-4`).
+     * Botón primario a ancho completo en color rojo corporativo exacto (`bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-xl`) para disparar la impresión térmica.
+     * Eliminación de botones superfluos o redundantes para un flujo de caja sin fricción.
+
+3. **Comprobante Térmico de Salida (`ReciboEntregaTermico.jsx`):**
+   - Componente modularizado e independiente de `TicketTermico.jsx`:
+     * Encabezado institucional completo con datos fiscales de la sucursal emisora.
+     * Desglose contable transparente: mano de obra, detalle de imprevistos/repuestos aprobados, anticipos previos, descuentos y balance cobrado en entrega.
+     * Bloque de garantía formal con días de validez y fecha exacta de expiración.
+     * Código QR vectorial dinámico (`TicketQR.jsx`) apuntando al portal público.
+     * Integración estricta con la configuración modular de tickets (`config_tickets`): respeta visibilidad de campos (`mostrar_cliente`, `mostrar_equipo`, `mostrar_falla`, `mostrar_observaciones`, `mostrar_costo_y_anticipo`, `imprimir_garantia`, `mostrar_mensaje_cortesia`), ancho configurado (58mm u 80mm) y regla de impresión de dos copias con salto de página.
+
+4. **Reapertura y Reimpresión desde Tablas Maestras (`ServiciosPage.jsx` & `PostCreacionModal.jsx`):**
+   - Detección normalizada y tolerante a mayúsculas/minúsculas de órdenes despachadas (`estadoNormalizado.includes('ENTREG') || orden_flujo === 7 || estado_id === 7 || fecha_entrega_real`).
+   - Al abrir el diálogo de impresión de una orden entregada, destaca prioritariamente el botón rojo **"Recibo de Entrega y Liquidación"** (renderizando `ReciboEntregaTermico`), manteniendo accesibles de forma secundaria el ticket de recepción original y los stickers.
 
 ---
 

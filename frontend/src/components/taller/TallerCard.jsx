@@ -93,7 +93,7 @@ const getNextAction = (ordenFlujo) => {
     case 5:
       return { label: 'Marcar Listo', nextOrden: 6 };
     case 6:
-      return { label: 'Entregar Equipo', nextOrden: 7, isEntrega: true };
+      return { label: 'Entregar', nextOrden: 7, isEntrega: true };
     default:
       return null;
   }
@@ -298,7 +298,7 @@ export const TallerCard = ({
             }
             className={`w-full mt-0.5 py-1.5 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
               nextAction?.isEntrega
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer'
+                ? 'bg-white hover:bg-emerald-50/70 dark:bg-neutral-900 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 dark:border-emerald-500/30 hover:border-emerald-500 dark:hover:border-emerald-500/60 shadow-2xs cursor-pointer'
                 : !hasTecnicos || hasPendingCosts
                 ? 'bg-neutral-100/50 dark:bg-neutral-800/40 text-neutral-400 dark:text-neutral-500 cursor-not-allowed opacity-60'
                 : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 group-hover:border-neutral-300 dark:group-hover:border-neutral-600 cursor-pointer'
@@ -306,7 +306,7 @@ export const TallerCard = ({
           >
             <span>{nextAction.label}</span>
             {nextAction?.isEntrega ? (
-              <PackageCheck size={14} className="shrink-0" />
+              <PackageCheck size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
             ) : hasPendingCosts ? (
               <span className="text-[10px] font-normal text-amber-600 dark:text-amber-400 font-inter">
                 (Costo pendiente)

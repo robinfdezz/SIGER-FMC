@@ -602,6 +602,8 @@ const getServicioById = async (req, res) => {
       '  sr.checklist_entrada AS checklist_recepcion,\n' +
       '  sr.observaciones_recepcion AS observaciones,\n' +
       '  es.nombre_estado AS estado,\n' +
+      '  es.codigo_estado,\n' +
+      '  es.orden_flujo,\n' +
       '  es.color_badge AS estado_color,\n' +
       '  cd.nombre_categoria AS categoria,\n' +
       '  ds.nombre_sucursal AS sucursal,\n' +
@@ -2168,6 +2170,36 @@ const liquidarYEntregarServicio = async (req, res) => {
        VALUES ($1, $2, $3, $4, NOW())`,
       [id, estadoEntregado.id, usuarioId, 'Equipo entregado y liquidado al cliente.']
     );
+
+    // 8. Insertar fotos de entrega en evidencias_fotograficas (si se proporcionaron)
+    const rawFotosEntrega = Array.isArray(req.body.fotos_entrega)
+      ? req.body.fotos_entrega
+      : (Array.isArray(req.body.evidencias_entrega)
+        ? req.body.evidencias_entrega
+        : (Array.isArray(req.body.fotos) ? req.body.fotos : []));
+
+    const fotosEntregaValidas = rawFotosEntrega
+      .filter(Boolean)
+      .map(function(item) {
+        if (typeof item === 'object' && item !== null) {
+          const url = String(item.url || item.url_foto || item.secure_url || '').trim();
+          const public_id = item.public_id ? String(item.public_id).trim() : null;
+          return url ? { url: url, public_id: public_id } : null;
+        }
+        if (typeof item === 'string' && item.trim().length > 0) {
+          return { url: item.trim(), public_id: null };
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    for (var fe = 0; fe < fotosEntregaValidas.length; fe++) {
+      var fotoEntrega = fotosEntregaValidas[fe];
+      await client.query(
+        'INSERT INTO evidencias_fotograficas (servicio_id, url_foto, public_id, tipo_evidencia, usuario_id) VALUES ($1, $2, $3, $4, $5)',
+        [id, fotoEntrega.url, fotoEntrega.public_id, 'ENTREGA', usuarioId]
+      );
+    }
 
     await client.query('COMMIT');
 
