@@ -376,6 +376,22 @@ Inspección ocular y funcional realizada durante la apertura de la orden:
 
 ---
 
+### 13. Tabla de Sesiones de Carga Remota de Fotos (`sesiones_carga_fotos`)
+
+Almacena las sesiones temporales originadas por Código QR para la sincronización y carga remota de evidencias desde dispositivos móviles sin requerir autenticación de empleado.
+
+| Campo | Tipo | Nulo | Descripción |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL / INT | NO | Llave Primaria (PK) |
+| `session_id` | VARCHAR(64) | NO | Identificador único de sesión (UUID v4) |
+| `fotos` | JSONB | NO | Array JSON de fotos subidas (`[{ url, secure_url, public_id, bytes, size, fecha_subida }]`) |
+| `estado` | VARCHAR(20) | NO | Estado del ciclo de vida: `'PENDIENTE'`, `'COMPLETADO'`, `'EXPIRADO'`, `'UTILIZADA'` (confirmada en orden de servicio), `'PURGADA'` (huérfanos eliminados de Cloudinary) |
+| `expira_en` | TIMESTAMPTZ | NO | Timestamp límite de vigencia (15 minutos desde la creación) |
+| `created_at` | TIMESTAMPTZ | NO | Fecha de apertura de la sesión |
+| `updated_at` | TIMESTAMPTZ | NO | Última actualización o recepción de fotos |
+
+---
+
 ## 2. Índices Secundarios para Rendimiento
 
 - `idx_servicios_sucursal` -> `servicios_recepcion(sucursal_id)`
@@ -389,6 +405,8 @@ Inspección ocular y funcional realizada durante la apertura de la orden:
 - `idx_incidencias_usuario` -> `incidencias_servicio(usuario_id)`
 - `idx_evidencias_servicio` -> `evidencias_fotograficas(servicio_id)`
 - `idx_evidencias_usuario` -> `evidencias_fotograficas(usuario_id)`
+- `idx_sesiones_carga_session_id` -> `sesiones_carga_fotos(session_id)`
+- `idx_sesiones_carga_estado_expira` -> `sesiones_carga_fotos(estado, expira_en)`
 
 ---
 

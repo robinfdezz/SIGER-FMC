@@ -855,6 +855,13 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 ### 5.8 Actualizar Estado Técnico en Taller
 - **Ruta:** `PATCH /api/servicios/:id/estado`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`)
+- **Aislamiento Multi-Sucursal Estricto:**
+  - Si el usuario no es `SuperAdmin`, la consulta valida `WHERE id = :id AND sucursal_id = req.user.sucursal_id`.
+  - Intentar modificar órdenes de otra sede retorna `404 Not Found` (*"Orden de servicio no encontrada en esta sucursal"*).
+- **Regla de Asignación Obligatoria:**
+  - No es posible avanzar el estado desde `RECIBIDO` hacia estados operativos superiores (`EN_DIAGNOSTICO`, `ESPERA_REPUESTO`, `EN_REPARACION`, etc.) si la orden no tiene al menos un técnico asignado en `tecnicos_asignados`.
+  - Si no hay técnicos asignados, la petición retorna `400 Bad Request`:
+    `"Debe asignar al menos un técnico responsable antes de iniciar el trabajo o cambiar el estado del equipo."`
 - **Body (JSON):**
   ```json
   {
@@ -875,10 +882,15 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 ---
 
 ### 5.9 Gestión de Técnicos en Taller
+- **Aislamiento Multi-Sucursal y Restricción de Roles:**
+  - Solo se pueden asignar usuarios que pertenezcan a la misma sucursal física de la orden de servicio (excepto `SuperAdmin`).
+  - **Exclusión Estricta de Secretaría:** Solo se admiten usuarios con rol `Tecnico`, `Admin_Sucursal` o `SuperAdmin`. Si se intenta asignar a un usuario con rol `Secretaria`, la petición es rechazada con `400 Bad Request` (*"El usuario seleccionado tiene rol de Secretaría/Recepción y no puede ser asignado como técnico operativo de taller"*).
 - **Asignar Técnico:** `POST /api/servicios/:id/tecnicos`
   - **Body (JSON):** `{ "tecnico_id": 4 }`
   - **Respuesta Exitosa (`200 OK`):** `{ "ok": true, "message": "Técnico asignado exitosamente" }`
 - **Remover Técnico:** `DELETE /api/servicios/:id/tecnicos/:tecnicoId`
+  - **Bloqueo de Desasignación del Único Técnico:** Si el servicio ya avanzó de `RECIBIDO` (se encuentra en diagnóstico, reparación, control de calidad, etc.) y solo cuenta con un técnico asignado, la petición se rechaza con `400 Bad Request`:
+    `"No se puede desasignar el único técnico mientras el servicio está en proceso. Asigne a otro técnico antes de removerlo o reasigne la orden."`
   - **Respuesta Exitosa (`200 OK`):** `{ "ok": true, "message": "Técnico desasignado exitosamente" }`
 
 ---
@@ -1001,9 +1013,95 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
   }
   ```
 
+### 5.13 Módulo de Sesiones de Carga Móvil y Recolector de Huérfanos (`/api/upload-session`)
+
+Permite a clientes o recepcionistas escanear un código QR desde cualquier dispositivo móvil para tomar fotografías de evidencias físicas y sincronizarlas en tiempo real con el formulario de recepción en PC, sin requerir inicio de sesión en el móvil.
+
+#### 5.13.1 Crear Sesión de Carga QR
+- **Ruta:** `POST /api/upload-session`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Vigencia:** 15 minutos desde el momento de emisión.
+- **Respuesta Exitosa (`201 Created`):**
+  ```json
+  {
+    "ok": true,
+    "data": {
+      "session_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      "url_subida": "http://192.168.1.50:5173/subir-fotos?session=9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      "expira_en": "2026-09-17T12:15:00.000Z",
+      "minutos_vigencia": 15
+    }
+  }
+  ```
+
+#### 5.13.2 Consultar Estado de la Sesión
+- **Ruta:** `GET /api/upload-session/:sessionId`
+- **Acceso:** Público (utilizado por el móvil y por el polling del modal en PC)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "data": {
+      "session_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      "estado": "COMPLETADO",
+      "expirado": false,
+      "expira_en": "2026-09-17T12:15:00.000Z",
+      "total_fotos": 2,
+      "fotos": [
+        {
+          "url": "https://res.cloudinary.com/demo/image/upload/v1/siger-fmc/evidencias/foto1.webp",
+          "secure_url": "https://res.cloudinary.com/demo/image/upload/v1/siger-fmc/evidencias/foto1.webp",
+          "public_id": "siger-fmc/evidencias/foto1",
+          "bytes": 245000,
+          "size": 245000,
+          "fecha_subida": "2026-09-17T12:02:00.000Z"
+        }
+      ]
+    }
+  }
+  ```
+
+#### 5.13.3 Subir Evidencias desde Dispositivo Móvil
+- **Ruta:** `POST /api/upload-session/:sessionId/subir`
+- **Acceso:** Público (validado por `:sessionId` activo y no expirado)
+- **Formato:** `multipart/form-data` con campo `fotos` (hasta 10 fotos) o JSON `{ "imagenes": ["data:image/..."] }`.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Se subieron 2 fotografía(s) exitosamente.",
+    "data": {
+      "session_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      "nuevas_fotos": [ ... ],
+      "total_fotos": 2
+    }
+  }
+  ```
+
+#### 5.13.4 Purgar Sesiones Huérfanas (Garbage Collector Manual)
+- **Ruta:** `POST /api/upload-session/purgar`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Descripción:** Ejecuta inmediatamente la rutina de recolección de huérfanos.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Purga de sesiones huérfanas completada.",
+    "data": {
+      "purgadas": 3,
+      "fotosEliminadas": 6
+    }
+  }
+  ```
+
+#### Ciclo de Vida y Prevención de Huérfanos:
+1. **`PENDIENTE` / `COMPLETADO`**: La sesión recibe fotos desde el móvil y las preserva temporalmente mientras el operador redacta la orden de servicio en la PC.
+2. **`UTILIZADA`**: Al presionar "Guardar Orden de Servicio" (`POST /api/servicios`), la orden vincula las fotos y actualiza la sesión a `'UTILIZADA'`. Las fotos de sesiones `'UTILIZADA'` **nunca** son borradas.
+3. **`PURGADA`**: Si la orden se cancela, la ventana se cierra o expira y pasan más de 30 minutos sin ser confirmada, el Garbage Collector automático elimina las imágenes de Cloudinary (`cloudinary.uploader.destroy`) y marca la sesión como `'PURGADA'`.
+
 ---
 
-## 5. Módulo de Catálogos del Sistema (`/api/catalogos`)
+## 6. Módulo de Catálogos del Sistema (`/api/catalogos`)
 
 ### Endpoints Disponibles
 

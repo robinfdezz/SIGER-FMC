@@ -373,6 +373,35 @@ const createServicio = async (req, res) => {
 
     await client.query('COMMIT');
 
+    // ── 7. Marcado de Confirmación en sesiones_carga_fotos (evitar purga de huérfanos) ──
+    try {
+      const urlsFotos = fotosValidas.map((f) => f.url).filter(Boolean);
+      const publicIdsFotos = fotosValidas.map((f) => f.public_id).filter(Boolean);
+      const sessionIdsToConfirm = [];
+      if (req.body.upload_session_id) sessionIdsToConfirm.push(String(req.body.upload_session_id).trim());
+      if (req.body.sessionId) sessionIdsToConfirm.push(String(req.body.sessionId).trim());
+
+      if (urlsFotos.length > 0 || publicIdsFotos.length > 0 || sessionIdsToConfirm.length > 0) {
+        await pool.query(
+          `UPDATE sesiones_carga_fotos
+           SET estado = 'UTILIZADA', updated_at = NOW()
+           WHERE estado IN ('PENDIENTE', 'COMPLETADO', 'EXPIRADO')
+             AND (
+               session_id = ANY($1::text[])
+               OR EXISTS (
+                 SELECT 1
+                 FROM jsonb_array_elements(fotos) elem
+                 WHERE (elem->>'url' IS NOT NULL AND elem->>'url' = ANY($2::text[]))
+                    OR (elem->>'public_id' IS NOT NULL AND elem->>'public_id' = ANY($3::text[]))
+               )
+             )`,
+          [sessionIdsToConfirm, urlsFotos, publicIdsFotos]
+        );
+      }
+    } catch (sessionConfirmErr) {
+      console.warn('⚠️ No se pudo marcar sesión en sesiones_carga_fotos como UTILIZADA:', sessionConfirmErr.message);
+    }
+
     var tecNombreRes = cleanTecnicosIds.length > 0
       ? await client.query(
           'SELECT TRIM(CONCAT(nombre, \' \', apellido)) AS nombre_completo FROM datos_trabajadores WHERE id = $1',
@@ -874,7 +903,9 @@ const uploadFotosServicio = async (req, res) => {
       const result = await uploadImageBuffer(files[i].buffer, 'siger-fmc/recepcion');
       fotos.push({
         url: result.secure_url,
-        public_id: result.public_id
+        public_id: result.public_id,
+        bytes: files[i].size,
+        size: (files[i].size / (1024 * 1024)).toFixed(2)
       });
       urls.push(result.secure_url);
     }

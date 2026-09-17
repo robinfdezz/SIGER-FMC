@@ -441,5 +441,40 @@ Al reimprimir comprobantes o stickers desde tablas operativas (`ServiciosPage.js
 - **Presets Soportados:** **`50x30 mm`** (estándar preferido) y **`60x40 mm`** (alta resolución).
 - **Integración de Seguridad del Dispositivo:**
   - **Patrón de Desbloqueo Android:** Dibuja la figura real en un SVG vectorial 3x3 normalizado a partir de las coordenadas base 0 (`[0..8]`), e imprime debajo la secuencia legible separada por guiones (ej. `"7-4-1-5-3-6-9"`).
-  - **PIN o Contraseña:** Imprime la clave en tipografía monoespaciada de alta visibilidad (`text-sm font-mono font-black tracking-widest text-neutral-900`) con encabezado `"PIN"` o `"CLAVE"`, omitiendo cualquier cuadrícula vacía.
-  - **Sin Bloqueo:** Indica claramente `"LIBRE / SIN CLAVE"`.
+    - **PIN o Contraseña:** Imprime la clave en tipografía monoespaciada de alta visibilidad (`text-sm font-mono font-black tracking-widest text-neutral-900`) con encabezado `"PIN"` o `"CLAVE"`, omitiendo cualquier cuadrícula vacía.
+    - **Sin Bloqueo:** Indica claramente `"LIBRE / SIN CLAVE"`.
+
+---
+
+## 7. Subsistema de Carga Móvil y Recolector de Huérfanos (Garbage Collector)
+
+Para agilizar la recepción de equipos en mostrador y talleres sin requerir cámaras web ni que los operarios deban iniciar sesión en sus teléfonos personales, SIGER-FMC implementa una arquitectura de captura remota desacoplada:
+
+```
+┌─────────────────────────┐          Escaneo QR         ┌─────────────────────────┐
+│     PC de Mostrador     │────────────────────────────▶│  Smartphone del Operario │
+│   (Formulario Orden)    │                             │   (UploadMobilePage)    │
+│  - Abre QrUploadModal   │◀────────────────────────────│  - Cámara nativa/galería│
+│  - Genera UUID Sesión   │     Sincronización Polling  │  - Envío a Cloudinary   │
+└────────────┬────────────┘                             └────────────┬────────────┘
+             │                                                       │
+             │ Guardar Orden (POST /servicios)                       │ POST /api/upload-session/:id/subir
+             ▼                                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          Backend Express + PostgreSQL                           │
+│  - sesiones_carga_fotos: [{ public_id, secure_url, bytes, size }]               │
+│                                                                                 │
+│  [Ciclo de Vida]:                                                               │
+│   1. PENDIENTE / COMPLETADO: Fotos en espera de confirmación.                   │
+│   2. UTILIZADA: Al guardar la orden, la sesión queda confirmada y blindada.     │
+│   3. PURGADA: Si se descarta/expira (> 30m), el Garbage Collector elimina       │
+│      los assets huérfanos de Cloudinary (cloudinary.uploader.destroy)           │
+│      y marca el estado como PURGADA.                                            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 7.1 Blindaje Multi-Sucursal y Reglas de Taller
+1. **Aislamiento Multi-Sucursal en Taller:** Todas las consultas y mutaciones de la Mesa de Trabajo fuerzan `WHERE sucursal_id = req.user.sucursal_id`. Intentos de acceso inter-sucursal son rechazados con `404 Not Found`.
+2. **Asignación Obligatoria:** No se permite realizar transiciones de estado desde `RECIBIDO` a fases operativas (`EN_DIAGNOSTICO`, `EN_REPARACION`, etc.) sin al menos un técnico asignado en `tecnicos_asignados`.
+3. **Bloqueo de Desasignación Única:** Si un servicio ya inició operaciones y cuenta con un solo técnico asignado, se prohíbe su desasignación hasta que se incorpore otro técnico responsable.
+4. **Exclusión Estricta de Secretaría:** Los trabajadores con rol `Secretaria` no pueden ser asignados como técnicos de taller ni tienen visible la acción de autoasignación.

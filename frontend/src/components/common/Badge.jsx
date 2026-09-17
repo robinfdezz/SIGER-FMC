@@ -26,8 +26,9 @@ const Badge = ({
   ...props
 }) => {
   // Retrocompatibilidad: Si variant contiene un nombre de color semántico, se usa como color y variant pasa a ser 'pill'
-  const isExplicitStyleVariant = variant === 'pill' || variant === 'minimal';
-  const effectiveVariant = isExplicitStyleVariant ? variant : 'pill';
+  const isMinimal = variant === 'minimal' || variant === 'minimalist';
+  const isExplicitStyleVariant = variant === 'pill' || isMinimal;
+  const effectiveVariant = isMinimal ? 'minimal' : (isExplicitStyleVariant ? variant : 'pill');
   const effectiveColor = color || (!isExplicitStyleVariant ? variant : 'neutral');
 
   // Variantes de color y bordes para estilo 'pill' (cápsula con fondo y borde)

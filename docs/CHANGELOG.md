@@ -10,6 +10,37 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.9.0] - 2026-09-17
+
+### Added
+- **Sincronización Móvil de Evidencias Fotográficas vía QR (`/api/upload-session`):**
+  - Tabla `sesiones_carga_fotos` con almacenamiento JSONB estructurado (`url`, `secure_url`, `public_id`, `bytes`, `size`, `fecha_subida`), UUID v4 y vigencia de 15 minutos.
+  - Endpoints `POST /api/upload-session`, `GET /api/upload-session/:sessionId`, `POST /api/upload-session/:sessionId/subir` y `POST /api/upload-session/purgar`.
+  - Interfaz web móvil responsiva (`UploadMobilePage.jsx`) para captura directa con cámara o galería desde smartphones sin autenticación.
+  - Modal interactivo de sincronización en PC (`QrUploadModal.jsx`) con polling automático y carga fluida de evidencias.
+- **Ciclo de Vida y Garbage Collector Autónomo de Cloudinary:**
+  - **Confirmación Automática:** Al guardar la orden (`POST /api/servicios`), las sesiones de carga móvil asociadas transicionan de forma atómica a `estado = 'UTILIZADA'`, protegiendo sus imágenes de cualquier purga.
+  - **Recolección Periódica en Background:** Rutina `purgarSesionesExpiradas()` que consulta sesiones huérfanas (`estado NOT IN ('UTILIZADA', 'CONFIRMADA', 'PURGADA')` y expiración mayor a 30 minutos atrás), destruye sus fotos en Cloudinary vía `cloudinary.uploader.destroy(public_id)` y marca la sesión como `'PURGADA'`.
+  - Activadores resilientes en background con intervalo `.unref()`, al crear/expirar sesiones y vía endpoint manual.
+  - Índice de base de datos compuesto `idx_sesiones_carga_estado_expira` sobre `(estado, expira_en)`.
+- **Regla de Asignación Obligatoria de Técnico en Taller:**
+  - Validación en backend (`servicios.controller.js`): Impide avanzar de estado desde `RECIBIDO` hacia cualquier estado operativo (`EN_DIAGNOSTICO`, `EN_REPARACION`, etc.) si no existe al menos un técnico asignado en `tecnicos_asignados` (HTTP `400 Bad Request`).
+  - Bloqueo de desasignación: Impide retirar al único técnico asignado si la orden ya no se encuentra en estado inicial `RECIBIDO`.
+- **Blindaje Estricto Multi-Sucursal en Mesa de Trabajo:**
+  - Forzado estricto de `req.user.sucursal_id` en todas las consultas y mutaciones de taller.
+  - Rechazo inmediato con HTTP `404 Not Found` en intentos de mutación cruzada entre sucursales.
+  - Validación de coincidencia de sede al asignar técnicos a una orden.
+- **Restricción de Roles Operativos en Taller:**
+  - Exclusión estricta de personal con rol `Secretaria`/Recepción en asignaciones técnicas de taller (`POST /api/servicios/:id/tecnicos`), selectores de colaboradores y visibilidad de la acción "Unirme a la orden" (restringido a `Tecnico`, `Admin_Sucursal` y `SuperAdmin`).
+
+### Changed
+- **Homologación Visual en Carga Móvil y Modal QR:**
+  - `UploadMobilePage.jsx`: Cabecera y branding homologados con `EstadoOrdenPage.jsx` (logo, selector de tema oscuro/claro y tipografía institucional).
+  - `QrUploadModal.jsx`: Reducción de textos redundantes, integración de componente `Badge` minimalista, espaciado inferior ergonómico y adopción del sistema de diseño unificado (`Button`, `SimpleButton`).
+  - `DevicePhotoUploader.jsx`: Tarjetas de evidencia con indicador de peso en bytes/KB y posicionamiento superior derecho del botón de eliminación.
+
+---
+
 ## [0.8.1] - 2026-09-16
 
 ### Added

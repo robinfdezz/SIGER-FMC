@@ -12,6 +12,7 @@ import ServiciosPage from './pages/ServiciosPage';
 import NuevaOrdenPage from './pages/NuevaOrdenPage';
 import EstadoOrdenPage from './pages/EstadoOrdenPage';
 import BancoTrabajoPage from './pages/BancoTrabajoPage';
+import UploadMobilePage from './pages/UploadMobilePage';
 import { useTheme } from './context/ThemeContext';
 import { Toaster } from 'sileo';
 import 'sileo/styles.css';
@@ -28,10 +29,11 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* Rutas Públicas: Login y Seguimiento QR */}
+            {/* Rutas Públicas: Login, Seguimiento QR y Carga Remota Móvil */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/estado" element={<EstadoOrdenPage />} />
             <Route path="/estado/:codigo" element={<EstadoOrdenPage />} />
+            <Route path="/subir-fotos/:sessionId" element={<UploadMobilePage />} />
 
             {/* Rutas Privadas Protegidas */}
             <Route

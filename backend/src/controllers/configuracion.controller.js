@@ -666,10 +666,10 @@ const getCompanyPublicProfile = async (req, res) => {
   try {
     const pool = getPool();
     const result = await pool.query(
-      'SELECT nombre_empresa, logo_url, telefono_principal, correo_contacto FROM datos_companhia ORDER BY id ASC LIMIT 1'
+      'SELECT nombre_empresa, logo_url, telefono_principal, correo_contacto, dominio_sistema FROM datos_companhia ORDER BY id ASC LIMIT 1'
     );
     if (result.rows.length === 0) {
-      return res.status(200).json({ ok: true, data: { nombre_empresa: 'Franyer Mobile Center', logo_url: null } });
+      return res.status(200).json({ ok: true, data: { nombre_empresa: 'Franyer Mobile Center', logo_url: null, dominio_sistema: 'https://franyermobilecenter.com' } });
     }
     return res.status(200).json({ ok: true, data: result.rows[0] });
   } catch (error) {

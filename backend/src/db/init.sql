@@ -234,6 +234,17 @@ CREATE TABLE IF NOT EXISTS evidencias_fotograficas (
         REFERENCES datos_trabajadores(id) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
+-- 13. Tabla de Sesiones de Carga Remota de Fotos (Vía QR)
+CREATE TABLE IF NOT EXISTS sesiones_carga_fotos (
+    id SERIAL PRIMARY KEY,
+    session_id VARCHAR(64) NOT NULL UNIQUE,
+    fotos JSONB NOT NULL DEFAULT '[]'::jsonb,
+    estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE', -- 'PENDIENTE', 'COMPLETADO', 'EXPIRADO', 'UTILIZADA', 'PURGADA'
+    expira_en TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ============================================================================
 -- ÍNDICES SECUNDARIOS PARA RENDIMIENTO
 -- ============================================================================
@@ -249,6 +260,8 @@ CREATE INDEX IF NOT EXISTS idx_incidencias_servicio ON incidencias_servicio(serv
 CREATE INDEX IF NOT EXISTS idx_incidencias_usuario ON incidencias_servicio(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_evidencias_servicio ON evidencias_fotograficas(servicio_id);
 CREATE INDEX IF NOT EXISTS idx_evidencias_usuario ON evidencias_fotograficas(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_sesiones_carga_session_id ON sesiones_carga_fotos(session_id);
+CREATE INDEX IF NOT EXISTS idx_sesiones_carga_estado_expira ON sesiones_carga_fotos(estado, expira_en);
 
 -- ============================================================================
 -- DATOS SEMILLA BASE (CATÁLOGOS OBLIGATORIOS)
