@@ -801,7 +801,40 @@ const getServicioByTicket = async (req, res) => {
       '    FROM historial_estados he\n' +
       '    LEFT JOIN estados_servicio es_h ON es_h.id = he.estado_id\n' +
       '    WHERE he.servicio_id = sr.id\n' +
-      '  ), \'[]\'::json) AS historial_estados\n' +
+      '  ), \'[]\'::json) AS historial_estados,\n' +
+      '  COALESCE((\n' +
+      '    SELECT json_agg(\n' +
+      '      json_build_object(\n' +
+      '        \'id\', inc.id,\n' +
+      '        \'servicio_id\', inc.servicio_id,\n' +
+      '        \'tipo_incidencia\', inc.tipo_incidencia,\n' +
+      '        \'descripcion\', inc.descripcion,\n' +
+      '        \'repuesto_requerido\', inc.repuesto_requerido,\n' +
+      '        \'costo_adicional_repuesto\', inc.costo_adicional_repuesto,\n' +
+      '        \'aprobado_por_cliente\', inc.aprobado_por_cliente,\n' +
+      '        \'fecha_aprobacion\', inc.fecha_aprobacion,\n' +
+      '        \'metodo_aprobacion\', inc.metodo_aprobacion,\n' +
+      '        \'estado_aprobacion\', CASE WHEN inc.aprobado_por_cliente = TRUE THEN \'APROBADO\' WHEN inc.fecha_aprobacion IS NOT NULL THEN \'RECHAZADO\' ELSE \'PENDIENTE\' END,\n' +
+      '        \'rechazado_por_cliente\', (inc.aprobado_por_cliente = FALSE AND inc.fecha_aprobacion IS NOT NULL),\n' +
+      '        \'fecha_registro\', inc.fecha_registro,\n' +
+      '        \'fotos\', COALESCE((\n' +
+      '          SELECT json_agg(\n' +
+      '            json_build_object(\n' +
+      '              \'id\', ef_inc.id,\n' +
+      '              \'url\', ef_inc.url_foto,\n' +
+      '              \'url_foto\', ef_inc.url_foto,\n' +
+      '              \'tipo_evidencia\', ef_inc.tipo_evidencia,\n' +
+      '              \'fecha_subida\', ef_inc.fecha_subida\n' +
+      '            ) ORDER BY ef_inc.id ASC\n' +
+      '          )\n' +
+      '          FROM evidencias_fotograficas ef_inc\n' +
+      '          WHERE ef_inc.incidencia_id = inc.id AND ef_inc.activo = TRUE\n' +
+      '        ), \'[]\'::json)\n' +
+      '      ) ORDER BY inc.fecha_registro DESC, inc.id DESC\n' +
+      '    )\n' +
+      '    FROM incidencias_servicio inc\n' +
+      '    WHERE inc.servicio_id = sr.id AND inc.activo = TRUE\n' +
+      '  ), \'[]\'::json) AS incidencias\n' +
       'FROM servicios_recepcion sr\n' +
       'LEFT JOIN estados_servicio es ON es.id = sr.estado_actual_id\n' +
       'LEFT JOIN clientes c ON c.id = sr.cliente_id\n' +

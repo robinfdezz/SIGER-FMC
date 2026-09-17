@@ -348,8 +348,8 @@ export const EstadoOrdenPage = () => {
           }
         ];
 
-    return base
-      .map((item, idx) => {
+    // Eventos de cambio de estado (con fotos de recepción/entrega asociadas)
+    const estadosEvents = base.map((item, idx) => {
         const isReceptionEvent =
           Number(item.orden_flujo) === 1 ||
           String(item.codigo_estado || '').toUpperCase().includes('RECIB') ||
@@ -376,8 +376,17 @@ export const EstadoOrdenPage = () => {
           _timelineKey: `pub-estado-${item.id || idx}`,
           _sortTime: new Date(item.fecha_registro || orden.created_at || 0).getTime()
         };
-      })
-      .sort((a, b) => b._sortTime - a._sortTime);
+      });
+
+    // Eventos de incidencias / hallazgos técnicos (filtrados por ServiceTimeline en modo público)
+    const incidenciasEvents = (Array.isArray(orden.incidencias) ? orden.incidencias : []).map((item, idx) => ({
+      ...item,
+      tipo_evento: 'INCIDENCIA',
+      _timelineKey: `pub-incidencia-${item.id || idx}`,
+      _sortTime: new Date(item.fecha_registro || 0).getTime()
+    }));
+
+    return [...estadosEvents, ...incidenciasEvents].sort((a, b) => b._sortTime - a._sortTime);
   }, [orden, fotosArray, fotosEntrega]);
 
   return (

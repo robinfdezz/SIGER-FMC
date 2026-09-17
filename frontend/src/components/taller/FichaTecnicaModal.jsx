@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
@@ -44,6 +44,7 @@ import {
   History,
   Plus,
   Check,
+  Copy,
   XCircle,
   MessageSquare,
   Phone,
@@ -223,7 +224,7 @@ export const FichaTecnicaModal = ({
   const [notaCambio, setNotaCambio] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [activePhoto, setActivePhoto] = useState(null);
-
+  const [copiedTicket, setCopiedTicket] = useState(false);
   // Gestión de incidencias y hallazgos
   const [incidencias, setIncidencias] = useState([]);
   const [isReportingIncidencia, setIsReportingIncidencia] = useState(false);
@@ -753,7 +754,25 @@ export const FichaTecnicaModal = ({
         title={
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-normal text-neutral-500 dark:text-neutral-400 font-outfit">Ficha Técnica</span>
-            <span className="font-bold text-neutral-900 dark:text-neutral-100 font-outfit">{orden?.codigo_ticket || '...'}</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (!orden?.codigo_ticket) return;
+                navigator.clipboard.writeText(orden.codigo_ticket).then(() => {
+                  setCopiedTicket(true);
+                  setTimeout(() => setCopiedTicket(false), 1500);
+                });
+              }}
+              title="Copiar código de ticket"
+              className="inline-flex items-center gap-1 font-bold text-neutral-900 dark:text-neutral-100 font-outfit hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer group"
+            >
+              <span>{orden?.codigo_ticket || '...'}</span>
+              {copiedTicket ? (
+                <Check size={13} className="text-emerald-500 shrink-0 animate-in fade-in duration-150" />
+              ) : (
+                <Copy size={13} className="text-neutral-400 dark:text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+              )}
+            </button>
           </div>
         }
         titleSlot={
