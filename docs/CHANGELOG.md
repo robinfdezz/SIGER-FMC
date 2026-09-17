@@ -10,6 +10,34 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.8.1] - 2026-09-16
+
+### Added
+- **Microcomponente Reutilizable de Confirmación Inline (`InlineConfirmButton.jsx`):**
+  - Componente interactivo de confirmación en dos pasos (`[Unirme] -> "¿Unirte?" [✓] [✕]`) con microanimaciones, auto-cierre tras 5s por inactividad (`autoCancelTimeout`), detección de clics externos y variantes visuales (`card`, `primary`, `custom`).
+  - Integración en `TallerCard.jsx` para autoasignación rápida de técnicos en el banco de trabajo sin necesidad de abrir la ficha técnica.
+  - Integración en `FichaTecnicaModal.jsx` para el botón de autoasignación técnica directa.
+- **Exposición y Filtrado de Incidencias en Consulta Pública (`getServicioByTicket` & `EstadoOrdenPage.jsx`):**
+  - Subconsulta SQL optimizada en `servicios.controller.js` (`getServicioByTicket`) que proyecta incidencias activas en formato JSON con ID, descripción, tipo, repuesto, costo, fecha y fotos vinculadas de `evidencias_fotograficas` (`WHERE incidencia_id = inc.id`).
+  - Inyección de eventos con `tipo_evento: 'INCIDENCIA'` en `historialPublico` ordenados cronológicamente de forma descendente junto a las transiciones de estado.
+- **Componente Modularizado de Línea de Tiempo (`ServiceTimeline.jsx`):**
+  - Componente compartido de visualización cronológica reutilizado tanto en Ficha Técnica (`FichaTecnicaModal.jsx`) como en el portal público de seguimiento (`EstadoOrdenPage.jsx`).
+  - Soporte de modo público (`isPublic={true}`) con regla de exposición controlada: solo muestra incidencias de tipo `"Aviso al Cliente"` o incidencias con resolución formal (aprobadas o rechazadas), filtrando hallazgos técnicos o notas operativas internas.
+  - Renderizado de miniaturas multimedia asociadas a cada hito y apertura a pantalla completa vía modal Lightbox.
+- **Copiado Rápido de Ticket en Ficha Técnica (`FichaTecnicaModal.jsx`):**
+  - Encabezado interactivo que permite copiar el código de ticket al portapapeles con un clic (`navigator.clipboard.writeText`) con feedback visual instantáneo (icono `Check` esmeralda durante 1.5s).
+
+### Changed
+- **Limpieza Visual en Ficha Técnica y Portal de Consulta Pública:**
+  - `FichaTecnicaModal.jsx`: Eliminación de galerías de fotos de recepción duplicadas fuera del timeline histórico, consolidando toda la evidencia fotográfica dentro de los nodos correspondientes.
+  - `EstadoOrdenPage.jsx`: Retiro del subtítulo redundante "Portal de Consulta y Seguimiento", unificación de espacios y enriquecimiento del detalle de hardware y avance.
+
+### Fixed
+- **Normalización de Evidencias en Nodos de Estado:**
+  - Vinculación inequívoca de fotos de recepción inicial (`tipo_evidencia = 'RECEPCION'`) al evento de ingreso en taller (`orden_flujo = 1`) y fotos de salida (`tipo_evidencia = 'ENTREGA'`) al evento de despacho (`orden_flujo = 7`), evitando fotos flotantes descontextualizadas.
+
+---
+
 ## [0.8.0] - 2026-09-15
 
 ### Added

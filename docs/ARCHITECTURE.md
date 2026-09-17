@@ -68,8 +68,10 @@ frontend/
 │   │   │   ├── Stepper.jsx      # Asistente visual por etapas (Checklist/Presupuesto)
 │   │   │   ├── Modal.jsx        # Ventana modal atómica (Clientes, edición)
 │   │   │   ├── ConfirmModal.jsx # Modal de confirmación de acciones críticas
+│   │   │   ├── InlineConfirmButton.jsx # Microcomponente inline de 2 pasos (autoasignación)
 │   │   │   └── TicketQR.jsx     # Renderizado vectorial QR dinámico
 │   │   ├── servicios/       # Modales y comprobantes de recepción y despacho
+│   │   │   ├── ServiceTimeline.jsx      # Línea de tiempo unificada (taller y portal público)
 │   │   │   ├── EntregaServicioModal.jsx # Modal de liquidación y cobro de balance
 │   │   │   ├── PostEntregaModal.jsx     # Diálogo post-despacho y disparador de recibo
 │   │   │   ├── ReciboEntregaTermico.jsx # Comprobante térmico de salida y liquidación
@@ -209,20 +211,60 @@ Cada orden de servicio técnico en la tabla `servicios_recepcion` sigue un flujo
     * **Pendiente:** Si la incidencia tiene costo extra y aún no ha sido respondida, se marca como `'PENDIENTE'`, bloqueando el cierre financiero hasta su resolución.
 - **Seguimiento Público:** Los clientes pueden consultar en tiempo real el progreso de su dispositivo introduciendo su `codigo_ticket` sin requerir inicio de sesión.
 
-### 4.3 Arquitectura de Taller y Ficha Técnica (`BancoTrabajoPage.jsx`, `FichaTecnicaModal.jsx`)
+### 4.3 Portal de Seguimiento Público y Contrato de Datos Extendido (`EstadoOrdenPage.jsx`, `ServiceTimeline.jsx`)
+
+El portal público permite a los clientes consultar en tiempo real el estado de reparación de su dispositivo introduciendo su `codigo_ticket` sin requerir autenticación (`GET /api/servicios/consulta/:ticket`).
+
+#### 1. Contrato de Datos del Endpoint Público (`getServicioByTicket`)
+La consulta en `servicios.controller.js` proyecta un payload enriquecido mediante subconsultas SQL con agregaciones JSON nativas de PostgreSQL:
+
+| Campo / Objeto | Tipo | Descripción |
+| :--- | :--- | :--- |
+| `id`, `codigo_ticket` | `integer`, `string` | Identificador interno y código alfanumérico visible del ticket. |
+| `marca_equipo`, `modelo_equipo`, `num_serie_imei` | `string` | Identificación técnica del dispositivo en taller. |
+| `falla_reportada`, `observaciones_recepcion`, `accesorios_recibidos` | `string` | Diagnóstico inicial, notas de recepción y accesorios entregados. |
+| `checklist_entrada` | `json` | Matriz de inspección física y funcional del equipo. |
+| `costo_previsto`, `monto_anticipo`, `monto_descuento`, `monto_liquidado` | `numeric` | Balance contable de la orden de servicio. |
+| `estado_id`, `codigo_estado`, `estado`, `estado_color`, `orden_flujo` | `mixed` | Fase operativa actual en el flujo de taller (1 al 7). |
+| `nombre_cliente`, `telefono_cliente` | `string` | Datos de contacto del titular con resolución `COALESCE`. |
+| `sucursal`, `sucursal_telefono` | `string` | Sede responsable de la orden técnica. |
+| `tecnicos` | `json (array)` | Lista de técnicos asignados (`id`, `nombre`, `apellido`, `nombre_completo`, `foto_perfil_url`). |
+| `fotos` / `fotos_recepcion` | `json (array)` | Evidencias fotográficas de recepción inicial (`tipo_evidencia = 'RECEPCION'`). |
+| `historial_estados` | `json (array)` | Historial cronológico de cambios de estado (`id`, `nombre_estado`, `codigo_estado`, `nota_cambio`, `fecha_registro`). |
+| `incidencias` | `json (array)` | Incidencias activas del servicio (`id`, `tipo_incidencia`, `descripcion`, `repuesto_requerido`, `costo_adicional_repuesto`, `aprobado_por_cliente`, `fecha_aprobacion`, `metodo_aprobacion`, `estado_aprobacion`, `fotos`). |
+
+#### 2. Regla de Filtrado y Exposición de Incidencias en Modo Público (`ServiceTimeline.jsx`)
+Para garantizar la confidencialidad de diagnósticos preliminares y notas internas de taller, el componente `ServiceTimeline` implementa un filtro estricto cuando opera con la propiedad `isPublic={true}`:
+```javascript
+const visibleEvents = events.filter((ev) => {
+  if (!isPublic) return true;
+  if (ev.tipo_evento === 'INCIDENCIA') {
+    return (
+      ev.tipo_incidencia === 'Aviso al Cliente' ||
+      ev.aprobado_por_cliente === true ||
+      ev.rechazado_por_cliente === true
+    );
+  }
+  return true;
+});
+```
+- **Aviso al Cliente:** Se expone de inmediato para mantener informado al cliente sobre novedades de su equipo.
+- **Hallazgos Técnicos Internos:** Permanecen confidenciales en el taller mientras se encuentren pendientes de evaluación interna.
+- **Incidencias Aprobadas / Rechazadas:** Se visibilizan junto con su estado de resolución y fotografías adjuntas vinculadas (`tipo_evidencia = 'INCIDENCIA'`).
+
+### 4.4 Arquitectura de Taller y Ficha Técnica (`BancoTrabajoPage.jsx`, `FichaTecnicaModal.jsx`)
 
 1. **Mesa de Trabajo Técnica (`/taller` / `BancoTrabajoPage.jsx`):**
    - Panel de control para técnicos con filtrado en tiempo real y pestañas animadas (`AnimatedTabs.jsx`) que reflejan la distribución de equipos en cada fase del taller (`Recibido`, `En Diagnóstico`, `En Reparación`, `Esperando Repuesto`, `Listo para Entrega`).
-   - Tarjetas técnicas (`TallerCard.jsx`) con información sintetizada del cliente, equipo, técnico asignado y prioridad.
+   - Tarjetas técnicas (`TallerCard.jsx`) con información sintetizada del cliente, equipo, técnico asignado y prioridad. Incluye el microcomponente `InlineConfirmButton` para autoasignación rápida con confirmación en dos pasos.
 2. **Ficha Técnica Modal (`FichaTecnicaModal.jsx`):**
    - Modal interactivo de alta densidad informativa dividido en 4 cuadrantes funcionales:
-     * **Datos del Dispositivo y Recepción:** Resumen de cliente, fallas, accesorios y checklist de entrada.
+     * **Datos del Dispositivo y Recepción:** Resumen de cliente, fallas, accesorios y checklist de entrada. Título interactivo con botón de copiado de código de ticket con feedback visual instantáneo (`Check` verde).
      * **Acceso y Seguridad:** Renderizado adaptativo de contraseñas, PIN numérico o patrón gráfico mediante `UnlockMethodView`.
-     * **Actualización de Estado y Multi-Técnicos:** Formulario de transición con notas técnicas y endpoints de asignación (`POST/DELETE /api/servicios/:id/tecnicos`).
-     * **Incidencias y Línea de Tiempo Unificada:** Registro dinámico de hallazgos con cargador de fotos y un contenedor de trayectoria scroleable independiente (`max-h-[480px]`) que fusiona en orden descendente los hitos de estado y las incidencias.
-     * **Refinamiento Visual del Histórico:** Línea conectora punteada/discontinua (`border-l-2 border-dashed border-neutral-300 dark:border-neutral-700`) centrada en el eje vertical de los eventos, y nodos en forma de aros/anillos huecos (`w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-[#18181b]`) con color de borde sincronizado temáticamente según el estado operativo o tipo de novedad técnica.
+     * **Actualización de Estado y Multi-Técnicos:** Formulario de transición con notas técnicas, endpoints de asignación (`POST/DELETE /api/servicios/:id/tecnicos`) y botón inline de autoasignación `InlineConfirmButton`.
+     * **Incidencias y Línea de Tiempo Unificada:** Registro dinámico de hallazgos con cargador de fotos y renderizado modularizado mediante `ServiceTimeline.jsx` (`max-h-[480px]`) que fusiona en orden descendente los hitos de estado y las incidencias con línea discontinua y nodos en forma de anillo hueco (*hollow rings*).
 
-### 4.4 Arquitectura de Credenciales de Seguridad y Patrón de Desbloqueo (`PatternLock.jsx`)
+### 4.5 Arquitectura de Credenciales de Seguridad y Patrón de Desbloqueo (`PatternLock.jsx`)
 
 Para visualizar de manera segura el acceso al equipo, el componente `UnlockMethodView` y `PatternLockSvg` manejan dos variantes vectoriales especializadas:
 1. **Variante Pantalla / Ficha Técnica (`variant="reception"`):**
@@ -233,7 +275,10 @@ Para visualizar de manera segura el acceso al equipo, el componente `UnlockMetho
    - **Paleta Estrictamente Monocromática:** Trazos y círculos en negro sólido (`#111827`) con números blancos sobre fondo blanco puro, evitando cualquier color rojo para prevenir tramas de escala de grises o manchas borrosas al imprimir.
    - **Contenedor Acotado:** Dimensiones restringidas a `w-20 sm:w-24 max-w-[96px]` con secuencia numérica en píldora micro `wrap` centrada, asegurando convivencia limpia con la columna de datos del cliente (`flex-1 min-w-0 pr-2`).
 
-### 4.5 Módulo de Entrega Final, Liquidación y Comprobantes de Salida
+### 4.6 Módulo de Entrega Final, Liquidación y Comprobantes de Salida [Planificado / Próximo Sprint]
+
+> [!NOTE]
+> Este módulo representa la especificación técnica de la fase de cierre de orden y caja para el próximo sprint.
 
 Arquitectura desacoplada en tres componentes especializados para la culminación y despacho formal del servicio técnico:
 
