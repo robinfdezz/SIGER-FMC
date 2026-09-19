@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import ClientModal from '../components/clients/ClientModal';
+import ClienteDetalleModal from '../components/clients/ClienteDetalleModal';
 import ConfirmModal from '../components/common/ConfirmModal';
 import Select from '../components/common/Select';
 import Badge from '../components/common/Badge';
@@ -14,6 +15,7 @@ import { RotateCcw } from 'lucide';
 import {
   UserPlus,
   Search,
+  Eye,
   Edit2,
   Power,
   Phone,
@@ -52,6 +54,8 @@ export const ClientsPage = () => {
   // Estados de modales
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedClienteView, setSelectedClienteView] = useState(null);
 
   // Estado de modal de confirmación para toggle de estado
   const [confirmModalState, setConfirmModalState] = useState({
@@ -249,6 +253,11 @@ export const ClientsPage = () => {
   const handleOpenEditModal = (client) => {
     setSelectedClient(client);
     setIsModalOpen(true);
+  };
+
+  const handleOpenViewModal = (client) => {
+    setSelectedClienteView(client);
+    setIsViewModalOpen(true);
   };
 
   // Manejo de alternado de estado lógico
@@ -472,24 +481,28 @@ export const ClientsPage = () => {
                     return (
                       <tr
                         key={client.id}
-                        className={`hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all ${
+                        onClick={() => handleOpenViewModal(client)}
+                        className={`hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all cursor-pointer ${
                           client.activo ? '' : 'opacity-50 hover:opacity-100'
                         }`}
                       >
                         {/* Columna 1: Cliente (Avatar + Nombre + Cédula) */}
                         <td className="py-3 px-3 sm:px-4.5 align-middle">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-xs shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden relative font-outfit">
+                          <div
+                            className="flex items-center gap-2.5 group"
+                            title="Ver detalles del cliente"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 group-hover:scale-105 group-hover:bg-red-200 dark:group-hover:bg-red-900/80 flex items-center justify-center font-bold text-xs shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden relative font-outfit transition-all">
                               {initials}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm whitespace-normal break-words leading-snug">
+                              <p className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm whitespace-normal break-words leading-snug group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
                                 {fullName}
                               </p>
                               <div className="flex items-center gap-1.5 mt-0.5 text-xs text-neutral-400">
                                 <CreditCard size={11} className="shrink-0" />
                                 <span className="font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
-                                  {client.cedula_rnc}
+                                  {client.cedula_rnc || 'Sin documento'}
                                 </span>
                               </div>
                             </div>
@@ -550,9 +563,22 @@ export const ClientsPage = () => {
                         {/* Columna 6: Acciones */}
                         <td className="py-3 px-2.5 sm:px-3 text-center align-middle">
                           <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenViewModal(client);
+                              }}
+                              title="Ver detalles del cliente"
+                              className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                            >
+                              <Eye size={16} />
+                            </button>
                             {canCreateEdit && (
                               <button
-                                onClick={() => handleOpenEditModal(client)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditModal(client);
+                                }}
                                 title="Editar cliente"
                                 className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                               >
@@ -561,7 +587,10 @@ export const ClientsPage = () => {
                             )}
                             {canToggleStatus && (
                               <button
-                                onClick={() => handleOpenConfirmToggle(client)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenConfirmToggle(client);
+                                }}
                                 title={client.activo ? 'Desactivar cliente' : 'Activar cliente'}
                                 className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                               >
@@ -596,6 +625,17 @@ export const ClientsPage = () => {
           />
         </div>
       </div>
+
+      {/* Modal de Detalle / Ficha del Cliente */}
+      <ClienteDetalleModal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedClienteView(null);
+        }}
+        cliente={selectedClienteView}
+        onEdit={canCreateEdit ? (c) => handleOpenEditModal(c) : null}
+      />
 
       {/* Modal de Creación / Edición */}
       <ClientModal

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import WorkerModal from '../components/workers/WorkerModal';
+import UsuarioDetalleModal from '../components/workers/UsuarioDetalleModal';
 import ConfirmModal from '../components/common/ConfirmModal';
 import Select from '../components/common/Select';
 import Badge from '../components/common/Badge';
@@ -15,6 +16,7 @@ import { RotateCcw } from 'lucide';
 import {
   UserPlus,
   Search,
+  Eye,
   Edit2,
   Power,
   Store,
@@ -130,6 +132,10 @@ const WorkersPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingWorker, setEditingWorker] = useState(null);
 
+  // Estado del Modal de Detalle de Usuario
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedWorkerForView, setSelectedWorkerForView] = useState(null);
+
   // Estado del Modal de Confirmación
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [workerToToggle, setWorkerToToggle] = useState(null);
@@ -235,6 +241,11 @@ const WorkersPage = () => {
     }
     setEditingWorker(worker);
     setIsModalOpen(true);
+  };
+
+  const handleOpenViewModal = (worker) => {
+    setSelectedWorkerForView(worker);
+    setIsViewModalOpen(true);
   };
 
   // Abrir confirmación antes de alternar estado
@@ -580,7 +591,8 @@ const WorkersPage = () => {
                   sortedWorkers.map((worker) => (
                     <tr
                       key={worker.id}
-                      className={`hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all ${worker.activo ? '' : 'opacity-50 hover:opacity-100'
+                      onClick={() => handleOpenViewModal(worker)}
+                      className={`hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all cursor-pointer ${worker.activo ? '' : 'opacity-50 hover:opacity-100'
                         }`}
                     >
                       {/* Columna 1: Trabajador / Usuario */}
@@ -675,11 +687,26 @@ const WorkersPage = () => {
                       {/* Columna 5: Acciones (Protegidas por RBAC) */}
                       <td className="py-3 px-2.5 sm:px-3 text-center align-middle">
                         <div className="flex items-center justify-center gap-1">
+                          {/* Botón Ver Detalles */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenViewModal(worker);
+                            }}
+                            title="Ver detalles del usuario"
+                            className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                          >
+                            <Eye size={16} />
+                          </button>
+
                           {canManageWorker(worker) ? (
                             <>
                               {/* Botón Editar */}
                               <button
-                                onClick={() => handleOpenEditModal(worker)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditModal(worker);
+                                }}
                                 title="Editar usuario"
                                 className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                               >
@@ -688,7 +715,10 @@ const WorkersPage = () => {
 
                               {/* Botón Activar / Desactivar */}
                               <button
-                                onClick={() => handleRequestToggleStatus(worker)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRequestToggleStatus(worker);
+                                }}
                                 title={worker.activo ? 'Desactivar cuenta' : 'Activar cuenta'}
                                 className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                               >
@@ -724,6 +754,17 @@ const WorkersPage = () => {
           />
         </div>
       </div>
+
+      {/* Modal de Detalle / Ficha del Usuario */}
+      <UsuarioDetalleModal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedWorkerForView(null);
+        }}
+        usuario={selectedWorkerForView}
+        onEdit={canManageWorker(selectedWorkerForView) ? (w) => handleOpenEditModal(w) : null}
+      />
 
       {/* Modal de Creación / Edición */}
       <WorkerModal
