@@ -40,7 +40,9 @@ import {
   Clock,
   Wrench,
   ClipboardCheck,
+  CheckCircle,
   CheckCircle2,
+  XCircle,
   Inbox,
   PackageCheck
 } from 'lucide-react';
@@ -118,8 +120,26 @@ const getEstadoIcon = (estado) => {
   if (flujo === 4 || cod.includes('REPARAC') || cod.includes('PROCESO') || nom.includes('reparac') || nom.includes('proceso')) return Wrench;
   if (flujo === 5 || cod.includes('CALIDAD') || cod.includes('CONTROL') || nom.includes('calidad') || nom.includes('control')) return ClipboardCheck;
   if (flujo === 6 || cod.includes('LISTO') || cod.includes('ENTREGA') || nom.includes('listo') || nom.includes('entrega')) return CheckCircle2;
-  if (flujo === 7 || cod.includes('ENTREG') || nom.includes('entreg')) return CheckCircle2;
+  if (flujo === 7 || cod.includes('ENTREG') || nom.includes('entreg')) return CheckCircle;
+  if (flujo === 8 || cod.includes('CANCEL') || nom.includes('cancel')) return XCircle;
   return Package;
+};
+
+const getEstadoColor = (estado) => {
+  if (estado?.color_badge) return estado.color_badge;
+  const flujo = Number(estado?.orden_flujo);
+  const cod = (estado?.codigo_estado || '').toUpperCase();
+  const nom = (estado?.nombre_estado || estado?.estado || '').toLowerCase();
+
+  if (flujo === 1 || cod.includes('RECIB') || nom.includes('recib')) return '#3B82F6';
+  if (flujo === 2 || cod.includes('DIAGN') || nom.includes('diagn')) return '#F59E0B';
+  if (flujo === 3 || cod.includes('ESPERA') || cod.includes('REPUESTO') || nom.includes('espera') || nom.includes('repuesto')) return '#EC4899';
+  if (flujo === 4 || cod.includes('REPARAC') || cod.includes('PROCESO') || nom.includes('reparac') || nom.includes('proceso')) return '#8B5CF6';
+  if (flujo === 5 || cod.includes('CALIDAD') || cod.includes('CONTROL') || nom.includes('calidad') || nom.includes('control')) return '#06B6D4';
+  if (flujo === 6 || cod.includes('LISTO') || cod.includes('ENTREGA') || nom.includes('listo') || nom.includes('entrega')) return '#10B981';
+  if (flujo === 7 || cod.includes('ENTREG') || nom.includes('entreg')) return '#059669';
+  if (flujo === 8 || cod.includes('CANCEL') || nom.includes('cancel')) return '#EF4444';
+  return '#6B7280';
 };
 
 const getEstadoLabel = (estado) => {
@@ -130,10 +150,10 @@ const getEstadoLabel = (estado) => {
 
   if (flujo === 1 || cod.includes('RECIB') || nom.includes('recib')) return 'Recibido';
   if (flujo === 2 || cod.includes('DIAGN') || nom.includes('diagn')) return 'En Diagnóstico';
-  if (flujo === 3 || cod.includes('ESPERA') || nom.includes('espera') || cod.includes('REPUESTO') || nom.includes('repuesto')) return 'En repuesto';
-  if (flujo === 4 || cod.includes('REPARAC') || nom.includes('reparac') || cod.includes('PROCESO') || nom.includes('proceso')) return 'En Reparación';
-  if (flujo === 5 || cod.includes('CALIDAD') || nom.includes('calidad') || cod.includes('CONTROL') || nom.includes('control')) return 'Control de Calidad';
-  if (flujo === 6 || cod.includes('LISTO') || nom.includes('listo')) return 'Listo para Entrega';
+  if (flujo === 3 || cod.includes('ESPERA') || cod.includes('espera') || cod.includes('REPUESTO') || nom.includes('repuesto')) return 'En Repuesto';
+  if (flujo === 4 || cod.includes('REPARAC') || cod.includes('reparac') || cod.includes('PROCESO') || nom.includes('proceso')) return 'En Reparación';
+  if (flujo === 5 || cod.includes('CALIDAD') || cod.includes('calidad') || cod.includes('CONTROL') || nom.includes('control')) return 'Control de Calidad';
+  if (flujo === 6 || cod.includes('LISTO') || cod.includes('listo')) return 'Listo para Entrega';
   if (flujo === 7 || cod.includes('ENTREG') || nom.includes('entreg')) return 'Entregado';
   if (flujo === 8 || cod.includes('CANCEL') || nom.includes('cancel')) return 'Cancelado';
   return estado.nombre_estado || estado.estado || '';
@@ -185,7 +205,7 @@ export const ServiciosPage = () => {
   // Filtros interactivos
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedEstado, setSelectedEstado] = useState('');
+  const [selectedEstado, setSelectedEstado] = useState('all');
   const [selectedPrioridad, setSelectedPrioridad] = useState('all');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedTecnico, setSelectedTecnico] = useState('all');
@@ -254,7 +274,7 @@ export const ServiciosPage = () => {
     try {
       const params = { page, limit: pagination.limit };
       if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
-      if (selectedEstado !== 'all') params.estado_id = selectedEstado;
+      if (selectedEstado && selectedEstado !== 'all') params.estado_id = selectedEstado;
       if (selectedPrioridad !== 'all') params.prioridad = selectedPrioridad;
       if (selectedBranch !== 'all') params.sucursal_id = selectedBranch;
       if (selectedTecnico !== 'all') params.tecnico_id = selectedTecnico;
@@ -290,7 +310,7 @@ export const ServiciosPage = () => {
   const handleClearFilters = () => {
     setSearchTerm('');
     setDebouncedSearch('');
-    setSelectedEstado('');
+    setSelectedEstado('all');
     setSelectedPrioridad('all');
     setSelectedBranch('all');
     setSelectedTecnico('all');
@@ -397,12 +417,17 @@ export const ServiciosPage = () => {
 
   // Opciones para los componentes Select
   const estadoOptions = useMemo(() => [
-    { id: '', value: '', label: 'Todos los Estados' },
-    ...estados.map((e) => ({
-      id: String(e.id),
-      value: String(e.id),
-      label: getEstadoLabel(e)
-    }))
+    { id: 'all', value: 'all', label: 'Todos los Estados' },
+    ...estados.map((e) => {
+      const Icon = getEstadoIcon(e);
+      const color = getEstadoColor(e);
+      return {
+        id: String(e.id),
+        value: String(e.id),
+        label: getEstadoLabel(e),
+        icon: <Icon size={16} className="shrink-0 stroke-[2.2]" style={{ color }} />
+      };
+    })
   ], [estados]);
 
   const prioridadOptions = useMemo(() => [
@@ -736,7 +761,7 @@ export const ServiciosPage = () => {
                               nombre_estado: orden.estado
                             };
                             const EstadoIcon = getEstadoIcon(estadoObj);
-                            const estadoColor = orden.estado_color || estadoObj.color_badge || '#6B7280';
+                            const estadoColor = orden.estado_color || getEstadoColor(estadoObj);
                             const estadoLabel = getEstadoLabel(estadoObj);
 
                             return (

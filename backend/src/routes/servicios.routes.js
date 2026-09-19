@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middlewares/authMiddleware');
+const verifyTurnstile = require('../middlewares/turnstile.middleware');
 const { upload, handleMulterErrors } = require('../middlewares/upload');
 const {
   createServicio,
@@ -21,8 +22,8 @@ const {
   liquidarYEntregarServicio
 } = require('../controllers/servicios.controller');
 
-// ── Ruta pública para consulta / tracking de ticket vía QR ──
-router.get('/ticket/:codigo', getServicioByTicket);
+// ── Ruta pública para consulta / tracking de ticket vía QR (Anti-Bot condicional) ──
+router.get('/ticket/:codigo', verifyTurnstile, getServicioByTicket);
 
 // Todas las demás rutas de servicios requieren autenticación
 router.use(authMiddleware);

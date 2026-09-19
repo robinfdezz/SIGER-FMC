@@ -203,12 +203,12 @@ export const TallerCard = ({
   return (
     <div
       onClick={() => onSelect && onSelect(orden)}
-      className="group relative bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600 rounded-2xl p-4 shadow-xs transition-colors duration-200 cursor-pointer flex flex-col justify-between gap-3 select-none"
+      className="group relative bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600 rounded-2xl p-4 shadow-xs transition-colors duration-200 cursor-pointer flex flex-col justify-between gap-3 select-none w-full max-w-full overflow-hidden"
     >
       <div>
         {/* Cabecera de la tarjeta: Ticket a la izquierda, Garantía + Prioridad a la derecha */}
         <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="font-mono text-xs font-bold text-neutral-900 dark:text-neutral-100 tracking-wider">
+          <span className="font-mono text-xs font-bold text-neutral-900 dark:text-neutral-100 tracking-wider truncate">
             {orden.codigo_ticket}
           </span>
 
@@ -267,7 +267,7 @@ export const TallerCard = ({
 
           {/* Falla Reportada */}
           <div className="pt-1">
-            <p className="text-xs text-neutral-600 dark:text-neutral-300 line-clamp-2 leading-relaxed bg-neutral-50 dark:bg-neutral-900/60 p-2 rounded-xl border border-neutral-100 dark:border-neutral-800/60 font-inter">
+            <p className="text-xs text-neutral-600 dark:text-neutral-300 line-clamp-2 leading-relaxed bg-neutral-50 dark:bg-neutral-900/60 p-2 rounded-xl border border-neutral-100 dark:border-neutral-800/60 font-inter break-words">
               {orden.falla_reportada || 'Revisión técnica en taller'}
             </p>
           </div>

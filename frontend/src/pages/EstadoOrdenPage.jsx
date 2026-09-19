@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import Badge from '../components/common/Badge';
+import TurnstileWidget from '../components/common/TurnstileWidget';
 import logoFmcBlack from '../assets/logo-FMC Black.png';
 import logoFmcWhite from '../assets/logo-FMC White.png';
 import {
@@ -92,6 +93,7 @@ export const EstadoOrdenPage = () => {
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
 
+  const isTurnstileEnabled = import.meta.env.VITE_ENABLE_TURNSTILE === 'true';
   const codeFromUrl = (codigo || searchParams.get('codigo') || '').trim().toUpperCase();
 
   const [inputCode, setInputCode] = useState(codeFromUrl);
@@ -100,6 +102,7 @@ export const EstadoOrdenPage = () => {
   const [orden, setOrden] = useState(null);
   const [companyLogo, setCompanyLogo] = useState(null);
   const [activePhoto, setActivePhoto] = useState(null);
+  const [turnstileToken, setTurnstileToken] = useState(null);
 
   // Cargar logotipo oficial de Cloudinary en la vista pública
   useEffect(() => {
@@ -117,13 +120,14 @@ export const EstadoOrdenPage = () => {
     return () => { isMounted = false; };
   }, []);
 
-  const fetchTicket = useCallback(async (codeToFetch) => {
+  const fetchTicket = useCallback(async (codeToFetch, token = null) => {
     if (!codeToFetch) return;
     setLoading(true);
     setError(null);
 
     try {
-      const res = await getServicioByTicket(codeToFetch);
+      const tokenToUse = token || turnstileToken;
+      const res = await getServicioByTicket(codeToFetch, tokenToUse);
       if (res && res.ok && res.data) {
         setOrden(res.data);
         if (res.data.logo_url) setCompanyLogo(res.data.logo_url);
@@ -141,24 +145,49 @@ export const EstadoOrdenPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [turnstileToken]);
 
+  // Si la vista carga automáticamente el ticket desde la URL:
+  // - Si VITE_ENABLE_TURNSTILE es false, consulta de forma directa e inmediata.
+  // - Si está activo, consulta una vez obtenido el token.
   useEffect(() => {
     if (codeFromUrl) {
       setInputCode(codeFromUrl);
-      fetchTicket(codeFromUrl);
+      if (!isTurnstileEnabled) {
+        fetchTicket(codeFromUrl);
+      } else if (turnstileToken) {
+        fetchTicket(codeFromUrl, turnstileToken);
+      }
     } else {
       setOrden(null);
       setError(null);
     }
-  }, [codeFromUrl, fetchTicket]);
+  }, [codeFromUrl, isTurnstileEnabled, turnstileToken, fetchTicket]);
+
+  // Callback cuando Turnstile se resuelve exitosamente
+  const handleTurnstileVerify = (token) => {
+    setTurnstileToken(token);
+    if (codeFromUrl && !orden && !loading) {
+      fetchTicket(codeFromUrl, token);
+    }
+  };
 
   // Manejo de búsqueda
   const handleSearch = (e) => {
     e.preventDefault();
     const clean = inputCode.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
     if (!clean) return;
-    navigate(`/estado/${encodeURIComponent(clean)}`);
+
+    if (isTurnstileEnabled && !turnstileToken) {
+      setError('Por favor complete la verificación de seguridad antes de consultar.');
+      return;
+    }
+
+    if (codeFromUrl === clean) {
+      fetchTicket(clean, turnstileToken);
+    } else {
+      navigate(`/estado/${encodeURIComponent(clean)}`);
+    }
   };
 
   // Sanitización estricta: solo alfanuméricos y guiones [A-Za-z0-9-], forzando mayúsculas
@@ -508,11 +537,19 @@ export const EstadoOrdenPage = () => {
             </Button>
           </form>
 
+          {/* Widget Anti-bot Cloudflare Turnstile (Condicional por Feature Flag) */}
+          <TurnstileWidget
+            onVerify={handleTurnstileVerify}
+            onExpire={() => setTurnstileToken(null)}
+            onError={() => setTurnstileToken(null)}
+            className="my-3.5"
+          />
+
           {/* Mensaje de Error Inline y Minimalista con separación adecuada */}
           {!loading && error && (
-            <div className="mt-5 sm:mt-6 flex items-center justify-center gap-1.5 text-sm font-medium text-rose-600 dark:text-rose-400 animate-fade-in font-inter text-center">
+            <div className="mt-4 sm:mt-5 flex items-center justify-center gap-1.5 text-sm font-medium text-rose-600 dark:text-rose-400 animate-fade-in font-inter text-center">
               <AlertCircle size={16} className="shrink-0" />
-              <span>Ticket no encontrado. Verifica el código e intenta nuevamente.</span>
+              <span>{typeof error === 'string' ? error : 'Ticket no encontrado. Verifica el código e intenta nuevamente.'}</span>
             </div>
           )}
         </section>

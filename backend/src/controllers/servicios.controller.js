@@ -303,7 +303,9 @@ const createServicio = async (req, res) => {
         sanitizedMarca,
         sanitizedModelo,
         sanitizedImei,
-        datos_acceso_equipo && typeof datos_acceso_equipo === 'object' ? JSON.stringify(datos_acceso_equipo) : null,
+        datos_acceso_equipo && typeof datos_acceso_equipo === 'object'
+          ? JSON.stringify(datos_acceso_equipo)
+          : (typeof datos_acceso_equipo === 'string' && datos_acceso_equipo.trim() ? datos_acceso_equipo.trim() : null),
         String(falla_reportada).trim(),
         isBlank(observaciones_recepcion) ? null : String(observaciones_recepcion).trim(),
         accesoriosFinal,
@@ -749,7 +751,7 @@ const getServicioByTicket = async (req, res) => {
     var result = await pool.query(
       'SELECT\n' +
       '  sr.id, sr.codigo_ticket, sr.marca_equipo, sr.modelo_equipo, sr.num_serie_imei,\n' +
-      '  sr.falla_reportada, sr.observaciones_recepcion, sr.accesorios_recibidos, sr.accesorios_recibidos AS accesorios,\n' +
+      '  sr.falla_reportada, sr.observaciones_recepcion, sr.observaciones_recepcion AS observaciones, sr.accesorios_recibidos, sr.accesorios_recibidos AS accesorios,\n' +
       '  sr.prioridad, sr.es_garantia, sr.checklist_entrada,\n' +
       '  sr.costo_previsto, sr.costo_final_confirmado, sr.monto_anticipo, sr.monto_descuento, sr.monto_liquidado,\n' +
       '  sr.fecha_entrega_estimada, sr.fecha_entrega_estimada AS fecha_estimada_entrega, sr.fecha_entrega_real, sr.created_at, sr.updated_at,\n' +
@@ -1132,6 +1134,7 @@ const getServiciosTaller = async (req, res) => {
         sr.num_serie_imei,
         sr.falla_reportada,
         sr.observaciones_recepcion,
+        sr.observaciones_recepcion AS observaciones,
         sr.accesorios_recibidos,
         sr.accesorios_recibidos AS accesorios,
         sr.prioridad,

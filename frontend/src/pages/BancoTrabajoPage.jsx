@@ -615,8 +615,8 @@ export const BancoTrabajoPage = () => {
 
         {/* VISTA KANBAN */}
         {viewMode === 'kanban' && (
-          <div className="overflow-x-auto pb-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 min-w-[1100px]">
+          <div className="w-full max-w-full overflow-x-auto pb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 w-full min-w-0 md:min-w-[1100px]">
               {estados.map((estado) => {
                 const ordenesColumna = filteredOrdenes.filter(
                   (o) => o.estado_id === estado.id || o.codigo_estado === estado.codigo_estado
@@ -626,7 +626,7 @@ export const BancoTrabajoPage = () => {
                 return (
                   <div
                     key={estado.id}
-                    className="flex flex-col rounded-2xl bg-neutral-100/60 dark:bg-[#121214] border border-neutral-200/70 dark:border-neutral-800/80 p-1.5 min-h-[500px] max-h-[700px]"
+                    className="flex flex-col rounded-2xl bg-neutral-100/60 dark:bg-[#121214] border border-neutral-200/70 dark:border-neutral-800/80 p-1.5 min-h-[400px] sm:min-h-[500px] max-h-[700px] w-full min-w-0 max-w-full"
                   >
                     {/* Encabezado de Columna */}
                     <div className="flex items-center justify-between gap-2 px-1.5 py-1.5 mb-1.5 border-b border-neutral-200/60 dark:border-neutral-800/60 shrink-0">
@@ -636,7 +636,7 @@ export const BancoTrabajoPage = () => {
                           className="shrink-0 stroke-[2.2]"
                           style={{ color: estado.color_badge || '#6B7280' }}
                         />
-                        <h3 className="font-outfit font-medium text-xs text-neutral-700 dark:text-neutral-300 whitespace-normal leading-tight">
+                        <h3 className="font-outfit font-medium text-xs text-neutral-700 dark:text-neutral-300 whitespace-normal leading-tight truncate">
                           {getColumnTitle(estado)}
                         </h3>
                       </div>
@@ -647,7 +647,7 @@ export const BancoTrabajoPage = () => {
                     </div>
 
                     {/* Lista de Tarjetas */}
-                    <div className="flex-1 space-y-2.5 overflow-y-auto pr-0.5 min-h-0">
+                    <div className="flex-1 space-y-2.5 overflow-y-auto pr-0.5 min-h-0 w-full max-w-full overflow-x-hidden">
                       {ordenesColumna.length === 0 ? (
                         <div className="py-12 flex flex-col items-center justify-center gap-2 text-center text-xs text-neutral-400 dark:text-neutral-500 font-inter select-none">
                           <Inbox size={22} className="stroke-[1.5] text-neutral-300 dark:text-neutral-600" />

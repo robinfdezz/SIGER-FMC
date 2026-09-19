@@ -96,13 +96,19 @@ export const AuthProvider = ({ children }) => {
    * Función para Iniciar Sesión
    * @param {Object} credentials { usuario, password, rememberMe }
    */
-  const login = async ({ usuario, correo, password, rememberMe = false }) => {
+  const login = async ({ usuario, correo, password, rememberMe = false, turnstileToken = null }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post('/auth/login', { 
+      const payload = { 
         usuario: usuario || correo, 
         password 
+      };
+      if (turnstileToken) {
+        payload.turnstileToken = turnstileToken;
+      }
+      const response = await api.post('/auth/login', payload, {
+        headers: turnstileToken ? { 'cf-turnstile-response': turnstileToken } : {}
       });
 
       if (response.data?.success) {

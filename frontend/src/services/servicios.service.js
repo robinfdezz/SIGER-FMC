@@ -39,10 +39,17 @@ export const uploadFotosRecepcion = async (files) => {
 };
 
 /**
- * Buscar orden por codigo de ticket (consulta publica autenticada)
+ * Buscar orden por codigo de ticket (consulta publica autenticada / anti-bot condicional)
+ * @param {string} codigo
+ * @param {string|null} [turnstileToken=null]
  */
-export const getServicioByTicket = async (codigo) => {
-  const response = await api.get(`/servicios/ticket/${codigo}`);
+export const getServicioByTicket = async (codigo, turnstileToken = null) => {
+  const config = {};
+  if (turnstileToken) {
+    config.headers = { 'cf-turnstile-response': turnstileToken };
+    config.params = { turnstileToken };
+  }
+  const response = await api.get(`/servicios/ticket/${codigo}`, config);
   return response.data;
 };
 

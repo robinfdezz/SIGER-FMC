@@ -613,6 +613,20 @@ export const FichaTecnicaModal = ({
     }
   }
 
+  const rawDatosAcceso = orden?.datos_acceso_equipo || orden?.datos_acceso;
+  let parsedDatosAcceso = null;
+  if (rawDatosAcceso) {
+    if (typeof rawDatosAcceso === 'object') {
+      parsedDatosAcceso = rawDatosAcceso;
+    } else if (typeof rawDatosAcceso === 'string') {
+      try {
+        parsedDatosAcceso = JSON.parse(rawDatosAcceso);
+      } catch {
+        parsedDatosAcceso = null;
+      }
+    }
+  }
+
   const checklistDisplayItems = [];
   if (checklistData && typeof checklistData === 'object') {
     CHECKLIST_ITEMS_DEF.forEach((item) => checklistDisplayItems.push(item));
@@ -957,6 +971,34 @@ export const FichaTecnicaModal = ({
                   <div className="my-auto py-1 w-full flex items-center justify-center">
                     <UnlockMethodView datosAcceso={orden.datos_acceso_equipo} />
                   </div>
+                  {Boolean(
+                    parsedDatosAcceso?.requiere_cuenta &&
+                    (parsedDatosAcceso?.cuenta_adicional || parsedDatosAcceso?.usuario_cuenta)
+                  ) && (
+                    <div className="w-full mt-2 pt-2 border-t border-neutral-200/60 dark:border-neutral-800/60 text-left space-y-1">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-700 dark:text-neutral-200">
+                        <KeyRound size={12} className="text-amber-500 shrink-0" />
+                        <span className="truncate">
+                          {parsedDatosAcceso.cuenta_adicional?.tipo_cuenta || parsedDatosAcceso.tipo_cuenta || 'Cuenta Vinculada'}
+                        </span>
+                      </div>
+                      {(parsedDatosAcceso.cuenta_adicional?.usuario || parsedDatosAcceso.usuario_cuenta) && (
+                        <p className="text-[11px] text-neutral-600 dark:text-neutral-300 font-mono truncate">
+                          User: <strong className="text-neutral-800 dark:text-neutral-100">{parsedDatosAcceso.cuenta_adicional?.usuario || parsedDatosAcceso.usuario_cuenta}</strong>
+                        </p>
+                      )}
+                      {(parsedDatosAcceso.cuenta_adicional?.password || parsedDatosAcceso.clave_cuenta) && (
+                        <p className="text-[11px] text-neutral-600 dark:text-neutral-300 font-mono truncate">
+                          Clave: <strong className="text-neutral-800 dark:text-neutral-100">{parsedDatosAcceso.cuenta_adicional?.password || parsedDatosAcceso.clave_cuenta}</strong>
+                        </p>
+                      )}
+                      {(parsedDatosAcceso.cuenta_adicional?.observaciones || parsedDatosAcceso.observaciones_cuenta) && (
+                        <p className="text-[10px] text-neutral-500 dark:text-neutral-400 italic leading-snug line-clamp-2">
+                          {parsedDatosAcceso.cuenta_adicional?.observaciones || parsedDatosAcceso.observaciones_cuenta}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1653,41 +1695,61 @@ export const FichaTecnicaModal = ({
                 )}
               </div>
 
-              {/* Falla Reportada y Observaciones */}
+              {/* Información Inicial de Recepción: Falla, Observaciones y Accesorios */}
               <div className="space-y-3">
+                {/* Falla Declarada por el Cliente */}
                 <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5">
-                  <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block">
-                    Falla Declarada por el Cliente
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle size={14} className="text-amber-500/90 dark:text-amber-400/90 shrink-0" />
+                    <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block">
+                      Falla Declarada por el Cliente
+                    </span>
+                  </div>
                   <p className="text-xs sm:text-sm text-neutral-800 dark:text-neutral-200 leading-relaxed font-medium">
                     {orden.falla_reportada || 'Revisión general'}
                   </p>
                 </div>
 
-                {orden.observaciones_recepcion && (
-                  <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5">
-                    <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block">
-                      Observaciones de Recepción
-                    </span>
-                    <p className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">
-                      {orden.observaciones_recepcion}
-                    </p>
+                {/* Observaciones de Recepción y Accesorios Recibidos */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Observaciones de Recepción */}
+                  <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5 flex flex-col justify-start">
+                    <div className="flex items-center gap-1.5">
+                      <FileText size={14} className="text-neutral-500 dark:text-neutral-400 shrink-0" />
+                      <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block">
+                        Observaciones de Recepción
+                      </span>
+                    </div>
+                    {(orden.observaciones_recepcion || orden.observaciones)?.trim() ? (
+                      <p className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed font-medium">
+                        {(orden.observaciones_recepcion || orden.observaciones).trim()}
+                      </p>
+                    ) : (
+                      <p className="text-xs sm:text-sm text-neutral-400 dark:text-neutral-500 italic">
+                        Sin observaciones registradas
+                      </p>
+                    )}
                   </div>
-                )}
 
-                {(orden.accesorios_recibidos || orden.accesorios) && (
-                  <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5">
+                  {/* Accesorios Recibidos */}
+                  <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5 flex flex-col justify-start">
                     <div className="flex items-center gap-1.5">
                       <Package size={14} className="text-neutral-500 dark:text-neutral-400 shrink-0" />
                       <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block">
                         Accesorios Recibidos
                       </span>
                     </div>
-                    <p className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed font-medium">
-                      {orden.accesorios_recibidos || orden.accesorios}
-                    </p>
+                    {(orden.accesorios_recibidos || orden.accesorios)?.trim() ? (
+                      <p className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed font-medium">
+                        {(orden.accesorios_recibidos || orden.accesorios).trim()}
+                      </p>
+                    ) : (
+                      <p className="text-xs sm:text-sm text-neutral-400 dark:text-neutral-500 italic">
+                        Sin accesorios recibidos
+                      </p>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Checklist de Recepción Centralizado con Badge */}

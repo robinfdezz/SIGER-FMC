@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { uploadCompanyLogo, updateCompanyProfile } from '../../services/configuracion.service';
 import SingleImageDropzone from '../common/SingleImageDropzone';
 import Button from '../common/Button';
+import Badge from '../common/Badge';
 import { sileo } from 'sileo';
 import {
   Building2,
@@ -227,15 +228,18 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
 
   return (
     <div className="space-y-6">
-      {/* Banner de Modo Solo Lectura para Admin Sucursal */}
+      {/* Aviso Sutil de Modo Solo Lectura para Admin Sucursal */}
       {!isSuperAdmin && (
-        <div className="flex items-center gap-3 p-3.5 sm:p-4 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-800 dark:text-red-300 text-xs sm:text-sm">
-          <div className="p-1.5 rounded-lg bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 shrink-0">
-            <ShieldAlert size={18} />
-          </div>
-          <p className="font-medium font-inter">
+        <div className="flex items-center justify-start -mt-2">
+          <Badge
+            variant="minimalist"
+            color="danger"
+            size="sm"
+            icon={Lock}
+            className="text-xs text-red-600 dark:text-red-400 font-inter gap-1.5"
+          >
             La edición está reservada para el Super Administrador.
-          </p>
+          </Badge>
         </div>
       )}
 

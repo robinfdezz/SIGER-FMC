@@ -3,6 +3,7 @@ import { ShieldCheck, RotateCcw, Lock, Hash, Type, Unlock } from 'lucide-react';
 import { Eye, EyeOff } from 'lucide';
 import { MorphIcon } from 'morphicons/react';
 import { normalizePattern } from '../common/PatternLock';
+import Select from '../common/Select';
 
 // ────────────────────────────────────────────────────────────────
 // MÉTODOS DE DESBLOQUEO
@@ -195,16 +196,25 @@ const PatternGrid = ({ pattern, onChange }) => {
   );
 };
 
+const TIPOS_CUENTA = [
+  { id: 'Cuenta Google', label: 'Cuenta Google', value: 'Cuenta Google' },
+  { id: 'Apple ID / iCloud', label: 'Apple ID / iCloud', value: 'Apple ID / iCloud' },
+  { id: 'Cuenta Samsung', label: 'Cuenta Samsung', value: 'Cuenta Samsung' },
+  { id: 'Cuenta Xiaomi / Mi', label: 'Cuenta Xiaomi / Mi', value: 'Cuenta Xiaomi / Mi' },
+  { id: 'Contraseña de Usuario / BIOS', label: 'Contraseña de Usuario / BIOS', value: 'Contraseña de Usuario / BIOS' },
+  { id: 'Otro', label: 'Otro', value: 'Otro' },
+];
+
 // ────────────────────────────────────────────────────────────────
 // COMPONENTE PRINCIPAL: DeviceSecurityPicker
 // ────────────────────────────────────────────────────────────────
 /**
  * DeviceSecurityPicker
- * Selector de método de desbloqueo del dispositivo.
- * Emite siempre: { metodo: string, valor: string|Array|null }
+ * Selector de método de desbloqueo del dispositivo y credenciales vinculadas opcionales.
+ * Emite siempre: { metodo, tipo, valor, patron, requiere_cuenta, cuenta_adicional, ... }
  *
- * @param {Object}   value    Estado actual: { metodo: 'pin', valor: '1234' }
- * @param {Function} onChange Callback con el nuevo objeto { metodo, valor }
+ * @param {Object}   value    Estado actual
+ * @param {Function} onChange Callback con el nuevo objeto de seguridad
  */
 const DeviceSecurityPicker = ({ value = {}, onChange }) => {
   const metodo = value?.metodo || value?.tipo || 'ninguno';
@@ -217,6 +227,24 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
   const [inputVal, setInputVal] = useState(
     typeof value?.valor === 'string' ? value.valor : (typeof value?.valor === 'number' ? String(value.valor) : '')
   );
+
+  // Estado para Cuentas y Credenciales Adicionales
+  const [requiereCuenta, setRequiereCuenta] = useState(
+    Boolean(value?.requiere_cuenta || value?.cuenta_adicional)
+  );
+  const [tipoCuenta, setTipoCuenta] = useState(
+    value?.cuenta_adicional?.tipo_cuenta || value?.tipo_cuenta || 'Cuenta Google'
+  );
+  const [usuarioCuenta, setUsuarioCuenta] = useState(
+    value?.cuenta_adicional?.usuario || value?.usuario_cuenta || ''
+  );
+  const [passwordCuenta, setPasswordCuenta] = useState(
+    value?.cuenta_adicional?.password || value?.cuenta_adicional?.clave || value?.clave_cuenta || ''
+  );
+  const [notasCuenta, setNotasCuenta] = useState(
+    value?.cuenta_adicional?.observaciones || value?.cuenta_adicional?.notas || value?.observaciones_cuenta || ''
+  );
+  const [showAccountSecret, setShowAccountSecret] = useState(false);
 
   // Sincronizar estado interno ante reseteos o cambios externos del prop value
   useEffect(() => {
@@ -236,36 +264,104 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
       setInputVal('');
       setShowSecret(false);
     }
-  }, [value?.metodo, value?.tipo, value?.valor, value?.patron, value?.base]);
+
+    const hasCuenta = Boolean(value?.requiere_cuenta || value?.cuenta_adicional);
+    setRequiereCuenta(hasCuenta);
+    if (hasCuenta && value?.cuenta_adicional) {
+      setTipoCuenta(value.cuenta_adicional.tipo_cuenta || value.tipo_cuenta || 'Cuenta Google');
+      setUsuarioCuenta(value.cuenta_adicional.usuario || value.usuario_cuenta || '');
+      setPasswordCuenta(value.cuenta_adicional.password || value.cuenta_adicional.clave || value.clave_cuenta || '');
+      setNotasCuenta(value.cuenta_adicional.observaciones || value.cuenta_adicional.notas || value.observaciones_cuenta || '');
+    } else if (!hasCuenta) {
+      setUsuarioCuenta('');
+      setPasswordCuenta('');
+      setNotasCuenta('');
+      setShowAccountSecret(false);
+    }
+  }, [
+    value?.metodo,
+    value?.tipo,
+    value?.valor,
+    value?.patron,
+    value?.base,
+    value?.requiere_cuenta,
+    value?.cuenta_adicional?.tipo_cuenta,
+    value?.cuenta_adicional?.usuario,
+    value?.cuenta_adicional?.password,
+    value?.cuenta_adicional?.observaciones
+  ]);
+
+  const buildResult = (updatedMetodoProps = {}, updatedCuentaProps = {}) => {
+    const isCuentaActive = updatedCuentaProps.requiereCuenta !== undefined
+      ? updatedCuentaProps.requiereCuenta
+      : requiereCuenta;
+
+    const currentTipo = updatedCuentaProps.tipoCuenta !== undefined
+      ? updatedCuentaProps.tipoCuenta
+      : tipoCuenta;
+
+    const currentUsuario = updatedCuentaProps.usuarioCuenta !== undefined
+      ? updatedCuentaProps.usuarioCuenta
+      : usuarioCuenta;
+
+    const currentPassword = updatedCuentaProps.passwordCuenta !== undefined
+      ? updatedCuentaProps.passwordCuenta
+      : passwordCuenta;
+
+    const currentNotas = updatedCuentaProps.notasCuenta !== undefined
+      ? updatedCuentaProps.notasCuenta
+      : notasCuenta;
+
+    const cuentaData = isCuentaActive ? {
+      tipo_cuenta: currentTipo || 'Cuenta Google',
+      usuario: currentUsuario ? currentUsuario.trim() : null,
+      password: currentPassword || null,
+      observaciones: currentNotas ? currentNotas.trim() : null,
+    } : null;
+
+    return {
+      ...value,
+      ...updatedMetodoProps,
+      requiere_cuenta: isCuentaActive,
+      cuenta_adicional: cuentaData,
+      tipo_cuenta: isCuentaActive ? (currentTipo || 'Cuenta Google') : null,
+      usuario_cuenta: isCuentaActive ? (currentUsuario ? currentUsuario.trim() : null) : null,
+      clave_cuenta: isCuentaActive ? (currentPassword || null) : null,
+      observaciones_cuenta: isCuentaActive ? (currentNotas ? currentNotas.trim() : null) : null
+    };
+  };
 
   const handleMetodoChange = (id) => {
     setPattern([]);
     setInputVal('');
     setShowSecret(false);
+    let updated;
     if (id === 'ninguno') {
-      onChange({ metodo: 'ninguno', tipo: 'ninguno', valor: null, patron: [] });
+      updated = { metodo: 'ninguno', tipo: 'ninguno', valor: null, patron: [] };
     } else {
-      onChange({ metodo: id, tipo: id, valor: id === 'patron' ? [] : '', patron: [], base: id === 'patron' ? 1 : undefined });
+      updated = { metodo: id, tipo: id, valor: id === 'patron' ? [] : '', patron: [], base: id === 'patron' ? 1 : undefined };
     }
+    onChange?.(buildResult(updated));
   };
 
   const handlePatternChange = (newPattern) => {
     setPattern(newPattern);
     const textSequence = newPattern.join('-');
-    onChange({
+    const updated = {
       metodo: 'patron',
       tipo: 'patron',
       valor: textSequence,
       patron: newPattern,
       base: 1
-    });
+    };
+    onChange?.(buildResult(updated));
   };
 
   const handlePinChange = (e) => {
     const v = e.target.value.replace(/[^0-9]/g, '');
     if (v.length <= 12) {
       setInputVal(v);
-      onChange({ metodo: 'pin', tipo: 'pin', valor: v, patron: [] });
+      onChange?.(buildResult({ metodo: 'pin', tipo: 'pin', valor: v, patron: [] }));
     }
   };
 
@@ -273,8 +369,39 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
     const v = e.target.value;
     if (v.length <= 64) {
       setInputVal(v);
-      onChange({ metodo: 'contrasena', tipo: 'contrasena', valor: v, patron: [] });
+      onChange?.(buildResult({ metodo: 'contrasena', tipo: 'contrasena', valor: v, patron: [] }));
     }
+  };
+
+  const handleToggleRequiereCuenta = (newChecked) => {
+    setRequiereCuenta(newChecked);
+    if (!newChecked) {
+      setShowAccountSecret(false);
+    }
+    onChange?.(buildResult({}, { requiereCuenta: newChecked }));
+  };
+
+  const handleTipoCuentaChange = (newTipo) => {
+    setTipoCuenta(newTipo);
+    onChange?.(buildResult({}, { tipoCuenta: newTipo }));
+  };
+
+  const handleUsuarioChange = (e) => {
+    const val = e.target.value;
+    setUsuarioCuenta(val);
+    onChange?.(buildResult({}, { usuarioCuenta: val }));
+  };
+
+  const handlePasswordCuentaChange = (e) => {
+    const val = e.target.value;
+    setPasswordCuenta(val);
+    onChange?.(buildResult({}, { passwordCuenta: val }));
+  };
+
+  const handleNotasChange = (e) => {
+    const val = e.target.value;
+    setNotasCuenta(val);
+    onChange?.(buildResult({}, { notasCuenta: val }));
   };
 
   // Estilos visuales de chips alineados a la línea roja institucional
@@ -284,7 +411,7 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
   return (
     <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-5 w-full">
 
-      {/* Cabecera */}
+      {/* Cabecera Principal */}
       <div className="flex items-center gap-2.5 border-b border-neutral-100 dark:border-neutral-800/80 pb-3">
         <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
           <ShieldCheck size={16} />
@@ -323,7 +450,7 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
 
       {/* Input condicional según el método seleccionado */}
       {metodo === 'pin' && (
-        <div className="space-y-2 pt-1">
+        <div className="space-y-2 pt-1 animate-in fade-in duration-150">
           <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
             PIN Numérico
           </label>
@@ -342,7 +469,7 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
               type="button"
               onClick={() => setShowSecret(!showSecret)}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer flex items-center justify-center rounded-lg"
-              title={showSecret ? 'Ocultar' : 'Mostrar'}
+              title={showSecret ? 'Ocultar PIN' : 'Mostrar PIN'}
             >
               <MorphIcon icon={showSecret ? EyeOff : Eye} size={18} spring="snappy" />
             </button>
@@ -351,7 +478,7 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
       )}
 
       {metodo === 'contrasena' && (
-        <div className="space-y-2 pt-1">
+        <div className="space-y-2 pt-1 animate-in fade-in duration-150">
           <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
             Contraseña
           </label>
@@ -368,7 +495,7 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
               type="button"
               onClick={() => setShowSecret(!showSecret)}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer flex items-center justify-center rounded-lg"
-              title={showSecret ? 'Ocultar' : 'Mostrar'}
+              title={showSecret ? 'Ocultar contraseña' : 'Mostrar contraseña'}
             >
               <MorphIcon icon={showSecret ? EyeOff : Eye} size={18} spring="snappy" />
             </button>
@@ -377,7 +504,7 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
       )}
 
       {metodo === 'patron' && (
-        <div className="space-y-2 pt-1">
+        <div className="space-y-2 pt-1 animate-in fade-in duration-150">
           <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
             Patrón Android
           </label>
@@ -391,6 +518,119 @@ const DeviceSecurityPicker = ({ value = {}, onChange }) => {
           El dispositivo no tiene bloqueo de pantalla activo.
         </div>
       )}
+
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* SECCIÓN SECUNDARIA: Cuentas y Credenciales Adicionales    */}
+      {/* ────────────────────────────────────────────────────────── */}
+      <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800/80 space-y-4">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => handleToggleRequiereCuenta(!requiereCuenta)}
+          onKeyDown={(e) => {
+            if (e.key === ' ' || e.key === 'Enter') {
+              e.preventDefault();
+              handleToggleRequiereCuenta(!requiereCuenta);
+            }
+          }}
+          className="flex items-center gap-3.5 p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200/70 dark:border-neutral-800 transition-colors cursor-pointer select-none group hover:bg-neutral-100/60 dark:hover:bg-neutral-800/60"
+        >
+          {/* Switch interactivo a la izquierda */}
+          <div className="relative inline-flex items-center shrink-0">
+            <input
+              type="checkbox"
+              checked={requiereCuenta}
+              onChange={(e) => handleToggleRequiereCuenta(e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-neutral-200 dark:bg-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-neutral-600 peer-checked:bg-red-600"></div>
+          </div>
+
+          {/* Título y Subtítulo */}
+          <div className="flex-1 min-w-0">
+            <h5 className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 font-outfit">
+              Cuentas y Credenciales Adicionales
+            </h5>
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter mt-0.5 leading-snug">
+              ¿El servicio requiere acceso a cuentas vinculadas (Google, Apple ID, etc.)?
+            </p>
+          </div>
+        </div>
+
+        {/* Formulario al activarse el switch */}
+        {requiereCuenta && (
+          <div className="p-4 sm:p-5 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-800/30 space-y-4 animate-in fade-in duration-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Selector de Tipo de Cuenta */}
+              <div>
+                <Select
+                  label="Tipo de Cuenta"
+                  placeholder="Seleccionar tipo de cuenta..."
+                  items={TIPOS_CUENTA}
+                  value={tipoCuenta}
+                  onChange={handleTipoCuentaChange}
+                />
+              </div>
+
+              {/* Correo / Usuario */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+                  Correo / Usuario
+                </label>
+                <input
+                  type="text"
+                  value={usuarioCuenta}
+                  onChange={handleUsuarioChange}
+                  placeholder="ejemplo@correo.com o nombre de usuario"
+                  maxLength={100}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 outline-none focus:border-red-500 dark:focus:border-red-500 focus:ring-2 focus:ring-red-500/20 font-inter transition-colors"
+                />
+              </div>
+
+              {/* Contraseña / Clave con alternancia de visibilidad */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+                  Contraseña / Clave
+                </label>
+                <div className="relative">
+                  <input
+                    type={showAccountSecret ? 'text' : 'password'}
+                    value={passwordCuenta}
+                    onChange={handlePasswordCuentaChange}
+                    placeholder="Contraseña o clave de la cuenta..."
+                    maxLength={100}
+                    className="w-full px-3.5 py-2.5 pr-11 text-sm rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 outline-none focus:border-red-500 dark:focus:border-red-500 focus:ring-2 focus:ring-red-500/20 font-mono transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAccountSecret(!showAccountSecret)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer flex items-center justify-center rounded-lg"
+                    title={showAccountSecret ? 'Ocultar contraseña' : 'Ver contraseña'}
+                  >
+                    <MorphIcon icon={showAccountSecret ? EyeOff : Eye} size={18} spring="snappy" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Notas de acceso / Observaciones de seguridad (ancho completo) */}
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+                  Notas de Acceso / Observaciones de Seguridad
+                </label>
+                <textarea
+                  rows={2}
+                  value={notasCuenta}
+                  onChange={handleNotasChange}
+                  placeholder="Ej. Requiere código 2FA enviado por SMS, patrón en arranque BIOS, etc."
+                  maxLength={250}
+                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 outline-none focus:border-red-500 dark:focus:border-red-500 focus:ring-2 focus:ring-red-500/20 font-inter transition-colors resize-none leading-relaxed"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
