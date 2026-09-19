@@ -99,6 +99,33 @@ const getNextAction = (ordenFlujo) => {
   }
 };
 
+const extractTecnicos = (src) => {
+  if (!src) return [];
+  if (Array.isArray(src.tecnicos) && src.tecnicos.length > 0) return src.tecnicos;
+  if (Array.isArray(src.tecnicos_asignados) && src.tecnicos_asignados.length > 0) return src.tecnicos_asignados;
+  if (Array.isArray(src.tecnicos_data) && src.tecnicos_data.length > 0) return src.tecnicos_data;
+  if (typeof src.tecnicos === 'string') {
+    try {
+      const parsed = JSON.parse(src.tecnicos);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {}
+  }
+  if (typeof src.tecnicos_asignados === 'string') {
+    try {
+      const parsed = JSON.parse(src.tecnicos_asignados);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {}
+  }
+  if (src.tecnico_id && src.tecnico_nombre && src.tecnico_nombre !== 'Sin asignar') {
+    return [{
+      id: src.tecnico_id,
+      nombre_completo: src.tecnico_nombre,
+      nombre: src.tecnico_nombre
+    }];
+  }
+  return [];
+};
+
 export const TallerCard = ({
   orden,
   onSelect,
@@ -163,7 +190,7 @@ export const TallerCard = ({
     }
   };
 
-  const tecnicosList = Array.isArray(orden.tecnicos) ? orden.tecnicos : [];
+  const tecnicosList = extractTecnicos(orden);
   const hasTecnicos = tecnicosList.length > 0;
   const isAlreadyAssigned = hasTecnicos && tecnicosList.some((t) => t.id === (currentUserId || authUser?.id));
 

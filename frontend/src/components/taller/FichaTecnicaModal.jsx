@@ -203,10 +203,38 @@ const normalizeChecklistState = (val) => {
   return 'sin_revisar';
 };
 
+const extractTecnicos = (src) => {
+  if (!src) return [];
+  if (Array.isArray(src.tecnicos) && src.tecnicos.length > 0) return src.tecnicos;
+  if (Array.isArray(src.tecnicos_asignados) && src.tecnicos_asignados.length > 0) return src.tecnicos_asignados;
+  if (Array.isArray(src.tecnicos_data) && src.tecnicos_data.length > 0) return src.tecnicos_data;
+  if (typeof src.tecnicos === 'string') {
+    try {
+      const parsed = JSON.parse(src.tecnicos);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {}
+  }
+  if (typeof src.tecnicos_asignados === 'string') {
+    try {
+      const parsed = JSON.parse(src.tecnicos_asignados);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch {}
+  }
+  if (src.tecnico_id && src.tecnico_nombre && src.tecnico_nombre !== 'Sin asignar') {
+    return [{
+      id: src.tecnico_id,
+      nombre_completo: src.tecnico_nombre,
+      nombre: src.tecnico_nombre
+    }];
+  }
+  return [];
+};
+
 export const FichaTecnicaModal = ({
   isOpen,
   onClose,
   ordenId,
+  ordenInicial = null,
   currentUserId,
   currentUserRole,
   allEstados = [],
@@ -250,6 +278,16 @@ export const FichaTecnicaModal = ({
 
   useEffect(() => {
     if (isOpen && ordenId) {
+      if (ordenInicial && (ordenInicial.id === ordenId || String(ordenInicial.id) === String(ordenId))) {
+        const initTecnicos = extractTecnicos(ordenInicial);
+        setOrden({
+          ...ordenInicial,
+          tecnicos: initTecnicos,
+          tecnicos_asignados: initTecnicos
+        });
+        setSelectedEstadoId(String(ordenInicial.estado_actual_id || ordenInicial.estado_id || ''));
+      }
+
       setLoading(true);
       Promise.all([
         getServicioById(ordenId),
@@ -257,7 +295,17 @@ export const FichaTecnicaModal = ({
       ])
         .then(([resOrden, resWorkers]) => {
           if (resOrden.ok && resOrden.data) {
-            setOrden(resOrden.data);
+            const rawTecnicos = extractTecnicos(resOrden.data);
+            const fallbackTecnicos = extractTecnicos(ordenInicial);
+            const finalTecnicos = rawTecnicos.length > 0 ? rawTecnicos : fallbackTecnicos;
+
+            const normalizedOrden = {
+              ...resOrden.data,
+              tecnicos: finalTecnicos,
+              tecnicos_asignados: finalTecnicos
+            };
+
+            setOrden(normalizedOrden);
             setIncidencias(resOrden.data.incidencias || []);
             setSelectedEstadoId(String(resOrden.data.estado_actual_id || resOrden.data.estado_id || ''));
             setNotaCambio('');
@@ -438,7 +486,7 @@ export const FichaTecnicaModal = ({
 
     const targetEstado = allEstados.find((est) => String(est.id) === String(selectedEstadoId));
     const esEstadoOperativo = targetEstado && targetEstado.codigo_estado !== 'RECIBIDO' && Number(targetEstado.orden_flujo) !== 1;
-    const tieneTecnicos = Array.isArray(orden?.tecnicos) && orden.tecnicos.length > 0;
+    const tieneTecnicos = extractTecnicos(orden).length > 0;
 
     if (esEstadoOperativo && !tieneTecnicos) {
       sileo.warning({
@@ -486,13 +534,15 @@ export const FichaTecnicaModal = ({
       const res = await assignTecnicoServicio(orden.id, targetId);
       if (res.ok && res.data) {
         sileo.success({ title: 'Técnico asignado', description: res.message });
+        const newTecnicos = extractTecnicos(res.data) || res.data.tecnicos || [];
         setOrden((prev) => ({
           ...prev,
-          tecnicos: res.data.tecnicos
+          tecnicos: newTecnicos,
+          tecnicos_asignados: newTecnicos
         }));
         setSelectedColabId('');
         if (onTecnicosUpdated) {
-          onTecnicosUpdated(orden.id, res.data.tecnicos);
+          onTecnicosUpdated(orden.id, newTecnicos);
         }
       }
     } catch (err) {
@@ -508,7 +558,7 @@ export const FichaTecnicaModal = ({
 
   // Remover técnico colaborador
   const handleRemoveTecnico = async (tecnicoId) => {
-    const tecnicosActuales = Array.isArray(orden?.tecnicos) ? orden.tecnicos : [];
+    const tecnicosActuales = extractTecnicos(orden);
     const ordenFlujoActual = Number(orden?.orden_flujo || 1);
     const esEstadoPosterior = orden?.codigo_estado !== 'RECIBIDO' && ordenFlujoActual > 1;
 
@@ -525,12 +575,14 @@ export const FichaTecnicaModal = ({
       const res = await removeTecnicoServicio(orden.id, tecnicoId);
       if (res.ok && res.data) {
         sileo.success({ title: 'Técnico desvinculado', description: res.message });
+        const newTecnicos = extractTecnicos(res.data) || res.data.tecnicos || [];
         setOrden((prev) => ({
           ...prev,
-          tecnicos: res.data.tecnicos
+          tecnicos: newTecnicos,
+          tecnicos_asignados: newTecnicos
         }));
         if (onTecnicosUpdated) {
-          onTecnicosUpdated(orden.id, res.data.tecnicos);
+          onTecnicosUpdated(orden.id, newTecnicos);
         }
       }
     } catch (err) {
@@ -586,7 +638,7 @@ export const FichaTecnicaModal = ({
   const fotosEntrega = (orden?.fotos || []).filter(
     (f) => f.tipo_evidencia === 'ENTREGA'
   );
-  const tecnicosList = Array.isArray(orden?.tecnicos) ? orden.tecnicos : [];
+  const tecnicosList = extractTecnicos(orden);
   const isCurrentUserAssigned = tecnicosList.some((t) => t.id === effectiveUserId);
 
   // Incidencias con costo adicional pendientes de aprobación

@@ -200,6 +200,7 @@ export const BancoTrabajoPage = () => {
 
   // Modal de Ficha Técnica
   const [selectedOrdenId, setSelectedOrdenId] = useState(null);
+  const [selectedOrden, setSelectedOrden] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Modal de Entrega y Liquidación
@@ -416,6 +417,7 @@ export const BancoTrabajoPage = () => {
   };
 
   const openFicha = (orden) => {
+    setSelectedOrden(orden);
     setSelectedOrdenId(orden.id);
     setIsModalOpen(true);
   };
@@ -468,6 +470,16 @@ export const BancoTrabajoPage = () => {
             }
           : o
       )
+    );
+    setSelectedOrden((prev) =>
+      prev && prev.id === ordenId
+        ? {
+            ...prev,
+            tecnicos: updatedTecnicos,
+            tecnicos_asignados: updatedTecnicos,
+            tecnico_nombre: updatedTecnicos[0]?.nombre_completo || 'Sin asignar'
+          }
+        : prev
     );
   };
 
@@ -944,8 +956,12 @@ export const BancoTrabajoPage = () => {
         {/* Modal de Ficha Técnica */}
         <FichaTecnicaModal
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedOrden(null);
+          }}
           ordenId={selectedOrdenId}
+          ordenInicial={selectedOrden}
           currentUserId={currentUser?.id}
           currentUserRole={currentUser?.rol_nombre || currentUser?.rol}
           allEstados={estados}

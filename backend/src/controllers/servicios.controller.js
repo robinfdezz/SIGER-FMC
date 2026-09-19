@@ -653,6 +653,9 @@ const getServicioById = async (req, res) => {
       '  TRIM(CONCAT(c.nombre, \' \', c.apellido)) AS nombre_cliente_reg,\n' +
       '  c.telefono AS telefono_cliente_reg,\n' +
       '  COALESCE((SELECT TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id ORDER BY ta.id ASC LIMIT 1), \'Sin asignar\') AS tecnico_nombre,\n' +
+      '  COALESCE((SELECT string_agg(TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)), \', \' ORDER BY ta.id ASC) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), \'Sin asignar\') AS tecnicos_nombres,\n' +
+      '  COALESCE((SELECT json_agg(json_build_object(\'id\', dt_tec.id, \'nombre\', dt_tec.nombre, \'apellido\', dt_tec.apellido, \'nombre_completo\', TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)), \'usuario\', dt_tec.usuario, \'foto_perfil_url\', dt_tec.foto_perfil_url) ORDER BY ta.id ASC) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), \'[]\'::json) AS tecnicos,\n' +
+      '  COALESCE((SELECT json_agg(json_build_object(\'id\', dt_tec.id, \'nombre\', dt_tec.nombre, \'apellido\', dt_tec.apellido, \'nombre_completo\', TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)), \'usuario\', dt_tec.usuario, \'foto_perfil_url\', dt_tec.foto_perfil_url) ORDER BY ta.id ASC) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), \'[]\'::json) AS tecnicos_asignados,\n' +
       '  COALESCE((SELECT json_agg(json_build_object(\'id\', ef.id, \'url\', ef.url_foto, \'url_foto\', ef.url_foto, \'public_id\', ef.public_id, \'tipo_evidencia\', ef.tipo_evidencia, \'fecha_subida\', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE AND ef.incidencia_id IS NULL AND ef.tipo_evidencia != \'INCIDENCIA\'), \'[]\'::json) AS fotos,\n' +
       '  COALESCE((SELECT json_agg(json_build_object(\'id\', ef.id, \'url\', ef.url_foto, \'url_foto\', ef.url_foto, \'public_id\', ef.public_id, \'tipo_evidencia\', ef.tipo_evidencia, \'fecha_subida\', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE AND ef.incidencia_id IS NULL AND (ef.tipo_evidencia = \'RECEPCION\' OR ef.tipo_evidencia IS NULL)), \'[]\'::json) AS fotos_recepcion,\n' +
       '  COALESCE((\n' +
@@ -1429,7 +1432,20 @@ const updateServicioEstado = async (req, res) => {
           FROM tecnicos_asignados ta
           JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
           WHERE ta.servicio_id = sr.id
-        ), '[]'::json) AS tecnicos
+        ), '[]'::json) AS tecnicos,
+        COALESCE((
+          SELECT json_agg(json_build_object(
+            'id', dt_tec.id,
+            'nombre', dt_tec.nombre,
+            'apellido', dt_tec.apellido,
+            'nombre_completo', TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido)),
+            'usuario', dt_tec.usuario,
+            'foto_perfil_url', dt_tec.foto_perfil_url
+          ) ORDER BY ta.id ASC)
+          FROM tecnicos_asignados ta
+          JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+          WHERE ta.servicio_id = sr.id
+        ), '[]'::json) AS tecnicos_asignados
       FROM servicios_recepcion sr
       JOIN estados_servicio es ON es.id = sr.estado_actual_id
       LEFT JOIN categorias_dispositivos cd ON cd.id = sr.categoria_id
@@ -1566,7 +1582,8 @@ const assignTecnicoServicio = async (req, res) => {
       success: true,
       message: `${tecnicoInfo.nombre} ${tecnicoInfo.apellido} asignado exitosamente a la orden.`,
       data: {
-        tecnicos: listRes.rows[0]?.tecnicos || []
+        tecnicos: listRes.rows[0]?.tecnicos || [],
+        tecnicos_asignados: listRes.rows[0]?.tecnicos || []
       }
     });
 
@@ -1661,7 +1678,8 @@ const removeTecnicoServicio = async (req, res) => {
       success: true,
       message: 'Técnico desvinculado de la orden.',
       data: {
-        tecnicos: listRes.rows[0]?.tecnicos || []
+        tecnicos: listRes.rows[0]?.tecnicos || [],
+        tecnicos_asignados: listRes.rows[0]?.tecnicos || []
       }
     });
 
