@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { uploadCompanyLogo, updateCompanyProfile } from '../../services/configuracion.service';
 import SingleImageDropzone from '../common/SingleImageDropzone';
 import Button from '../common/Button';
+import InlineConfirmButton from '../common/InlineConfirmButton';
 import Badge from '../common/Badge';
 import { sileo } from 'sileo';
 import {
@@ -470,16 +471,18 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
               {/* Botón de Guardado (Solo SuperAdmin) */}
               {isSuperAdmin && (
                 <div className="pt-4 flex items-center justify-end">
-                  <Button
-                    type="submit"
+                  <InlineConfirmButton
+                    type="button"
                     variant="primary"
                     size="md"
+                    icon={Save}
+                    text="Guardar Cambios"
+                    confirmText="¿Guardar?"
+                    onBeforeConfirm={validate}
+                    onConfirm={handleSubmit}
                     disabled={isSubmitting || !hasChanges}
                     isLoading={isSubmitting}
-                    icon={Save}
-                  >
-                    Guardar Cambios
-                  </Button>
+                  />
                 </div>
               )}
             </div>

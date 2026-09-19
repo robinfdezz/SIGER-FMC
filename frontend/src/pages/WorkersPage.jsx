@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import WorkerModal from '../components/workers/WorkerModal';
 import ConfirmModal from '../components/common/ConfirmModal';
@@ -6,6 +6,7 @@ import Select from '../components/common/Select';
 import Badge from '../components/common/Badge';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
 import AnimatedIconButton from '../components/common/AnimatedIconButton';
+import Pagination from '../components/common/Pagination';
 import { getWorkers, toggleWorkerStatus } from '../services/workers.service';
 import { getRoles, getSucursales } from '../services/catalogs.service';
 import { useAuth } from '../context/AuthContext';
@@ -96,10 +97,34 @@ const WorkersPage = () => {
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [isResetting, setIsResetting] = useState(false);
+
+  // Paginación
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 1
+  });
+
+  // Debounce para el buscador textual
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Al cambiar cualquier filtro, reiniciar a la página 1
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, selectedRole, selectedBranch, selectedStatus]);
 
   // Estado del Modal de Usuario
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -130,35 +155,66 @@ const WorkersPage = () => {
     return false;
   };
 
-  const fetchInitialData = async () => {
-    setIsLoading(true);
+  const fetchCatalogs = async () => {
     try {
-      const [workersRes, rolesRes, branchesRes] = await Promise.all([
-        getWorkers().catch(() => ({ data: [] })),
+      const [rolesRes, branchesRes] = await Promise.all([
         getRoles().catch(() => ({ data: [] })),
         getSucursales().catch(() => ({ data: [] }))
       ]);
-      setWorkers(extractArray(workersRes));
       setRoles(extractArray(rolesRes));
       setSucursales(extractArray(branchesRes));
     } catch (error) {
-      console.error('Error al cargar datos de usuarios:', error);
-    } finally {
-      setIsLoading(false);
+      console.error('Error al cargar catálogos:', error);
     }
   };
 
   useEffect(() => {
-    fetchInitialData();
+    fetchCatalogs();
   }, []);
+
+  const fetchWorkersData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
+    try {
+      const params = {
+        page,
+        limit,
+        q: debouncedSearch.trim() || undefined,
+        rol_id: selectedRole || undefined,
+        sucursal_id: selectedBranch !== 'all' ? selectedBranch : undefined,
+        activo: selectedStatus === 'all' ? undefined : selectedStatus === 'active' ? 'true' : 'false'
+      };
+      const res = await getWorkers(params);
+      const data = extractArray(res);
+      setWorkers(data);
+      if (res?.pagination) {
+        setPagination(res.pagination);
+      } else {
+        setPagination({
+          total: data.length,
+          page: 1,
+          limit: data.length || 20,
+          totalPages: 1
+        });
+      }
+    } catch (error) {
+      console.error('Error al cargar datos de usuarios:', error);
+    } finally {
+      if (!isSilent) setIsLoading(false);
+    }
+  }, [page, limit, debouncedSearch, selectedRole, selectedBranch, selectedStatus]);
+
+  useEffect(() => {
+    fetchWorkersData();
+  }, [fetchWorkersData]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await fetchInitialData();
+      await Promise.all([fetchCatalogs(), fetchWorkersData(true)]);
       setRefreshSuccess(true);
+      setTimeout(() => setRefreshSuccess(false), 2000);
     } catch {
-      // error handled in fetchInitialData
+      // error handled in fetchWorkersData
     } finally {
       setIsRefreshing(false);
     }
@@ -247,50 +303,10 @@ const WorkersPage = () => {
     setSelectedRole('');
     setSelectedBranch('all');
     setSelectedStatus('all');
+    setPage(1);
   };
 
-  // Filtrado de usuarios
-  const filteredWorkers = useMemo(() => {
-    return workers.filter((w) => {
-      // 1. Filtro por término de búsqueda (nombre, apellido, usuario, cedula, correo)
-      if (searchTerm.trim()) {
-        const term = searchTerm.toLowerCase().trim();
-        const fullName = `${w.nombre} ${w.apellido}`.toLowerCase();
-        const username = (w.usuario || '').toLowerCase();
-        const cedula = (w.cedula || '').toLowerCase();
-        const email = (w.correo || '').toLowerCase();
-
-        if (
-          !fullName.includes(term) &&
-          !username.includes(term) &&
-          !cedula.includes(term) &&
-          !email.includes(term)
-        ) {
-          return false;
-        }
-      }
-
-      // 2. Filtro por Rol
-      if (selectedRole && String(w.rol_id) !== String(selectedRole)) {
-        return false;
-      }
-
-      // 3. Filtro por Sucursal
-      if (selectedBranch && selectedBranch !== 'all') {
-        if (selectedBranch === 'global') {
-          if (w.sucursal_id !== null && w.sucursal_id !== undefined) return false;
-        } else if (String(w.sucursal_id) !== String(selectedBranch)) {
-          return false;
-        }
-      }
-
-      // 4. Filtro por Estado
-      if (selectedStatus === 'active' && !w.activo) return false;
-      if (selectedStatus === 'inactive' && w.activo) return false;
-
-      return true;
-    });
-  }, [workers, searchTerm, selectedRole, selectedBranch, selectedStatus]);
+  const filteredWorkers = workers;
 
   const [sortConfig, setSortConfig] = useState({ key: 'usuario', direction: 'asc' });
 
@@ -302,7 +318,7 @@ const WorkersPage = () => {
   };
 
   const sortedWorkers = useMemo(() => {
-    const items = [...filteredWorkers];
+    const items = [...workers];
     if (!sortConfig.key) return items;
 
     // Jerarquía de roles: Super Admin > Admin Sucursal > Secretaria > Técnico
@@ -485,13 +501,6 @@ const WorkersPage = () => {
                   hasActiveFilters={hasActiveFilters}
                 />
               </div>
-            </div>
-
-            {/* Resumen de conteo */}
-            <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 pt-1">
-              <span>
-                Mostrando <strong>{sortedWorkers.length}</strong> de <strong>{workers.length}</strong> usuarios registrados
-              </span>
             </div>
           </div>
         </div>
@@ -700,12 +709,19 @@ const WorkersPage = () => {
             </table>
           </div>
 
-          {/* Barra inferior resumen */}
-          <div className="px-4 sm:px-6 py-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-inter shrink-0 bg-neutral-50/50 dark:bg-neutral-900/20">
-            <span>
-              Mostrando <strong>{filteredWorkers.length}</strong> {filteredWorkers.length === 1 ? 'usuario' : 'usuarios'}{workers.length !== filteredWorkers.length && ` (de ${workers.length} en total)`}
-            </span>
-          </div>
+          {/* Paginación */}
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={(newPage) => setPage(newPage)}
+            onItemsPerPageChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+            isLoading={isLoading || isRefreshing}
+          />
         </div>
       </div>
 
@@ -716,7 +732,7 @@ const WorkersPage = () => {
         worker={editingWorker}
         roles={roles}
         sucursales={sucursales}
-        onSuccess={fetchInitialData}
+        onSuccess={() => fetchWorkersData(true)}
       />
 
       {/* Modal de Confirmación de Estado */}

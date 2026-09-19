@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import ClientModal from '../components/clients/ClientModal';
 import ConfirmModal from '../components/common/ConfirmModal';
 import Select from '../components/common/Select';
 import Badge from '../components/common/Badge';
+import Pagination from '../components/common/Pagination';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
 import AnimatedIconButton from '../components/common/AnimatedIconButton';
 import { useAuth } from '../context/AuthContext';
@@ -42,7 +43,11 @@ export const ClientsPage = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshSuccess, setRefreshSuccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 20, totalPages: 1 });
 
   // Estados de modales
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,73 +67,112 @@ export const ClientsPage = () => {
     { id: 'inactive', label: 'Solo Inactivos' }
   ], []);
 
-  // Carga de datos
-  const fetchClients = async () => {
+  // Debounce para búsqueda
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Carga de datos con paginación
+  const fetchClients = useCallback(async (targetPage = page, targetLimit = limit) => {
     try {
       setIsLoading(true);
-      const res = await getClients({ limit: 100 });
-      if (res.success) {
-        setClients(res.data || []);
+      const params = {
+        page: targetPage,
+        limit: targetLimit,
+        estado: selectedStatus
+      };
+      if (debouncedSearch.trim()) {
+        params.q = debouncedSearch.trim();
       }
+
+      const res = await getClients(params);
+
+      // Normalizar la extracción de datos con fallbacks seguros
+      const items = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.clientes)
+            ? res.clientes
+            : Array.isArray(res?.data?.clientes)
+              ? res.data.clientes
+              : Array.isArray(res?.data?.data)
+                ? res.data.data
+                : [];
+
+      setClients(items);
+
+      // Normalizar la paginación con valores seguros por defecto
+      const pag = res?.pagination || res?.data?.pagination || {
+        total: items.length,
+        page: Number(targetPage) || 1,
+        limit: Number(targetLimit) || 20,
+        totalPages: Math.ceil(items.length / (Number(targetLimit) || 20)) || 1
+      };
+
+      const safeTotal = Number(pag.total) >= 0 ? Number(pag.total) : items.length;
+      const safePage = Number(pag.page) || Number(targetPage) || 1;
+      const safeLimit = Number(pag.limit) || Number(targetLimit) || 20;
+      const safeTotalPages = Number(pag.totalPages) || Math.ceil(safeTotal / safeLimit) || 1;
+
+      setPagination({
+        total: safeTotal,
+        page: safePage,
+        limit: safeLimit,
+        totalPages: safeTotalPages
+      });
+      setPage(safePage);
+      setLimit(safeLimit);
+      return true;
     } catch (error) {
       console.error('Error al cargar clientes:', error);
+      setClients([]);
+      setPagination({ total: 0, page: 1, limit: 20, totalPages: 1 });
       sileo.error({
         title: 'Error de carga',
         description: 'No se pudo obtener el listado de clientes del servidor.'
       });
+      return false;
     } finally {
       setIsLoading(false);
     }
+  }, [debouncedSearch, selectedStatus, page, limit]);
+
+  // Recarga reactiva al cambiar filtros (reinicia a página 1)
+  useEffect(() => {
+    setPage(1);
+    fetchClients(1, limit);
+  }, [debouncedSearch, selectedStatus]);
+
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
+    fetchClients(newPage, limit);
   };
 
-  useEffect(() => {
-    fetchClients();
-  }, []);
+  const handleItemsPerPageChange = (newLimit) => {
+    setLimit(newLimit);
+    setPage(1);
+    fetchClients(1, newLimit);
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setDebouncedSearch('');
+    setSelectedStatus('all');
+    setPage(1);
+  };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    try {
-      await fetchClients();
+    const success = await fetchClients(page, limit);
+    setIsRefreshing(false);
+    if (success) {
       setRefreshSuccess(true);
-    } catch {
-      // error handled in fetchClients
-    } finally {
-      setIsRefreshing(false);
     }
   };
-
-  // Filtrado de clientes en cliente para búsqueda reactiva
-  const filteredClients = useMemo(() => {
-    return clients.filter((c) => {
-      // 1. Filtro por término de búsqueda
-      if (searchTerm.trim()) {
-        const term = searchTerm.toLowerCase().trim();
-        const fullName = `${c.nombre} ${c.apellido || ''}`.toLowerCase();
-        const cedula = (c.cedula_rnc || '').toLowerCase();
-        const telefono = (c.telefono || '').toLowerCase();
-        const telefonoExtra = (c.telefono_adicional || '').toLowerCase();
-        const email = (c.correo || '').toLowerCase();
-        const direccion = (c.direccion || '').toLowerCase();
-
-        if (
-          !fullName.includes(term) &&
-          !cedula.includes(term) &&
-          !telefono.includes(term) &&
-          !telefonoExtra.includes(term) &&
-          !email.includes(term) &&
-          !direccion.includes(term)
-        ) {
-          return false;
-        }
-      }
-
-      // 2. Filtro por Estado
-      if (selectedStatus === 'active' && !c.activo) return false;
-      if (selectedStatus === 'inactive' && c.activo) return false;
-
-      return true;
-    });
-  }, [clients, searchTerm, selectedStatus]);
 
   const [sortConfig, setSortConfig] = useState({ key: 'registro', direction: 'desc' });
 
@@ -140,7 +184,7 @@ export const ClientsPage = () => {
   };
 
   const sortedClients = useMemo(() => {
-    const items = [...filteredClients];
+    const items = Array.isArray(clients) ? [...clients] : [];
     if (!sortConfig.key) return items;
 
     return items.sort((a, b) => {
@@ -175,7 +219,7 @@ export const ClientsPage = () => {
       if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [filteredClients, sortConfig]);
+  }, [clients, sortConfig]);
 
   const renderSortIcon = (columnKey) => {
     if (sortConfig.key !== columnKey) return null;
@@ -190,11 +234,6 @@ export const ClientsPage = () => {
     searchTerm.trim() ||
     selectedStatus !== 'all'
   );
-
-  const handleClearFilters = () => {
-    setSearchTerm('');
-    setSelectedStatus('all');
-  };
 
   const getInitials = (nombre, apellido) => {
     const n = nombre ? nombre.charAt(0).toUpperCase() : '';
@@ -254,13 +293,7 @@ export const ClientsPage = () => {
   };
 
   const handleModalSuccess = (savedClient) => {
-    setClients((prev) => {
-      const exists = prev.some((c) => c.id === savedClient.id);
-      if (exists) {
-        return prev.map((c) => (c.id === savedClient.id ? savedClient : c));
-      }
-      return [savedClient, ...prev];
-    });
+    fetchClients(page, limit);
   };
 
   const activeCount = useMemo(() => clients.filter((c) => c.activo).length, [clients]);
@@ -338,13 +371,6 @@ export const ClientsPage = () => {
                   hasActiveFilters={hasActiveFilters}
                 />
               </div>
-            </div>
-
-            {/* Resumen de conteo */}
-            <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 pt-1">
-              <span>
-                Mostrando <strong>{sortedClients.length}</strong> de <strong>{clients.length}</strong> clientes registrados
-              </span>
             </div>
           </div>
         </div>
@@ -432,7 +458,7 @@ export const ClientsPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  sortedClients.map((client) => {
+                  (sortedClients || []).map((client) => {
                     const fullName = `${client.nombre} ${client.apellido || ''}`.trim();
                     const initials = getInitials(client.nombre, client.apellido);
                     const formattedDate = client.created_at
@@ -557,12 +583,17 @@ export const ClientsPage = () => {
             </table>
           </div>
 
-          {/* Barra inferior resumen */}
-          <div className="px-4 sm:px-6 py-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-inter shrink-0 bg-neutral-50/50 dark:bg-neutral-900/20">
-            <span>
-              Mostrando <strong>{filteredClients.length}</strong> {filteredClients.length === 1 ? 'cliente' : 'clientes'}{clients.length !== filteredClients.length && ` (de ${clients.length} en total)`}
-            </span>
-          </div>
+          {/* Paginación Reutilizable */}
+          <Pagination
+            currentPage={Number(pagination?.page) || Number(page) || 1}
+            totalPages={Number(pagination?.totalPages) || 1}
+            totalItems={Number(pagination?.total) >= 0 ? Number(pagination.total) : 0}
+            itemsPerPage={Number(pagination?.limit) || Number(limit) || 20}
+            onPageChange={handlePageChange}
+            onItemsPerPageChange={handleItemsPerPageChange}
+            pageSizeOptions={[10, 20, 50, 100]}
+            isLoading={isLoading || isRefreshing}
+          />
         </div>
       </div>
 

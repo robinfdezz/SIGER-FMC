@@ -6,6 +6,7 @@ import Select from '../common/Select';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
 import AnimatedTabs from '../common/AnimatedTabs';
+import InlineConfirmButton from '../common/InlineConfirmButton';
 import { sileo } from 'sileo';
 import {
   Printer,
@@ -268,289 +269,293 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* COLUMNA IZQUIERDA: Formularios de Configuración (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          {/* SECCIÓN 1: Etiquetas Adhesivas (Stickers de Taller) */}
-          <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-5">
-            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800/80 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
-                  <Tag size={17} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 font-outfit">
-                    Stickers Adhesivos de Taller
-                  </h4>
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter">
-                    Etiquetas térmicas fijadas en los dispositivos recibidos para trazabilidad física.
-                  </p>
+          {/* SECCIÓN 1: Etiquetas Adhesivas (Stickers de Taller) - Visible solo si previewMode === 'etiqueta' */}
+          {previewMode === 'etiqueta' && (
+            <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-5 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800/80 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                    <Tag size={17} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 font-outfit">
+                      Stickers Adhesivos de Taller
+                    </h4>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter">
+                      Etiquetas térmicas fijadas en los dispositivos recibidos para trazabilidad física.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Selector de Presets de Tamaño */}
-            <div className="space-y-3">
-              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
-                Preset de Tamaño de Etiqueta
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {SIZE_PRESETS.map((preset) => (
+              {/* Selector de Presets de Tamaño */}
+              <div className="space-y-3">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+                  Preset de Tamaño de Etiqueta
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {SIZE_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleEtiquetaChange('preset', preset.id)}
+                      className={`py-2.5 px-3 rounded-xl border text-center transition-all cursor-pointer text-xs font-semibold ${
+                        etiquetasConfig.preset === preset.id
+                          ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
+                          : 'border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dimensiones Manuales si el preset es manual */}
+              {etiquetasConfig.preset === 'manual' && (
+                <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200/80 dark:border-neutral-800">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
+                      Ancho (mm)
+                    </label>
+                    <input
+                      type="number"
+                      min={30}
+                      max={100}
+                      value={etiquetasConfig.ancho_mm}
+                      onChange={(e) => handleEtiquetaChange('ancho_mm', parseInt(e.target.value, 10) || 50)}
+                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
+                      Alto (mm)
+                    </label>
+                    <input
+                      type="number"
+                      min={20}
+                      max={80}
+                      value={etiquetasConfig.alto_mm}
+                      onChange={(e) => handleEtiquetaChange('alto_mm', parseInt(e.target.value, 10) || 30)}
+                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Orientación del Sticker */}
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
+                  Orientación del Sticker
+                </label>
+                <div className="flex gap-2">
                   <button
-                    key={preset.id}
                     type="button"
-                    onClick={() => handleEtiquetaChange('preset', preset.id)}
-                    className={`py-2.5 px-3 rounded-xl border text-center transition-all cursor-pointer text-xs font-semibold ${
-                      etiquetasConfig.preset === preset.id
+                    onClick={() => handleEtiquetaChange('orientacion', 'horizontal')}
+                    className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                      etiquetasConfig.orientacion === 'horizontal'
                         ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
-                        : 'border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
+                        : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
                     }`}
                   >
-                    {preset.label}
+                    Horizontal
                   </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Dimensiones Manuales si el preset es manual */}
-            {etiquetasConfig.preset === 'manual' && (
-              <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200/80 dark:border-neutral-800">
-                <div>
-                  <label className="block text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
-                    Ancho (mm)
-                  </label>
-                  <input
-                    type="number"
-                    min={30}
-                    max={100}
-                    value={etiquetasConfig.ancho_mm}
-                    onChange={(e) => handleEtiquetaChange('ancho_mm', parseInt(e.target.value, 10) || 50)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
-                    Alto (mm)
-                  </label>
-                  <input
-                    type="number"
-                    min={20}
-                    max={80}
-                    value={etiquetasConfig.alto_mm}
-                    onChange={(e) => handleEtiquetaChange('alto_mm', parseInt(e.target.value, 10) || 30)}
-                    className="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 font-mono"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => handleEtiquetaChange('orientacion', 'vertical')}
+                    className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                      etiquetasConfig.orientacion === 'vertical'
+                        ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
+                        : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
+                    }`}
+                  >
+                    Vertical
+                  </button>
                 </div>
               </div>
-            )}
 
-            {/* Orientación del Sticker */}
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
-                Orientación del Sticker
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleEtiquetaChange('orientacion', 'horizontal')}
-                  className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                    etiquetasConfig.orientacion === 'horizontal'
-                      ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
-                      : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
-                  }`}
-                >
-                  Horizontal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleEtiquetaChange('orientacion', 'vertical')}
-                  className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                    etiquetasConfig.orientacion === 'vertical'
-                      ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
-                      : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
-                  }`}
-                >
-                  Vertical
-                </button>
-              </div>
-            </div>
-
-            {/* Toggles de Campos Visibles en el Sticker */}
-            <div className="space-y-2.5 pt-2">
-              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
-                Campos a Imprimir en el Sticker
-              </label>
-
-              <div className="flex flex-wrap gap-2 sm:gap-2.5">
-                {[
-                  { key: 'incluir_nombre_empresa', label: 'Nombre de Empresa / Sede' },
-                  { key: 'incluir_codigo_ticket', label: 'Código de Ticket (#)' },
-                  { key: 'incluir_cliente', label: 'Nombre del Cliente' },
-                  { key: 'incluir_telefono', label: 'Teléfono de Contacto' },
-                  { key: 'incluir_equipo', label: 'Marca y Modelo de Equipo' },
-                  { key: 'incluir_falla', label: 'Falla o Problema Reportado' },
-                  { key: 'incluir_fecha', label: 'Fecha de Recepción' },
-                  { key: 'incluir_tecnico', label: 'Técnico Asignado' },
-                  { key: 'incluir_metodo_desbloqueo', label: 'Método de Desbloqueo (PIN/Patrón)' }
-                ].map((item) => {
-                  const isChecked = Boolean(etiquetasConfig[item.key]);
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => handleEtiquetaChange(item.key, !isChecked)}
-                      className={`rounded-xl py-2 px-3.5 sm:px-4 text-xs font-semibold transition-all cursor-pointer select-none border text-center ${
-                        isChecked
-                          ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-400 dark:border-rose-600 text-rose-700 dark:text-rose-300 shadow-2xs'
-                          : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* SECCIÓN 2: Comprobantes Térmicos (Tickets POS) */}
-          <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-5">
-            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800/80 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
-                  <Receipt size={17} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 font-outfit">
-                    Comprobantes Térmicos
-                  </h4>
-                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter">
-                    Recibo entregado al cliente al ingresar su equipo al taller técnico.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Selectores Base: Ancho y Copias de Impresión */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Ancho de Rollo */}
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-2">
-                  Ancho de Rollo
+              {/* Toggles de Campos Visibles en el Sticker */}
+              <div className="space-y-2.5 pt-2">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+                  Campos a Imprimir en el Sticker
                 </label>
-                <div className="flex gap-1.5">
+
+                <div className="flex flex-wrap gap-2 sm:gap-2.5">
                   {[
-                    { val: 80, label: '80 mm' },
-                    { val: 58, label: '58 mm' }
-                  ].map((item) => (
-                    <button
-                      key={item.val}
-                      type="button"
-                      onClick={() => handleTicketChange('ancho_papel_mm', item.val)}
-                      className={`flex-1 py-2 px-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center ${
-                        Number(ticketsConfig.ancho_papel_mm) === item.val
-                          ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
-                          : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
+                    { key: 'incluir_nombre_empresa', label: 'Nombre de Empresa / Sede' },
+                    { key: 'incluir_codigo_ticket', label: 'Código de Ticket (#)' },
+                    { key: 'incluir_cliente', label: 'Nombre del Cliente' },
+                    { key: 'incluir_telefono', label: 'Teléfono de Contacto' },
+                    { key: 'incluir_equipo', label: 'Marca y Modelo de Equipo' },
+                    { key: 'incluir_falla', label: 'Falla o Problema Reportado' },
+                    { key: 'incluir_fecha', label: 'Fecha de Recepción' },
+                    { key: 'incluir_tecnico', label: 'Técnico Asignado' },
+                    { key: 'incluir_metodo_desbloqueo', label: 'Método de Desbloqueo (PIN/Patrón)' }
+                  ].map((item) => {
+                    const isChecked = Boolean(etiquetasConfig[item.key]);
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => handleEtiquetaChange(item.key, !isChecked)}
+                        className={`rounded-xl py-2 px-3.5 sm:px-4 text-xs font-semibold transition-all cursor-pointer select-none border text-center ${
+                          isChecked
+                            ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-400 dark:border-rose-600 text-rose-700 dark:text-rose-300 shadow-2xs'
+                            : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SECCIÓN 2: Comprobantes Térmicos (Tickets POS) - Visible solo si previewMode === 'ticket' */}
+          {previewMode === 'ticket' && (
+            <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-5 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800/80 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                    <Receipt size={17} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 font-outfit">
+                      Comprobantes Térmicos
+                    </h4>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter">
+                      Recibo entregado al cliente al ingresar su equipo al taller técnico.
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Copias de Impresión */}
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-2">
-                  Copias de Impresión
+              {/* Selectores Base: Ancho y Copias de Impresión */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Ancho de Rollo */}
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-2">
+                    Ancho de Rollo
+                  </label>
+                  <div className="flex gap-1.5">
+                    {[
+                      { val: 80, label: '80 mm' },
+                      { val: 58, label: '58 mm' }
+                    ].map((item) => (
+                      <button
+                        key={item.val}
+                        type="button"
+                        onClick={() => handleTicketChange('ancho_papel_mm', item.val)}
+                        className={`flex-1 py-2 px-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center ${
+                          Number(ticketsConfig.ancho_papel_mm) === item.val
+                            ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
+                            : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Copias de Impresión */}
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-2">
+                    Copias de Impresión
+                  </label>
+                  <div className="flex gap-1.5">
+                    {[
+                      { val: 1, label: '1 Copia' },
+                      { val: 2, label: '2 Copias' }
+                    ].map((item) => (
+                      <button
+                        key={item.val}
+                        type="button"
+                        onClick={() => handleTicketChange('copias_impresion', item.val)}
+                        className={`flex-1 py-2 px-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center ${
+                          Number(ticketsConfig.copias_impresion) === item.val
+                            ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
+                            : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Toggles de Contenido del Ticket */}
+              <div className="space-y-2.5">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+                  Secciones Visibles en el Ticket
                 </label>
-                <div className="flex gap-1.5">
+
+                <div className="flex flex-wrap gap-2 sm:gap-2.5">
                   {[
-                    { val: 1, label: '1 Copia' },
-                    { val: 2, label: '2 Copias' }
-                  ].map((item) => (
-                    <button
-                      key={item.val}
-                      type="button"
-                      onClick={() => handleTicketChange('copias_impresion', item.val)}
-                      className={`flex-1 py-2 px-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center ${
-                        Number(ticketsConfig.copias_impresion) === item.val
-                          ? 'bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs'
-                          : 'border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
+                    { key: 'imprimir_logo', label: 'Logotipo de la Empresa' },
+                    { key: 'mostrar_rnc', label: 'Razón Social y RNC' },
+                    { key: 'mostrar_contacto_sucursal', label: 'Dirección y Teléfono de Sede' },
+                    { key: 'mostrar_cliente', label: 'Datos del Cliente (Nombre/Tel/Céd)' },
+                    { key: 'mostrar_equipo', label: 'Equipo y Número de Serie / IMEI' },
+                    { key: 'mostrar_falla', label: 'Diagnóstico / Falla Inicial' },
+                    { key: 'mostrar_observaciones', label: 'Observaciones Estéticas' },
+                    { key: 'mostrar_costo_y_anticipo', label: 'Desglose Financiero y Anticipo' },
+                    { key: 'mostrar_checklist_recepcion', label: 'Checklist de Recepción' },
+                    { key: 'incluir_qr_tracking', label: 'Código QR para Rastreo Online' },
+                    { key: 'imprimir_garantia', label: 'Cláusula de Garantía' },
+                    { key: 'mostrar_mensaje_cortesia', label: 'Mensaje de Cortesía al Pie' }
+                  ].map((item) => {
+                    const isChecked = Boolean(ticketsConfig[item.key]);
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => handleTicketChange(item.key, !isChecked)}
+                        className={`rounded-xl py-2 px-3.5 sm:px-4 text-xs font-semibold transition-all cursor-pointer select-none border text-center ${
+                          isChecked
+                            ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-400 dark:border-rose-600 text-rose-700 dark:text-rose-300 shadow-2xs'
+                            : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            </div>
 
-            {/* Toggles de Contenido del Ticket */}
-            <div className="space-y-2.5">
-              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
-                Secciones Visibles en el Ticket
-              </label>
+              {/* Cláusula de Términos de Garantía */}
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
+                  Términos y Cláusula de Garantía
+                </label>
+                <textarea
+                  value={ticketsConfig.clausula_garantia_defecto}
+                  onChange={(e) => handleTicketChange('clausula_garantia_defecto', e.target.value)}
+                  rows={3}
+                  placeholder="Garantía válida únicamente con este comprobante..."
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-neutral-100/10 resize-none font-inter"
+                />
+              </div>
 
-              <div className="flex flex-wrap gap-2 sm:gap-2.5">
-                {[
-                  { key: 'imprimir_logo', label: 'Logotipo de la Empresa' },
-                  { key: 'mostrar_rnc', label: 'Razón Social y RNC' },
-                  { key: 'mostrar_contacto_sucursal', label: 'Dirección y Teléfono de Sede' },
-                  { key: 'mostrar_cliente', label: 'Datos del Cliente (Nombre/Tel/Céd)' },
-                  { key: 'mostrar_equipo', label: 'Equipo y Número de Serie / IMEI' },
-                  { key: 'mostrar_falla', label: 'Diagnóstico / Falla Inicial' },
-                  { key: 'mostrar_observaciones', label: 'Observaciones Estéticas' },
-                  { key: 'mostrar_costo_y_anticipo', label: 'Desglose Financiero y Anticipo' },
-                  { key: 'mostrar_checklist_recepcion', label: 'Checklist de Recepción' },
-                  { key: 'incluir_qr_tracking', label: 'Código QR para Rastreo Online' },
-                  { key: 'imprimir_garantia', label: 'Cláusula de Garantía' },
-                  { key: 'mostrar_mensaje_cortesia', label: 'Mensaje de Cortesía al Pie' }
-                ].map((item) => {
-                  const isChecked = Boolean(ticketsConfig[item.key]);
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => handleTicketChange(item.key, !isChecked)}
-                      className={`rounded-xl py-2 px-3.5 sm:px-4 text-xs font-semibold transition-all cursor-pointer select-none border text-center ${
-                        isChecked
-                          ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-400 dark:border-rose-600 text-rose-700 dark:text-rose-300 shadow-2xs'
-                          : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800/40'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  );
-                })}
+              {/* Mensaje de Despedida / Cortesía */}
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
+                  Mensaje de Cortesía al Pie
+                </label>
+                <input
+                  type="text"
+                  value={ticketsConfig.mensaje_cortesia}
+                  onChange={(e) => handleTicketChange('mensaje_cortesia', e.target.value)}
+                  placeholder="¡Gracias por confiar en Franyer Mobile Center!"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-neutral-100/10 font-inter"
+                />
               </div>
             </div>
-
-            {/* Cláusula de Términos de Garantía */}
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
-                Términos y Cláusula de Garantía
-              </label>
-              <textarea
-                value={ticketsConfig.clausula_garantia_defecto}
-                onChange={(e) => handleTicketChange('clausula_garantia_defecto', e.target.value)}
-                rows={3}
-                placeholder="Garantía válida únicamente con este comprobante..."
-                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-neutral-100/10 resize-none font-inter"
-              />
-            </div>
-
-            {/* Mensaje de Despedida / Cortesía */}
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
-                Mensaje de Cortesía al Pie
-              </label>
-              <input
-                type="text"
-                value={ticketsConfig.mensaje_cortesia}
-                onChange={(e) => handleTicketChange('mensaje_cortesia', e.target.value)}
-                placeholder="¡Gracias por confiar en Franyer Mobile Center!"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 focus:ring-neutral-900/10 dark:focus:ring-neutral-100/10 font-inter"
-              />
-            </div>
-          </div>
+          )}
         </div>
 
         {/* COLUMNA DERECHA: Vista Previa Fija en Vivo y Acciones (5 cols) */}
@@ -613,18 +618,19 @@ export const PrintingTab = ({ branches = [], companyData, onRefresh }) => {
                 Imprimir Prueba
               </Button>
 
-              <Button
+              <InlineConfirmButton
                 type="button"
                 variant="primary"
                 size="md"
-                onClick={handleSave}
+                icon={Save}
+                text="Guardar"
+                confirmText="¿Guardar?"
+                onConfirm={handleSave}
                 disabled={isSubmitting || !hasChanges}
                 isLoading={isSubmitting}
-                icon={Save}
                 className="w-full sm:flex-1"
-              >
-                Guardar
-              </Button>
+                confirmClassName="w-full sm:flex-1"
+              />
             </div>
           </div>
         </div>

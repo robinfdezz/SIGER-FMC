@@ -1224,13 +1224,47 @@ const getServiciosTaller = async (req, res) => {
         sr.created_at ASC
     `;
 
-    const result = await pool.query(query, params);
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM servicios_recepcion sr
+      JOIN estados_servicio es ON es.id = sr.estado_actual_id
+      ${whereClause}
+    `;
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0]?.total || 0, 10);
+
+    const shouldPaginate = req.query.page !== undefined || req.query.limit !== undefined || req.query.paginate === 'true';
+
+    let pageNum = 1;
+    let limitNum = total || 20;
+    let totalPages = 1;
+
+    let finalQuery = query;
+    const finalParams = [...params];
+
+    if (shouldPaginate) {
+      pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+      limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+      const offset = (pageNum - 1) * limitNum;
+      totalPages = Math.ceil(total / limitNum) || 1;
+
+      finalQuery += ` LIMIT $${finalParams.length + 1} OFFSET $${finalParams.length + 2}`;
+      finalParams.push(limitNum, offset);
+    }
+
+    const result = await pool.query(finalQuery, finalParams);
 
     return res.status(200).json({
       ok: true,
       success: true,
-      total: result.rowCount,
-      data: result.rows
+      total,
+      data: result.rows,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages
+      }
     });
   } catch (error) {
     console.error('❌ Error en getServiciosTaller:', error);

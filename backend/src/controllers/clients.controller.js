@@ -167,7 +167,7 @@ const getClients = async (req, res) => {
     `;
 
     const countResult = await pool.query(countQuery, queryParams);
-    const total = parseInt(countResult.rows[0].total, 10);
+    const total = parseInt(countResult.rows[0]?.total || 0, 10);
     const totalPages = Math.ceil(total / limitNum) || 1;
 
     // Consulta de registros paginados
@@ -196,7 +196,9 @@ const getClients = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+      ok: true,
       data: dataResult.rows,
+      clientes: dataResult.rows,
       pagination: {
         total,
         page: pageNum,

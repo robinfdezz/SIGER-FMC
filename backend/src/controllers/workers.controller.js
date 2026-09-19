@@ -200,21 +200,28 @@ const getWorkers = async (req, res) => {
     if (!req.isSuperAdmin && req.filterSucursalId) {
       queryParams.push(req.filterSucursalId);
       conditions.push(`(t.sucursal_id = $${queryParams.length} OR t.sucursal_id IS NULL)`);
-    } else if (req.query.sucursal_id) {
+    } else if (req.query.sucursal_id && req.query.sucursal_id !== 'all') {
       // Filtro opcional para SuperAdmin
-      queryParams.push(parseInt(req.query.sucursal_id, 10));
-      conditions.push(`(t.sucursal_id = $${queryParams.length} OR t.sucursal_id IS NULL)`);
+      if (req.query.sucursal_id === 'global') {
+        conditions.push(`t.sucursal_id IS NULL`);
+      } else {
+        queryParams.push(parseInt(req.query.sucursal_id, 10));
+        conditions.push(`t.sucursal_id = $${queryParams.length}`);
+      }
     }
 
     // Filtro por activo si se especifica
-    if (req.query.activo !== undefined) {
+    if (req.query.activo !== undefined && req.query.activo !== 'all') {
       const isActivo = req.query.activo === 'true' || req.query.activo === true || req.query.activo === '1';
       queryParams.push(isActivo);
       conditions.push(`t.activo = $${queryParams.length}`);
     }
 
-    // Filtro por rol si se solicita
-    if (req.query.rol) {
+    // Filtro por rol si se solicita (por id o por nombre)
+    if (req.query.rol_id) {
+      queryParams.push(parseInt(req.query.rol_id, 10));
+      conditions.push(`t.rol_id = $${queryParams.length}`);
+    } else if (req.query.rol) {
       queryParams.push(req.query.rol.toLowerCase());
       conditions.push(`LOWER(r.nombre_rol) = $${queryParams.length}`);
     }
@@ -224,20 +231,69 @@ const getWorkers = async (req, res) => {
       conditions.push(`r.nombre_rol NOT ILIKE '%secretaria%' AND r.nombre_rol NOT ILIKE '%recepcio%' AND r.nombre_rol NOT ILIKE '%cajero%'`);
     }
 
-    if (conditions.length > 0) {
-      query += ` WHERE ${conditions.join(' AND ')}`;
+    // Filtro por búsqueda textual (nombre, apellido, usuario, cedula, correo, telefono)
+    const searchTerm = req.query.q || req.query.search;
+    if (searchTerm && String(searchTerm).trim().length > 0) {
+      queryParams.push(`%${String(searchTerm).trim().toLowerCase()}%`);
+      const searchIdx = queryParams.length;
+      conditions.push(`(
+        LOWER(t.nombre) LIKE $${searchIdx} OR
+        LOWER(t.apellido) LIKE $${searchIdx} OR
+        LOWER(CONCAT(t.nombre, ' ', t.apellido)) LIKE $${searchIdx} OR
+        LOWER(t.usuario) LIKE $${searchIdx} OR
+        LOWER(t.cedula) LIKE $${searchIdx} OR
+        LOWER(COALESCE(t.correo, '')) LIKE $${searchIdx} OR
+        LOWER(COALESCE(t.telefono, '')) LIKE $${searchIdx}
+      )`);
     }
 
-    query += ` ORDER BY t.id ASC`;
+    const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : '';
 
-    const result = await pool.query(query, queryParams);
+    // Consulta de conteo total filtrado
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM datos_trabajadores t
+      INNER JOIN roles_equipo r ON t.rol_id = r.id
+      LEFT JOIN datos_sucursales s ON t.sucursal_id = s.id
+      ${whereClause}
+    `;
+    const countResult = await pool.query(countQuery, queryParams);
+    const total = parseInt(countResult.rows[0]?.total || 0, 10);
+
+    const shouldPaginate = req.query.page !== undefined || req.query.limit !== undefined || req.query.paginate === 'true';
+
+    let dataQuery = query + whereClause + ` ORDER BY t.id ASC`;
+    let pageNum = 1;
+    let limitNum = total || 20;
+    let totalPages = 1;
+
+    const dataParams = [...queryParams];
+    if (shouldPaginate) {
+      pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+      limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+      const offset = (pageNum - 1) * limitNum;
+      totalPages = Math.ceil(total / limitNum) || 1;
+
+      dataQuery += ` LIMIT $${dataParams.length + 1} OFFSET $${dataParams.length + 2}`;
+      dataParams.push(limitNum, offset);
+    }
+
+    const result = await pool.query(dataQuery, dataParams);
 
     return res.status(200).json({
       success: true,
       ok: true,
       message: 'Listado de trabajadores obtenido con éxito.',
       data: result.rows,
-      total: result.rows.length
+      workers: result.rows,
+      trabajadores: result.rows,
+      total,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages
+      }
     });
   } catch (error) {
     console.error('❌ Error en getWorkers:', error);

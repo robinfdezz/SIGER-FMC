@@ -338,10 +338,6 @@ export const TallerCard = ({
               <span className="text-[10px] font-normal text-amber-600 dark:text-amber-400 font-inter">
                 (Costo pendiente)
               </span>
-            ) : !hasTecnicos ? (
-              <span className="text-[10px] font-normal text-amber-600 dark:text-amber-400 font-inter">
-                (Asigna técnico)
-              </span>
             ) : (
               <ArrowRight size={13} className="shrink-0 group-hover:translate-x-0.5 transition-transform" />
             )}

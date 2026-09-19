@@ -7,6 +7,7 @@ import EntregaServicioModal from '../components/servicios/EntregaServicioModal';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
 import AnimatedIconButton from '../components/common/AnimatedIconButton';
 import Badge from '../components/common/Badge';
+import Pagination from '../components/common/Pagination';
 import { useAuth } from '../context/AuthContext';
 import {
   getServiciosTaller,
@@ -177,6 +178,15 @@ export const BancoTrabajoPage = () => {
   });
 
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Paginación para vista tabla
+  const [tablePage, setTablePage] = useState(1);
+  const [tableLimit, setTableLimit] = useState(20);
+
+  // Reiniciar a la primera página al alterar búsqueda o filtros rápidos
+  useEffect(() => {
+    setTablePage(1);
+  }, [searchTerm, quickFilter]);
 
   // Sincronizar preferencias del usuario en localStorage
   useEffect(() => {
@@ -352,6 +362,21 @@ export const BancoTrabajoPage = () => {
     });
   }, [filteredOrdenes, sortConfig]);
 
+  // Paginación de la vista de tabla
+  const totalTableItems = sortedOrdenes.length;
+  const totalTablePages = Math.ceil(totalTableItems / tableLimit) || 1;
+
+  const paginatedTableOrdenes = useMemo(() => {
+    const start = (tablePage - 1) * tableLimit;
+    return sortedOrdenes.slice(start, start + tableLimit);
+  }, [sortedOrdenes, tablePage, tableLimit]);
+
+  useEffect(() => {
+    if (tablePage > totalTablePages && totalTablePages > 0) {
+      setTablePage(totalTablePages);
+    }
+  }, [tablePage, totalTablePages]);
+
   const renderSortIcon = (columnKey) => {
     if (sortConfig.key !== columnKey) return null;
     return sortConfig.direction === 'asc' ? (
@@ -427,6 +452,7 @@ export const BancoTrabajoPage = () => {
   const handleClearFilters = () => {
     setSearchTerm('');
     setQuickFilter('all');
+    setTablePage(1);
   };
 
   // Asignarse a sí mismo directamente desde la tarjeta
@@ -773,7 +799,7 @@ export const BancoTrabajoPage = () => {
                       </td>
                     </tr>
                   ) : (
-                    sortedOrdenes.map((ord) => {
+                    paginatedTableOrdenes.map((ord) => {
                       const isSinAsignar = !ord.tecnico_id || ord.tecnico_nombre === 'Sin asignar';
 
                       return (
@@ -944,12 +970,19 @@ export const BancoTrabajoPage = () => {
               </table>
             </div>
 
-            {/* Resumen de conteo */}
-            <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 p-3 border-t border-neutral-100 dark:border-neutral-800">
-              <span>
-                Mostrando <strong>{sortedOrdenes.length}</strong> de <strong>{ordenes.length}</strong> órdenes en taller
-              </span>
-            </div>
+            {/* Paginación */}
+            <Pagination
+              currentPage={tablePage}
+              totalPages={totalTablePages}
+              totalItems={totalTableItems}
+              itemsPerPage={tableLimit}
+              onPageChange={(newPage) => setTablePage(newPage)}
+              onItemsPerPageChange={(newLimit) => {
+                setTableLimit(newLimit);
+                setTablePage(1);
+              }}
+              isLoading={isLoading || isRefreshing}
+            />
           </div>
         )}
 
