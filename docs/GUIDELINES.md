@@ -85,16 +85,22 @@ frontend/
 * **Feedback Visual:** Spinners en peticiones asíncronas, toasts de notificación para acciones exitosas/fallidas.
 * **Fotos de Perfil:** Si el usuario no tiene `foto_perfil_url`, mostrar un avatar con sus iniciales.
 * **Atenuación en Modo Solo Lectura:** Bloques y formularios no editables por restricciones de rol (RBAC) aplican la directriz uniforme `opacity-50 select-none pointer-events-none` junto a un banner explicativo conciso.
-* **Tablas de Gestión Scroleables y Sticky:**
+* **Tablas de Gestión con Paginación Universal:**
   - Contenedor con altura fija estándar (`h-[560px] overflow-y-auto overflow-x-auto relative`).
   - Cabecera fija (`thead sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs`).
-  - Barra inferior con resumen dinámico de conteo (`"Mostrando X registros"`).
+  - Barra inferior con el componente unificado `<Pagination />`: selector de elementos por página (`[10, 20, 50, 100]`), leyenda "Mostrando {start} a {end} de {total} registros" en tono gris neutro tenue, botones `<` y `>` y navegación numerada responsiva sin fondos estridentes.
   - Scrollbars estandarizados a `8px` tanto en el eje vertical como horizontal (`scrollbar-gutter: stable`).
+* **Microcomponente de Confirmación Inline (`InlineConfirmButton`):**
+  - Para acciones críticas o de confirmación (guardar configuraciones de sucursal/empresa, despachar y cobrar órdenes, autoasignarse órdenes de taller), preferir la doble confirmación interactiva en el mismo botón (`¿Guardar? [✓] [✕]` / `¿Confirmar entrega? [✓] [✕]`).
+  - Soporta tamaño `size="md"` para formularios y modales principales, e integra validaciones previas (`onBeforeConfirm`) antes de alternar el estado.
+* **Estados de Carga con Esqueletos Preciso (Shimmer Skeletons):**
+  - En vistas de consulta pública o paneles con estructura geométrica fija, utilizar `react-loading-skeleton` con `<SkeletonTheme>` adaptado a tema claro (`#e5e7eb` / `#f3f4f6`) y oscuro (`#262626` / `#404040`).
+  - El esqueleto debe calcar la geometría, dimensiones de tarjetas, nodos de stepper y tablas 1:1 respecto a la vista final, eliminando saltos bruscos de diseño (*CLS*).
 * **Envoltorio Natural de Texto en Tablas:** En columnas de nombres de clientes y modelos de dispositivos, evitar el uso de `truncate` estricto; utilizar `whitespace-normal break-words leading-snug` con ancho delimitado para permitir el flujo multilínea sin cortes bruscos.
 * **Presentación de Roles en Tablas:** Utilizar el componente oficial `<Badge variant="minimal" color={...} icon={RoleIcon}>{nombreRol}</Badge>` para proyectar un formato en línea limpio con icono y texto a color semántico sin recuadros ni fondos pesados.
 * **Indicadores de Campos Obligatorios:** En formularios, todo asterisco indicador de obligatoriedad debe proyectar explícitamente `<span className="text-red-500">*</span>` en color rojo institucional.
 * **Controles Inferiores del Sidebar:** En estado expandido, los botones de tema y modo se alinean a la izquierda en la misma vertical del menú (`items-start`), con formato cuadrado estricto (`w-10 h-10 aspect-square rounded-lg flex items-center justify-center`) y hover contenido sin expansión a lo ancho.
-* **Seguimiento Público:** Vista minimalista y limpia para clientes sin requerir inicio de sesión.
+* **Seguimiento Público:** Vista minimalista y limpia para clientes sin requerir inicio de sesión, protegida condicionalmente con Cloudflare Turnstile anti-bot.
 
 ---
 

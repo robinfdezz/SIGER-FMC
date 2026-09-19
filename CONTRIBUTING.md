@@ -36,7 +36,7 @@ git checkout develop
    ```sql
    CREATE DATABASE siger_fmc_db;
    ```
-2. Ejecuta el script oficial de inicialización [backend/src/db/init.sql](file:///c:/Users/pc/Desktop/SIGER-FMC/backend/src/db/init.sql) para crear las 11 tablas, índices y datos semilla iniciales.
+2. Ejecuta el script oficial de inicialización [backend/src/db/init.sql](./backend/src/db/init.sql) para crear las tablas, índices y datos semilla iniciales.
 3. Asegúrate de que el usuario de base de datos posea permisos completos (`GRANT ALL`) sobre las tablas y secuencias del esquema `public`.
 
 ---
@@ -70,6 +70,15 @@ JWT_SECRET=tu_clave_secreta_jwt_para_desarrollo
 JWT_EXPIRES_IN=24h
 
 CLIENT_URL=http://localhost:5173
+
+# Cloudinary
+CLOUDINARY_CLOUD_NAME=tu_cloud_name
+CLOUDINARY_API_KEY=tu_api_key
+CLOUDINARY_API_SECRET=tu_api_secret
+
+# Protección Anti-Bot Cloudflare Turnstile (false en desarrollo local)
+ENABLE_TURNSTILE=false
+TURNSTILE_SECRET_KEY=
 ```
 
 ---

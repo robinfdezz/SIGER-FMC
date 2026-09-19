@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import Badge from '../components/common/Badge';
+import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
 import TurnstileWidget from '../components/common/TurnstileWidget';
 import logoFmcBlack from '../assets/logo-FMC Black.png';
 import logoFmcWhite from '../assets/logo-FMC White.png';
@@ -220,16 +221,23 @@ export const EstadoOrdenPage = () => {
   // LÍNEA DE TIEMPO DINÁMICA DE ESTADOS
   // ─────────────────────────────────────────────────────────────
   const buildTimelineSteps = (ord) => {
-    if (!ord) return { steps: [], activeIndex: 0 };
+    if (!ord) return { steps: [], activeIndex: 0, isCancelado: false, isEntregado: false };
 
-    const estadoNorm = String(ord.codigo_estado || ord.estado || '').toUpperCase();
-    const estadoNombre = String(ord.estado || '').toLowerCase();
+    const estadoNorm = String(ord.codigo_estado || ord.estado || '').toUpperCase().trim();
+    const estadoNombre = String(ord.estado || '').toLowerCase().trim();
 
     const isCancelado =
       estadoNorm === 'CANCELADO_DEVUELTO' ||
       estadoNombre.includes('cancel') ||
       estadoNombre.includes('devuelt') ||
       estadoNombre.includes('no reparado');
+
+    // Normalización de la detección del estado final entregado
+    const isEntregado =
+      (['ENTREGADO', 'ENTREGADO_CLIENTE', 'ENTREGA_CONFORME'].includes(estadoNorm) ||
+        Number(ord.orden_flujo) === 7 ||
+        (estadoNombre.includes('entreg') && !estadoNombre.includes('listo'))) &&
+      estadoNorm !== 'LISTO_ENTREGA';
 
     const hasEsperaRepuesto =
       estadoNorm === 'ESPERA_REPUESTO' ||
@@ -305,7 +313,7 @@ export const EstadoOrdenPage = () => {
     let activeIndex = 0;
     if (isCancelado) {
       activeIndex = steps.length - 1;
-    } else if (estadoNorm === 'ENTREGADO' || estadoNombre.includes('entrega') || estadoNombre.includes('finaliz')) {
+    } else if (isEntregado) {
       activeIndex = steps.length - 1;
     } else if (estadoNorm === 'LISTO_ENTREGA' || estadoNombre.includes('listo')) {
       const listoIdx = steps.findIndex((s) => s.key === 'LISTO_ENTREGA');
@@ -328,10 +336,10 @@ export const EstadoOrdenPage = () => {
       activeIndex = 0;
     }
 
-    return { steps, activeIndex, isCancelado };
+    return { steps, activeIndex, isCancelado, isEntregado };
   };
 
-  const { steps: timelineSteps, activeIndex: currentStepIndex } = buildTimelineSteps(orden);
+  const { steps: timelineSteps, activeIndex: currentStepIndex, isEntregado } = buildTimelineSteps(orden);
 
   // Determinar si la vista está vacía / en espera de búsqueda
   const isVistaInicial = !orden && !loading && !error;
@@ -348,16 +356,28 @@ export const EstadoOrdenPage = () => {
         ? [{ id: 1, nombre_completo: orden.tecnico_nombre }]
         : []);
 
-  // Fotos de ingreso / recepción
-  const fotosArray = useMemo(() => {
-    return (orden?.fotos || orden?.fotos_recepcion || []).filter(
-      (f) => !f.incidencia_id && (f.tipo_evidencia === 'RECEPCION' || !f.tipo_evidencia || f.tipo_evidencia !== 'INCIDENCIA')
+  // Fotos de ingreso / recepción (excluyendo entrega e incidencias)
+  const fotosRecepcion = useMemo(() => {
+    const list = Array.isArray(orden?.fotos_recepcion) && orden.fotos_recepcion.length > 0
+      ? orden.fotos_recepcion
+      : (Array.isArray(orden?.fotos) ? orden.fotos : []);
+
+    return list.filter(
+      (f) =>
+        !f.incidencia_id &&
+        (f.tipo_evidencia === 'RECEPCION' || !f.tipo_evidencia) &&
+        f.tipo_evidencia !== 'ENTREGA' &&
+        f.tipo_evidencia !== 'INCIDENCIA'
     );
   }, [orden]);
 
-  // Fotos de entrega (si hubiere)
+  // Fotos de entrega final (únicamente tipo ENTREGA)
   const fotosEntrega = useMemo(() => {
-    return (orden?.fotos || []).filter((f) => f.tipo_evidencia === 'ENTREGA');
+    const list = Array.isArray(orden?.fotos_entrega) && orden.fotos_entrega.length > 0
+      ? orden.fotos_entrega
+      : (Array.isArray(orden?.fotos) ? orden.fotos : []);
+
+    return list.filter((f) => f.tipo_evidencia === 'ENTREGA');
   }, [orden]);
 
   // Historial de eventos públicos para ServiceTimeline
@@ -377,24 +397,37 @@ export const EstadoOrdenPage = () => {
           }
         ];
 
-    // Eventos de cambio de estado (con fotos de recepción/entrega asociadas)
+    // Eventos de cambio de estado (con fotos de recepción/entrega asociadas unívocamente)
     const estadosEvents = base.map((item, idx) => {
-        const isReceptionEvent =
-          Number(item.orden_flujo) === 1 ||
-          String(item.codigo_estado || '').toUpperCase().includes('RECIB') ||
-          item.id === 'inicio' ||
-          idx === 0;
+        const codigoUpper = String(item.codigo_estado || '').toUpperCase().trim();
+        const nombreLower = String(item.nombre_estado || '').toLowerCase().trim();
+        const flujo = Number(item.orden_flujo);
 
+        // Es evento de recepción si es orden_flujo 1, o código RECIBIDO, o el primer item si no hay código
+        const isReceptionEvent =
+          flujo === 1 ||
+          codigoUpper === 'RECIBIDO' ||
+          (codigoUpper.includes('RECIB') && !codigoUpper.includes('LISTO')) ||
+          (nombreLower.includes('recib') && !nombreLower.includes('listo')) ||
+          item.id === 'inicio';
+
+        // Es evento de entrega ÚNICAMENTE si es el estado final de entrega (orden_flujo 7, o código ENTREGADO/ENTREGADO_CLIENTE)
+        // Se descarta explícitamente cualquier coincidencia con LISTO_ENTREGA
         const isEntregaEvent =
-          Number(item.orden_flujo) === 7 ||
-          String(item.codigo_estado || '').toUpperCase().includes('ENTREG');
+          flujo === 7 ||
+          ['ENTREGADO', 'ENTREGADO_CLIENTE', 'ENTREGA_CONFORME'].includes(codigoUpper) ||
+          (nombreLower.includes('entreg') && !nombreLower.includes('listo') && !codigoUpper.includes('LISTO'));
 
         let itemFotos = Array.isArray(item.fotos) && item.fotos.length > 0 ? item.fotos : [];
         if (itemFotos.length === 0) {
           if (isReceptionEvent) {
-            itemFotos = fotosArray;
+            itemFotos = fotosRecepcion;
           } else if (isEntregaEvent) {
             itemFotos = fotosEntrega;
+          } else {
+            // Estados intermedios (como Listo para Entrega, En Reparación, En Diagnóstico)
+            // NUNCA deben heredar fotos de entrega ni de recepción
+            itemFotos = [];
           }
         }
 
@@ -416,7 +449,7 @@ export const EstadoOrdenPage = () => {
     }));
 
     return [...estadosEvents, ...incidenciasEvents].sort((a, b) => b._sortTime - a._sortTime);
-  }, [orden, fotosArray, fotosEntrega]);
+  }, [orden, fotosRecepcion, fotosEntrega]);
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-[#121214] text-neutral-900 dark:text-neutral-100 flex flex-col font-inter selection:bg-red-500 selection:text-white transition-colors duration-200">
@@ -554,14 +587,164 @@ export const EstadoOrdenPage = () => {
           )}
         </section>
 
-        {/* Estado de Carga */}
+        {/* Estado de Carga con react-loading-skeleton calcando 1:1 el layout real */}
         {loading && (
-          <div className="py-12 text-center flex flex-col items-center justify-center gap-3 animate-fade-in">
-            <div className="w-8 h-8 rounded-full border-2 border-red-600 border-t-transparent animate-spin" />
-            <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400 font-inter">
-              Localizando orden de servicio en taller...
-            </p>
-          </div>
+          <SkeletonTheme
+            baseColor={isDark ? '#262626' : '#e5e7eb'}
+            highlightColor={isDark ? '#404040' : '#f3f4f6'}
+            borderRadius="0.75rem"
+          >
+            <div className="space-y-6 pb-12 animate-fade-in select-none">
+              {/* Réplica 1:1 del Stepper horizontal */}
+              <div className="w-full my-6 sm:my-8 overflow-x-auto no-scrollbar pb-3 pt-1 px-1">
+                <div className="min-w-[540px] sm:min-w-0 w-full flex items-start justify-between relative">
+                  {[1, 2, 3, 4, 5].map((stepIdx, idx) => (
+                    <React.Fragment key={stepIdx}>
+                      <div className="flex flex-col items-center text-center relative z-10" style={{ flex: 1 }}>
+                        {/* Círculo del paso */}
+                        <div className="flex items-center justify-center">
+                          <Skeleton circle width={42} height={42} />
+                        </div>
+                        {/* Título y subtítulo */}
+                        <div className="mt-2.5 px-1 max-w-[110px] sm:max-w-[140px] w-full flex flex-col items-center space-y-1">
+                          <Skeleton width={70} height={14} />
+                          <div className="hidden sm:block w-full">
+                            <Skeleton width={50} height={10} />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Línea conectora entre nodos */}
+                      {idx < 4 && (
+                        <div className="flex-1 h-0.5 relative z-0 self-start mt-5 mx-[-12px] sm:mx-[-15px]">
+                          <Skeleton height={2} />
+                        </div>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+
+              {/* Réplica 1:1 del Grid de Tarjetas de Información */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Tarjeta 1: Dispositivo en Servicio */}
+                <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                    <div className="flex items-center gap-2">
+                      <Skeleton circle width={18} height={18} />
+                      <Skeleton width={150} height={18} />
+                    </div>
+                    <Skeleton width={60} height={20} borderRadius="9999px" />
+                  </div>
+
+                  <div className="space-y-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div>
+                        <Skeleton width={80} height={12} className="mb-1" />
+                        <Skeleton width={140} height={18} />
+                      </div>
+                      <div>
+                        <Skeleton width={100} height={12} className="mb-1" />
+                        <Skeleton width={120} height={18} />
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-2">
+                      <Skeleton width={160} height={12} />
+                      <Skeleton width="90%" height={16} />
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-2">
+                      <Skeleton width={130} height={12} />
+                      <Skeleton width="75%" height={16} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tarjeta 2: Tiempos y Personal */}
+                <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
+                  <div className="flex items-center gap-2 pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                    <Skeleton circle width={18} height={18} />
+                    <Skeleton width={140} height={18} />
+                  </div>
+
+                  <div className="space-y-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div>
+                        <Skeleton width={90} height={12} className="mb-1" />
+                        <Skeleton width={110} height={18} />
+                      </div>
+                      <div>
+                        <Skeleton width={110} height={12} className="mb-1" />
+                        <Skeleton width={130} height={18} />
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-2">
+                      <Skeleton width={120} height={12} />
+                      <div className="flex gap-2">
+                        <Skeleton width={130} height={26} borderRadius="0.5rem" />
+                        <Skeleton width={110} height={26} borderRadius="0.5rem" />
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-2">
+                      <Skeleton width={140} height={12} />
+                      <Skeleton width={160} height={16} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tarjeta 3: Checklist de Recepción (Full Width) */}
+                <div className="md:col-span-2 p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                    <div className="flex items-center gap-2">
+                      <Skeleton circle width={18} height={18} />
+                      <Skeleton width={160} height={18} />
+                    </div>
+                    <Skeleton width={150} height={14} />
+                  </div>
+
+                  {/* Grid de items del checklist */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+                    {Array.from({ length: 10 }).map((_, itemIdx) => (
+                      <div
+                        key={itemIdx}
+                        className="p-3 rounded-xl border border-neutral-200/60 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-900/40 flex flex-col items-center justify-center gap-2"
+                      >
+                        <Skeleton circle width={22} height={22} />
+                        <Skeleton width={65} height={12} />
+                        <Skeleton width={50} height={16} borderRadius="9999px" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tarjeta 4: Historial de Avance */}
+                <div className="md:col-span-2 p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                    <Skeleton width={150} height={18} />
+                    <Skeleton width={80} height={14} />
+                  </div>
+
+                  <div className="space-y-4 pl-3">
+                    {[1, 2, 3].map((entryIdx) => (
+                      <div key={entryIdx} className="flex items-start gap-3">
+                        <Skeleton circle width={12} height={12} className="mt-1.5" />
+                        <div className="flex-1 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <Skeleton width={140} height={16} />
+                            <Skeleton width={90} height={12} />
+                          </div>
+                          <Skeleton width="80%" height={14} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </SkeletonTheme>
         )}
 
         {/* ─────────────────────────────────────────────────────────────
@@ -573,8 +756,9 @@ export const EstadoOrdenPage = () => {
             <div className="w-full my-6 sm:my-8 overflow-x-auto no-scrollbar pb-3 pt-1 px-1 select-none">
               <div className="min-w-[540px] sm:min-w-0 w-full flex items-start justify-between relative">
                 {timelineSteps.map((s, index) => {
-                  const isCompleted = index < currentStepIndex;
-                  const isCurrent = index === currentStepIndex;
+                  const isOrderFinished = isEntregado;
+                  const isCompleted = index < currentStepIndex || (isOrderFinished && index === currentStepIndex);
+                  const isCurrent = index === currentStepIndex && !isOrderFinished;
                   const isPending = index > currentStepIndex;
                   const StepIcon = s.icon;
                   const colorStage = s.color;
@@ -655,12 +839,12 @@ export const EstadoOrdenPage = () => {
                             className="h-full transition-all duration-300"
                             style={{
                               background:
-                                index < currentStepIndex
+                                index < currentStepIndex || isEntregado
                                   ? `linear-gradient(to right, ${colorStage.hex}, ${nextColorStage.hex})`
                                   : undefined
                             }}
                           >
-                            {index >= currentStepIndex && (
+                            {!isEntregado && index >= currentStepIndex && (
                               <div className="h-full bg-neutral-200 dark:bg-neutral-800" />
                             )}
                           </div>

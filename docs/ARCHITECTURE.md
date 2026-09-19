@@ -41,17 +41,25 @@ SIGER-FMC está implementado bajo una arquitectura desacoplada de 3 capas:
 ```
 backend/
 ├── src/
-│   ├── config/              # Conexión a PostgreSQL (db.js) y servicios externos
-│   ├── controllers/         # Lógica de controladores por entidad (auth, tickets, etc.)
+│   ├── config/              # Conexión a PostgreSQL (db.js) y Cloudinary (cloudinary.js)
+│   ├── controllers/         # Lógica por entidad (auth, servicios, clients, workers, configuracion, uploadSession)
 │   ├── db/                  # Scripts DDL y semillas iniciales (init.sql)
-│   ├── middlewares/         # Autenticación (JWT), autorización por roles y aislamientos
+│   ├── middlewares/         # Autenticación (JWT), RBAC, upload (Multer) y anti-bot
 │   │   ├── authMiddleware.js
-│   │   └── roleMiddleware.js
+│   │   ├── roleMiddleware.js
+│   │   ├── turnstile.middleware.js # Validación de tokens Cloudflare Turnstile
+│   │   └── upload.js
 │   ├── routes/              # Declaración de rutas y endpoints de la API REST
-│   │   └── auth.routes.js
+│   │   ├── auth.routes.js
+│   │   ├── servicios.routes.js
+│   │   ├── clients.routes.js
+│   │   ├── workers.routes.js
+│   │   ├── configuracion.routes.js
+│   │   ├── uploadSession.routes.js
+│   │   └── catalogos.routes.js
 │   └── app.js               # Configuración central de Express, CORS y middlewares globales
 ├── server.js                # Punto de entrada y arranque del servidor HTTP
-├── package.json             # Dependencias del servidor (pg, express, jsonwebtoken, bcryptjs)
+├── package.json             # Dependencias del servidor (pg, express, jsonwebtoken, bcryptjs, multer)
 ├── .env                     # Variables de entorno privadas (ignorado por Git)
 └── .env.example             # Plantilla pública de variables requeridas
 ```
@@ -68,18 +76,26 @@ frontend/
 │   │   │   ├── Stepper.jsx      # Asistente visual por etapas (Checklist/Presupuesto)
 │   │   │   ├── Modal.jsx        # Ventana modal atómica (Clientes, edición)
 │   │   │   ├── ConfirmModal.jsx # Modal de confirmación de acciones críticas
-│   │   │   ├── InlineConfirmButton.jsx # Microcomponente inline de 2 pasos (autoasignación)
+│   │   │   ├── InlineConfirmButton.jsx # Microcomponente inline de confirmación (sm/md, onBeforeConfirm)
+│   │   │   ├── Pagination.jsx   # Paginador universal homologado (selector por página, botones < >)
+│   │   │   ├── TurnstileWidget.jsx # Widget anti-bot Cloudflare con soporte dark mode
+│   │   │   ├── SingleImageDropzone.jsx # Subida y recorte de logotipo / avatares
 │   │   │   └── TicketQR.jsx     # Renderizado vectorial QR dinámico
+│   │   ├── configuration/   # Pestañas de configuración institucional
+│   │   │   ├── CompanyProfileTab.jsx # Perfil matriz, RNC, dirección y logotipo Cloudinary
+│   │   │   ├── BranchesTab.jsx       # Gestión de sedes y datos operativos
+│   │   │   └── PrintingTab.jsx       # Personalización sincronizada de Tickets y Stickers
 │   │   ├── servicios/       # Modales y comprobantes de recepción y despacho
 │   │   │   ├── ServiceTimeline.jsx      # Línea de tiempo unificada (taller y portal público)
-│   │   │   ├── EntregaServicioModal.jsx # Modal de liquidación y cobro de balance
+│   │   │   ├── EntregaServicioModal.jsx # Modal de liquidación y cobro con InlineConfirmButton
 │   │   │   ├── PostEntregaModal.jsx     # Diálogo post-despacho y disparador de recibo
 │   │   │   ├── ReciboEntregaTermico.jsx # Comprobante térmico de salida y liquidación
 │   │   │   ├── TicketTermico.jsx        # Ticket térmico original de recepción
 │   │   │   ├── StickerTermico.jsx       # Etiqueta adhesiva térmica con QR
 │   │   │   ├── PostCreacionModal.jsx    # Diálogo post-creación y selector de reimpresión
 │   │   │   ├── DevicePhotoUploader.jsx  # Subida de evidencias a Cloudinary
-│   │   │   └── DeviceSecurityPicker.jsx # Diseñador de patrones y contraseñas
+│   │   │   ├── DeviceSecurityPicker.jsx # Diseñador de patrones gráficos y contraseñas
+│   │   │   └── QrUploadModal.jsx        # Modal de sincronización QR para fotos móviles
 │   │   ├── taller/          # Componentes de mesa de trabajo técnica
 │   │   │   ├── FichaTecnicaModal.jsx    # Ficha técnica, incidencias y timeline unificado
 │   │   │   ├── TallerCard.jsx           # Tarjeta de orden en banco de trabajo
@@ -93,19 +109,23 @@ frontend/
 │   │   ├── AuthContext.jsx      # Sesión del trabajador, persistencia y estado
 │   │   └── ThemeContext.jsx     # Manejo del tema (Light por defecto / Dark)
 │   ├── pages/               # Vistas principales del sistema
-│   │   ├── Login/               # LoginPage.jsx (Formulario institucional, validaciones)
+│   │   ├── Login/               # LoginPage.jsx (Formulario institucional con Turnstile)
 │   │   ├── Dashboard/           # DashboardPage.jsx (Métricas, resumen y accesos)
-│   │   └── Tickets/             # Vistas del módulo de órdenes y recepción
-│   │       ├── TicketsPage.jsx  # Listado general de órdenes con filtros
-│   │       ├── NewTicketPage.jsx# Flujo por etapas (Stepper) de recepción
-│   │       └── TicketDetailPage.jsx # Detalle integral del servicio técnico
-│   ├── services/            # Clientes de red y configuración HTTP
-│   │   └── api.js               # Instancia de Axios con interceptor automático de JWT
+│   │   ├── ServiciosPage.jsx    # Listado general de órdenes con filtros y paginación
+│   │   ├── NuevaOrdenPage.jsx   # Flujo por etapas (Stepper) de recepción
+│   │   ├── BancoTrabajoPage.jsx # Tablero operativo Kanban y modo tabla
+│   │   ├── ClientsPage.jsx      # Directorio de clientes con paginación y búsqueda
+│   │   ├── WorkersPage.jsx      # Gestión de personal/usuarios con paginación
+│   │   ├── ConfigurationPage.jsx# Panel de configuración matriz, sedes y formatos
+│   │   ├── EstadoOrdenPage.jsx  # Seguimiento público de orden con react-loading-skeleton
+│   │   └── UploadMobilePage.jsx # Captura fotográfica móvil vía QR
+│   ├── services/            # Clientes de red y configuración HTTP (api.js, servicios, etc.)
 │   ├── hooks/               # Custom hooks reutilizables
+│   ├── utils/               # Utilidades de impresión, formato y printStyles
 │   ├── App.jsx              # Configuración de React Router y providers globales
-│   ├── main.jsx             # Montaje de la aplicación React en el DOM
+│   ├── main.jsx             # Montaje con react-loading-skeleton/dist/skeleton.css
 │   └── index.css            # Directivas Tailwind y tokens del sistema de diseño
-├── package.json             # Dependencias del cliente (react, vite, tailwindcss, morphicons)
+├── package.json             # Dependencias (react, vite, tailwindcss, morphicons, react-loading-skeleton)
 ├── tailwind.config.js       # Paleta de colores, breakpoints y temas
 ├── vite.config.js           # Configuración del bundler y proxy de desarrollo
 └── index.html               # Plantilla HTML base con favicon institucional y fuentes

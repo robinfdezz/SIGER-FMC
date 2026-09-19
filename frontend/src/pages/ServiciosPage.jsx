@@ -110,54 +110,125 @@ const getDeviceCategoryIcon = (categoria) => {
   return <Package size={14} className={iconClass} />;
 };
 
-const getEstadoIcon = (estado) => {
-  const flujo = Number(estado?.orden_flujo);
-  const cod = (estado?.codigo_estado || '').toUpperCase();
-  const nom = (estado?.nombre_estado || estado?.estado || '').toLowerCase();
+const normalizeEstadoKey = (estado) => {
+  if (!estado) return '';
+  const flujo = Number(estado.orden_flujo);
+  const cod = String(estado.codigo_estado || '').toUpperCase().trim();
+  const nom = String(estado.nombre_estado || estado.estado || '').toLowerCase().trim();
 
-  if (flujo === 1 || cod.includes('RECIB') || nom.includes('recib')) return Package;
-  if (flujo === 2 || cod.includes('DIAGN') || nom.includes('diagn')) return Search;
-  if (flujo === 3 || cod.includes('ESPERA') || cod.includes('REPUESTO') || nom.includes('espera') || nom.includes('repuesto')) return Clock;
-  if (flujo === 4 || cod.includes('REPARAC') || cod.includes('PROCESO') || nom.includes('reparac') || nom.includes('proceso')) return Wrench;
-  if (flujo === 5 || cod.includes('CALIDAD') || cod.includes('CONTROL') || nom.includes('calidad') || nom.includes('control')) return ClipboardCheck;
-  if (flujo === 6 || cod.includes('LISTO') || cod.includes('ENTREGA') || nom.includes('listo') || nom.includes('entrega')) return CheckCircle2;
-  if (flujo === 7 || cod.includes('ENTREG') || nom.includes('entreg')) return CheckCircle;
-  if (flujo === 8 || cod.includes('CANCEL') || nom.includes('cancel')) return XCircle;
-  return Package;
+  // 1. Evaluación canónica por orden_flujo
+  if (flujo === 1) return 'RECIBIDO';
+  if (flujo === 2) return 'EN_DIAGNOSTICO';
+  if (flujo === 3) return 'ESPERA_REPUESTO';
+  if (flujo === 4) return 'EN_REPARACION';
+  if (flujo === 5) return 'CONTROL_CALIDAD';
+  if (flujo === 6) return 'LISTO_ENTREGA';
+  if (flujo === 7) return 'ENTREGADO';
+  if (flujo === 8) return 'CANCELADO';
+
+  // 2. Evaluación estricta por codigo_estado
+  if (cod === 'RECIBIDO') return 'RECIBIDO';
+  if (cod === 'EN_DIAGNOSTICO') return 'EN_DIAGNOSTICO';
+  if (cod === 'ESPERA_REPUESTO' || cod === 'EN_ESPERA_REPUESTO') return 'ESPERA_REPUESTO';
+  if (cod === 'EN_REPARACION') return 'EN_REPARACION';
+  if (cod === 'CONTROL_CALIDAD') return 'CONTROL_CALIDAD';
+  if (cod === 'LISTO_ENTREGA') return 'LISTO_ENTREGA';
+  if (cod === 'ENTREGADO' || cod === 'ENTREGADO_CLIENTE' || cod === 'ENTREGA_CONFORME') return 'ENTREGADO';
+  if (cod === 'CANCELADO' || cod === 'CANCELADO_DEVUELTO') return 'CANCELADO';
+
+  // 3. Evaluación por texto evitando confusiones ("listo para entrega" vs "entregado")
+  // ¡CRÍTICO: Evaluar LISTO_ENTREGA primero para que "entrega" no sea capturado por "entregado"!
+  if (cod.includes('LISTO') || nom.includes('listo')) return 'LISTO_ENTREGA';
+  if (
+    (cod.includes('ENTREG') || nom.includes('entreg')) &&
+    !cod.includes('LISTO') &&
+    !nom.includes('listo')
+  ) {
+    return 'ENTREGADO';
+  }
+
+  if (cod.includes('RECIB') || nom.includes('recib')) return 'RECIBIDO';
+  if (cod.includes('DIAGN') || nom.includes('diagn')) return 'EN_DIAGNOSTICO';
+  if (cod.includes('ESPERA') || nom.includes('espera') || cod.includes('REPUESTO') || nom.includes('repuesto')) return 'ESPERA_REPUESTO';
+  if (cod.includes('REPARAC') || nom.includes('reparac') || cod.includes('PROCESO') || nom.includes('proceso')) return 'EN_REPARACION';
+  if (cod.includes('CALIDAD') || nom.includes('calidad') || cod.includes('CONTROL') || nom.includes('control')) return 'CONTROL_CALIDAD';
+  if (cod.includes('CANCEL') || nom.includes('cancel') || nom.includes('devuelt')) return 'CANCELADO';
+
+  return cod || nom;
+};
+
+const getEstadoIcon = (estado) => {
+  const key = normalizeEstadoKey(estado);
+  switch (key) {
+    case 'RECIBIDO':
+      return Package;
+    case 'EN_DIAGNOSTICO':
+      return Search;
+    case 'ESPERA_REPUESTO':
+      return Clock;
+    case 'EN_REPARACION':
+      return Wrench;
+    case 'CONTROL_CALIDAD':
+      return ClipboardCheck;
+    case 'LISTO_ENTREGA':
+      return PackageCheck;
+    case 'ENTREGADO':
+      return CheckCircle;
+    case 'CANCELADO':
+      return XCircle;
+    default:
+      return Package;
+  }
 };
 
 const getEstadoColor = (estado) => {
   if (estado?.color_badge) return estado.color_badge;
-  const flujo = Number(estado?.orden_flujo);
-  const cod = (estado?.codigo_estado || '').toUpperCase();
-  const nom = (estado?.nombre_estado || estado?.estado || '').toLowerCase();
-
-  if (flujo === 1 || cod.includes('RECIB') || nom.includes('recib')) return '#3B82F6';
-  if (flujo === 2 || cod.includes('DIAGN') || nom.includes('diagn')) return '#F59E0B';
-  if (flujo === 3 || cod.includes('ESPERA') || cod.includes('REPUESTO') || nom.includes('espera') || nom.includes('repuesto')) return '#EC4899';
-  if (flujo === 4 || cod.includes('REPARAC') || cod.includes('PROCESO') || nom.includes('reparac') || nom.includes('proceso')) return '#8B5CF6';
-  if (flujo === 5 || cod.includes('CALIDAD') || cod.includes('CONTROL') || nom.includes('calidad') || nom.includes('control')) return '#06B6D4';
-  if (flujo === 6 || cod.includes('LISTO') || cod.includes('ENTREGA') || nom.includes('listo') || nom.includes('entrega')) return '#10B981';
-  if (flujo === 7 || cod.includes('ENTREG') || nom.includes('entreg')) return '#059669';
-  if (flujo === 8 || cod.includes('CANCEL') || nom.includes('cancel')) return '#EF4444';
-  return '#6B7280';
+  const key = normalizeEstadoKey(estado);
+  switch (key) {
+    case 'RECIBIDO':
+      return '#3B82F6';
+    case 'EN_DIAGNOSTICO':
+      return '#F59E0B';
+    case 'ESPERA_REPUESTO':
+      return '#EC4899';
+    case 'EN_REPARACION':
+      return '#8B5CF6';
+    case 'CONTROL_CALIDAD':
+      return '#06B6D4';
+    case 'LISTO_ENTREGA':
+      return '#10B981';
+    case 'ENTREGADO':
+      return '#059669';
+    case 'CANCELADO':
+      return '#EF4444';
+    default:
+      return '#6B7280';
+  }
 };
 
 const getEstadoLabel = (estado) => {
   if (!estado) return '';
-  const flujo = Number(estado.orden_flujo);
-  const cod = (estado.codigo_estado || '').toUpperCase();
-  const nom = (estado.nombre_estado || estado.estado || '').toLowerCase();
-
-  if (flujo === 1 || cod.includes('RECIB') || nom.includes('recib')) return 'Recibido';
-  if (flujo === 2 || cod.includes('DIAGN') || nom.includes('diagn')) return 'En Diagnóstico';
-  if (flujo === 3 || cod.includes('ESPERA') || cod.includes('espera') || cod.includes('REPUESTO') || nom.includes('repuesto')) return 'En Repuesto';
-  if (flujo === 4 || cod.includes('REPARAC') || cod.includes('reparac') || cod.includes('PROCESO') || nom.includes('proceso')) return 'En Reparación';
-  if (flujo === 5 || cod.includes('CALIDAD') || cod.includes('calidad') || cod.includes('CONTROL') || nom.includes('control')) return 'Control de Calidad';
-  if (flujo === 6 || cod.includes('LISTO') || cod.includes('listo')) return 'Listo para Entrega';
-  if (flujo === 7 || cod.includes('ENTREG') || nom.includes('entreg')) return 'Entregado';
-  if (flujo === 8 || cod.includes('CANCEL') || nom.includes('cancel')) return 'Cancelado';
-  return estado.nombre_estado || estado.estado || '';
+  const key = normalizeEstadoKey(estado);
+  switch (key) {
+    case 'RECIBIDO':
+      return 'Recibido';
+    case 'EN_DIAGNOSTICO':
+      return 'En Diagnóstico';
+    case 'ESPERA_REPUESTO':
+      return 'En Repuesto';
+    case 'EN_REPARACION':
+      return 'En Reparación';
+    case 'CONTROL_CALIDAD':
+      return 'Control de Calidad';
+    case 'LISTO_ENTREGA':
+      return 'Listo para Entrega';
+    case 'ENTREGADO':
+      return 'Entregado';
+    case 'CANCELADO':
+      return 'Cancelado';
+    default:
+      return estado.nombre_estado || estado.estado || '';
+  }
 };
 
 const FALLBACK_ESTADOS = [
@@ -705,165 +776,175 @@ export const ServiciosPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  sortedServicios.map((orden) => (
-                    <tr
-                      key={orden.id}
-                      className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all"
-                    >
-                      {/* Columna 1: Ticket */}
-                      <td className="py-3 px-2.5 sm:px-3 whitespace-nowrap align-middle">
-                        <div className="font-mono font-bold text-neutral-900 dark:text-neutral-100 tracking-tight text-xs sm:text-[13px]">
-                          {orden.codigo_ticket}
-                        </div>
-                        {orden.es_garantia && (
-                          <div className="mt-1">
-                            <Badge
-                              variant="minimal"
-                              color="danger"
-                              icon={<ShieldCheck size={11} className="stroke-[2.2] shrink-0" />}
-                              size="sm"
-                              className="font-semibold text-[10px] tracking-wide leading-none"
+                  sortedServicios.map((orden) => {
+                    const estadoObj = (estados || []).find((e) =>
+                      (orden.estado_id && Number(e.id) === Number(orden.estado_id)) ||
+                      (orden.codigo_estado && String(e.codigo_estado).toUpperCase() === String(orden.codigo_estado).toUpperCase()) ||
+                      (orden.estado && (String(e.nombre_estado).toLowerCase() === String(orden.estado).toLowerCase() || String(e.codigo_estado).toUpperCase() === String(orden.estado).toUpperCase()))
+                    ) || {
+                      orden_flujo: orden.orden_flujo,
+                      codigo_estado: orden.codigo_estado,
+                      nombre_estado: orden.estado,
+                      color_badge: orden.estado_color
+                    };
+                    const estadoNormKey = normalizeEstadoKey(estadoObj);
+                    const isListoParaEntrega = estadoNormKey === 'LISTO_ENTREGA' || Number(orden.orden_flujo) === 6 || orden.codigo_estado === 'LISTO_ENTREGA';
+
+                    return (
+                      <tr
+                        key={orden.id}
+                        className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all"
+                      >
+                        {/* Columna 1: Ticket */}
+                        <td className="py-3 px-2.5 sm:px-3 whitespace-nowrap align-middle">
+                          <div className="font-mono font-bold text-neutral-900 dark:text-neutral-100 tracking-tight text-xs sm:text-[13px]">
+                            {orden.codigo_ticket}
+                          </div>
+                          {orden.es_garantia && (
+                            <div className="mt-1">
+                              <Badge
+                                variant="minimal"
+                                color="danger"
+                                icon={<ShieldCheck size={11} className="stroke-[2.2] shrink-0" />}
+                                size="sm"
+                                className="font-semibold text-[10px] tracking-wide leading-none"
+                              >
+                                GARANTÍA
+                              </Badge>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Columna 2: Cliente */}
+                        <td className="py-3 px-3 sm:px-4 align-middle min-w-[165px] max-w-[220px]">
+                          <div className="flex items-start gap-1.5">
+                            <User size={13} className="text-neutral-400 shrink-0 mt-0.5" />
+                            <span className="text-neutral-800 dark:text-neutral-200 font-medium text-xs leading-snug whitespace-normal break-words">
+                              {orden.nombre_cliente || '—'}
+                            </span>
+                          </div>
+                          {orden.telefono_cliente && (
+                            <p className="text-[11px] text-neutral-400 font-inter ml-5 font-mono whitespace-nowrap mt-0.5">
+                              {orden.telefono_cliente}
+                            </p>
+                          )}
+                        </td>
+
+                        {/* Columna 3: Equipo */}
+                        <td className="py-3 px-3 sm:px-4 align-middle min-w-[165px] max-w-[230px]">
+                          <div className="flex items-start gap-1.5">
+                            {getDeviceCategoryIcon(orden.categoria)}
+                            <span className="text-neutral-700 dark:text-neutral-300 font-medium text-xs leading-snug whitespace-normal break-words">
+                              {orden.marca_equipo} {orden.modelo_equipo}
+                            </span>
+                          </div>
+                          {Array.isArray(orden.tecnicos) && orden.tecnicos.length > 0 ? (
+                            <p
+                              className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter mt-1 flex items-start gap-1 whitespace-normal break-words leading-tight"
+                              title={orden.tecnicos.map((t) => t.nombre_completo).join(', ')}
                             >
-                              GARANTÍA
-                            </Badge>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1" />
+                              <span>{orden.tecnicos.map((t) => t.nombre_completo).join(', ')}</span>
+                            </p>
+                          ) : (
+                            <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-inter mt-1">
+                              <Inbox size={12} className="text-amber-500 shrink-0" />
+                              <span>Sin asignar</span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Columna 4: Estado con Badge minimal */}
+                        <td className="py-3 px-3 sm:px-4 whitespace-nowrap align-middle">
+                          {orden.estado ? (
+                            (() => {
+                              const EstadoIcon = getEstadoIcon(estadoObj);
+                              const estadoColor = orden.estado_color || getEstadoColor(estadoObj);
+                              const estadoLabel = getEstadoLabel(estadoObj);
+
+                              return (
+                                <Badge
+                                  variant="minimal"
+                                  size="sm"
+                                  showDot={false}
+                                  icon={<EstadoIcon size={12} className="shrink-0 stroke-[2.2]" style={{ color: estadoColor }} />}
+                                  className="font-medium"
+                                  style={{ color: estadoColor }}
+                                >
+                                  {estadoLabel}
+                                </Badge>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-neutral-400 dark:text-neutral-500">—</span>
+                          )}
+                        </td>
+
+                        {/* Columna 5: Prioridad con Badge minimal */}
+                        <td className="py-3 px-3 sm:px-4 whitespace-nowrap align-middle">
+                          {orden.prioridad ? (
+                            (() => {
+                              const config = getPrioridadConfig(orden.prioridad);
+                              const PriorityIcon = config.icon;
+                              return (
+                                <Badge
+                                  variant="minimal"
+                                  color={config.color}
+                                  icon={PriorityIcon}
+                                  size="sm"
+                                  className="capitalize font-medium"
+                                >
+                                  {config.label}
+                                </Badge>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-neutral-400 dark:text-neutral-500">—</span>
+                          )}
+                        </td>
+
+                        {/* Columna 6: Fecha */}
+                        <td className="py-3 px-2.5 sm:px-3 whitespace-nowrap align-middle">
+                          <div className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400">
+                            <Calendar size={13} className="shrink-0" />
+                            <span className="text-xs font-inter">
+                              {orden.created_at
+                                ? new Date(orden.created_at).toLocaleDateString('es-DO', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric'
+                                })
+                                : '—'}
+                            </span>
                           </div>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* Columna 2: Cliente */}
-                      <td className="py-3 px-3 sm:px-4 align-middle min-w-[165px] max-w-[220px]">
-                        <div className="flex items-start gap-1.5">
-                          <User size={13} className="text-neutral-400 shrink-0 mt-0.5" />
-                          <span className="text-neutral-800 dark:text-neutral-200 font-medium text-xs leading-snug whitespace-normal break-words">
-                            {orden.nombre_cliente || '—'}
-                          </span>
-                        </div>
-                        {orden.telefono_cliente && (
-                          <p className="text-[11px] text-neutral-400 font-inter ml-5 font-mono whitespace-nowrap mt-0.5">
-                            {orden.telefono_cliente}
-                          </p>
-                        )}
-                      </td>
-
-                      {/* Columna 3: Equipo */}
-                      <td className="py-3 px-3 sm:px-4 align-middle min-w-[165px] max-w-[230px]">
-                        <div className="flex items-start gap-1.5">
-                          {getDeviceCategoryIcon(orden.categoria)}
-                          <span className="text-neutral-700 dark:text-neutral-300 font-medium text-xs leading-snug whitespace-normal break-words">
-                            {orden.marca_equipo} {orden.modelo_equipo}
-                          </span>
-                        </div>
-                        {Array.isArray(orden.tecnicos) && orden.tecnicos.length > 0 ? (
-                          <p
-                            className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter mt-1 flex items-start gap-1 whitespace-normal break-words leading-tight"
-                            title={orden.tecnicos.map((t) => t.nombre_completo).join(', ')}
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1" />
-                            <span>{orden.tecnicos.map((t) => t.nombre_completo).join(', ')}</span>
-                          </p>
-                        ) : (
-                          <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-inter mt-1">
-                            <Inbox size={12} className="text-amber-500 shrink-0" />
-                            <span>Sin asignar</span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Columna 4: Estado con Badge minimal */}
-                      <td className="py-3 px-3 sm:px-4 whitespace-nowrap align-middle">
-                        {orden.estado ? (
-                          (() => {
-                            const estadoObj = (estados || []).find((e) => e.id === orden.estado_id || e.codigo_estado === orden.codigo_estado) || {
-                              orden_flujo: orden.orden_flujo,
-                              codigo_estado: orden.codigo_estado,
-                              nombre_estado: orden.estado
-                            };
-                            const EstadoIcon = getEstadoIcon(estadoObj);
-                            const estadoColor = orden.estado_color || getEstadoColor(estadoObj);
-                            const estadoLabel = getEstadoLabel(estadoObj);
-
-                            return (
-                              <Badge
-                                variant="minimal"
-                                size="sm"
-                                showDot={false}
-                                icon={<EstadoIcon size={12} className="shrink-0 stroke-[2.2]" style={{ color: estadoColor }} />}
-                                className="font-medium"
-                                style={{ color: estadoColor }}
+                        {/* Columna 7: Acciones */}
+                        <td className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-center align-middle">
+                          <div className="flex items-center justify-center gap-1">
+                            {isListoParaEntrega && !isTecnico && (
+                              <button
+                                type="button"
+                                onClick={() => setOrdenParaEntregar(orden)}
+                                className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
+                                title="Liquidar y entregar equipo"
                               >
-                                {estadoLabel}
-                              </Badge>
-                            );
-                          })()
-                        ) : (
-                          <span className="text-neutral-400 dark:text-neutral-500">—</span>
-                        )}
-                      </td>
-
-                      {/* Columna 5: Prioridad con Badge minimal */}
-                      <td className="py-3 px-3 sm:px-4 whitespace-nowrap align-middle">
-                        {orden.prioridad ? (
-                          (() => {
-                            const config = getPrioridadConfig(orden.prioridad);
-                            const PriorityIcon = config.icon;
-                            return (
-                              <Badge
-                                variant="minimal"
-                                color={config.color}
-                                icon={PriorityIcon}
-                                size="sm"
-                                className="capitalize font-medium"
-                              >
-                                {config.label}
-                              </Badge>
-                            );
-                          })()
-                        ) : (
-                          <span className="text-neutral-400 dark:text-neutral-500">—</span>
-                        )}
-                      </td>
-
-                      {/* Columna 6: Fecha */}
-                      <td className="py-3 px-2.5 sm:px-3 whitespace-nowrap align-middle">
-                        <div className="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400">
-                          <Calendar size={13} className="shrink-0" />
-                          <span className="text-xs font-inter">
-                            {orden.created_at
-                              ? new Date(orden.created_at).toLocaleDateString('es-DO', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric'
-                              })
-                              : '—'}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Columna 7: Acciones */}
-                      <td className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-center align-middle">
-                        <div className="flex items-center justify-center gap-1">
-                          {(Number(orden.orden_flujo) === 6 || orden.codigo_estado === 'LISTO_ENTREGA') && !isTecnico && (
+                                <PackageCheck size={16} />
+                              </button>
+                            )}
                             <button
                               type="button"
-                              onClick={() => setOrdenParaEntregar(orden)}
-                              className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
-                              title="Liquidar y entregar equipo"
+                              onClick={() => handleImprimirClick(orden)}
+                              className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                              title="Imprimir comprobante o etiqueta"
                             >
-                              <PackageCheck size={16} />
+                              <Printer size={15} />
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleImprimirClick(orden)}
-                            className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-                            title="Imprimir comprobante o etiqueta"
-                          >
-                            <Printer size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

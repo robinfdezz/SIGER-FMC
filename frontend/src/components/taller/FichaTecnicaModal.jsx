@@ -148,7 +148,7 @@ const getEstadoLabel = (estado) => {
   if (flujo === 4 || cod.includes('REPARAC') || nom.includes('reparac') || cod.includes('PROCESO') || nom.includes('proceso')) return 'En Reparación';
   if (flujo === 5 || cod.includes('CALIDAD') || nom.includes('calidad') || cod.includes('CONTROL') || nom.includes('control')) return 'Control de Calidad';
   if (flujo === 6 || cod.includes('LISTO') || nom.includes('listo')) return 'Listo para Entrega';
-  if (flujo === 7 || cod.includes('ENTREG') || nom.includes('entreg')) return 'Entregado';
+  if ((flujo === 7 || cod.includes('ENTREG') || nom.includes('entreg')) && !cod.includes('LISTO') && !nom.includes('listo')) return 'Entregado';
   if (flujo === 8 || cod.includes('CANCEL') || nom.includes('cancel')) return 'Cancelado';
   return estado.nombre_estado || estado.estado || '';
 };

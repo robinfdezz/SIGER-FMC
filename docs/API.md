@@ -67,12 +67,14 @@ La arquitectura de seguridad de SIGER-FMC implementa control de acceso basado en
 
 ### 2.1 Iniciar Sesión (Login)
 - **Ruta:** `POST /api/auth/login`
-- **Acceso:** Público
+- **Acceso:** Público (Protegido condicionalmente por `verifyTurnstile` según `ENABLE_TURNSTILE`)
+- **Headers:** `Content-Type: application/json`, `cf-turnstile-response: <token_turnstile>` (opcional si viene en body/query)
 - **Body (JSON):**
   ```json
   {
     "usuario": "superadmin",
-    "password": "admin123"
+    "password": "admin123",
+    "turnstileToken": "0.XXXXX..."
   }
   ```
 - **Respuesta Exitosa (`200 OK`):**
@@ -156,12 +158,18 @@ La arquitectura de seguridad de SIGER-FMC implementa control de acceso basado en
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Aislamiento:** Filtrado automático por `requireBranchAccess` según `sucursal_id` del token (excepto `SuperAdmin` que tiene visión global).
 - **Query Params (Opcionales):**
-  - `sucursal_id` (solo `SuperAdmin`): Filtrar por ID de sucursal.
+  - `page` (número, default 1): Número de página.
+  - `limit` (número, default 20, máx 100): Registros por página.
+  - `paginate` (`true`/`false`): Forzar modo paginado.
+  - `sucursal_id` (solo `SuperAdmin`): Filtrar por ID de sucursal (`'all'`, `'global'` o ID numérico).
   - `activo` (`true`/`false`): Filtrar trabajadores activos.
-  - `rol` (string): Filtrar por nombre de rol (ej. `tecnico`).
+  - `rol` / `rol_id`: Filtrar por nombre de rol o ID.
+  - `solo_tecnicos` / `taller` (`true`): Excluye personal con rol de Secretaria/Recepción para selectores operativos de taller.
+  - `q` / `search`: Búsqueda textual por nombre, apellido, usuario, cédula, correo o teléfono.
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
+    "success": true,
     "ok": true,
     "message": "Listado de trabajadores obtenido con éxito.",
     "data": [
@@ -183,7 +191,15 @@ La arquitectura de seguridad de SIGER-FMC implementa control de acceso basado en
         "sucursal_codigo": "MATRIZ"
       }
     ],
-    "total": 1
+    "workers": [ ... ],
+    "trabajadores": [ ... ],
+    "total": 1,
+    "pagination": {
+      "total": 1,
+      "page": 1,
+      "limit": 20,
+      "totalPages": 1
+    }
   }
   ```
 
@@ -778,11 +794,12 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 
 ---
 
-### 5.4 Consultar por Código de Ticket
+### 5.4 Consultar por Código de Ticket (Público / Seguimiento Online)
 - **Ruta:** `GET /api/servicios/ticket/:codigo`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
-- **Parámetros:** `codigo` (ej. `FMC-2026-0001`).
-- **Respuesta Exitosa (`200 OK`):** Devuelve la orden con sus datos descriptivos y estado.
+- **Acceso:** Público (Protegido condicionalmente por `verifyTurnstile` si `ENABLE_TURNSTILE === 'true'`)
+- **Headers:** `cf-turnstile-response: <token_turnstile>` (opcional si se pasa por query param `turnstileToken`)
+- **Parámetros URL:** `codigo` (ej. `FMC-2026-0001` o `FMC-SFM-6XQB-W33K`).
+- **Respuesta Exitosa (`200 OK`):** Devuelve la orden con sus datos descriptivos de hardware, tiempos, técnicos asignados, checklist de entrada, historial de estados e incidencias públicas con fotos.
 
 ---
 

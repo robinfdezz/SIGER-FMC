@@ -56,19 +56,19 @@ Cada orden de servicio transita de manera estructurada a través de 8 estados se
 ---
 
 ## 5. Módulos y Entidades Clave
-* **`clientes`:** Directorio único de clientes con documento de identidad (Cédula/RNC), contactos y dirección.
-* **`servicios_recepcion`:** Registro maestro de la orden de reparación, especificaciones del equipo y costos.
-* **Banco de Trabajo Técnico (`/taller` / `BancoTrabajoPage.jsx`):** Tablero operativo de taller con tarjetas de servicio (`TallerCard.jsx`) y filtrado por estado mediante pestañas animadas (`AnimatedTabs.jsx`). Incluye la **Ficha Técnica Modal (`FichaTecnicaModal.jsx`)** para transición de estados, asignación multi-técnico y visualización gráfica del patrón/PIN de acceso.
+* **`clientes`:** Directorio único de clientes con documento de identidad (Cédula/RNC), contactos y dirección. Soporta búsqueda integral y paginación en servidor.
+* **`servicios_recepcion`:** Registro maestro de la orden de reparación, especificaciones del equipo, liquidación financiera y costos.
+* **Banco de Trabajo Técnico (`/taller` / `BancoTrabajoPage.jsx`):** Tablero operativo de taller con tarjetas de servicio (`TallerCard.jsx`), vista conmutativa en tabla con paginación y filtrado por estado mediante pestañas animadas (`AnimatedTabs.jsx`). Incluye la **Ficha Técnica Modal (`FichaTecnicaModal.jsx`)** para transición de estados, asignación multi-técnico y visualización gráfica del patrón/PIN de acceso.
 * **`incidencias_servicio`:** Registro de imprevistos, piezas extra y costos adicionales surgidos durante el diagnóstico o la reparación, con ciclo de vida completo de autorización del cliente (Aprobado o Rechazado formalmente por WhatsApp, Llamada o Presencial).
-* **`evidencias_fotograficas`:** Registro fotográfico en Cloudinary con aislamiento estricto entre fotos de recepción inicial (`tipo_evidencia = 'RECEPCION'`) y evidencias técnicas de incidencias (`tipo_evidencia = 'INCIDENCIA'`).
+* **`evidencias_fotograficas`:** Registro fotográfico en Cloudinary con aislamiento estricto entre fotos de recepción inicial (`tipo_evidencia = 'RECEPCION'`), evidencias técnicas de incidencias (`tipo_evidencia = 'INCIDENCIA'`) y fotos de despacho (`tipo_evidencia = 'ENTREGA'`).
 * **`categorias_dispositivos`:** Clasificación de equipos atendidos (Smartphone, Tablet/iPad, Laptop, Consola de Videojuegos, Smartwatch, Otros).
-* **Portal de Seguimiento Público (`EstadoOrdenPage.jsx`):** Consulta web pública en tiempo real (`/estado` y `/estado/:codigo`) accesible vía escaneo de código QR generado por `TicketQR.jsx` con enlace dinámico corporativo.
+* **Portal de Seguimiento Público (`EstadoOrdenPage.jsx`):** Consulta web pública en tiempo real (`/estado` y `/estado/:codigo`) accesible vía escaneo de código QR generado por `TicketQR.jsx` con enlace dinámico corporativo, protegida por Cloudflare Turnstile y con transiciones de carga fluidas mediante `react-loading-skeleton`.
 
 ---
 
 ## 6. Stack Tecnológico
-* **Frontend:** React, Tailwind CSS, Vite, Lucide Icons, Morphicons, QRCode.react (`qrcode.react`), Sileo (Toaster).
+* **Frontend:** React, Tailwind CSS, Vite, Lucide Icons, Morphicons, QRCode.react (`qrcode.react`), react-loading-skeleton, Sileo (Toaster).
 * **Backend:** Node.js, Express.js.
 * **Base de Datos:** PostgreSQL (`siger_fmc_db`) vía driver nativo `pg` con Connection Pooling.
-* **Gestión Multimedia:** Cloudinary SDK v2 + Multer (MemoryStorage), compresión adaptativa a WebP (`siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`).
-* **Seguridad y Sesión:** Autenticación basada en JSON Web Tokens (JWT) con contraseñas encriptadas en `bcryptjs`.
+* **Gestión Multimedia:** Cloudinary SDK v2 + Multer (MemoryStorage), compresión adaptativa a WebP (`siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`), sincronización móvil de fotos vía QR y recolección automática de imágenes huérfanas.
+* **Seguridad y Sesión:** Autenticación basada en JSON Web Tokens (JWT) con contraseñas encriptadas en `bcryptjs` y protección anti-bot opcional vía Cloudflare Turnstile.

@@ -10,20 +10,20 @@ A continuación se detalla la estructura y el propósito de cada documento en el
 
 | Documento | Ubicación | Audiencia / Propósito |
 | :--- | :--- | :--- |
-| **Arquitectura Global** | [docs/ARCHITECTURE.md](file:///c:/Users/pc/Desktop/SIGER-FMC/docs/ARCHITECTURE.md) | Capas de la aplicación, ciclo de vida de tickets, aislamiento multi-sucursal y pipeline multimedia Cloudinary. |
-| **Catálogo de API REST** | [docs/API.md](file:///c:/Users/pc/Desktop/SIGER-FMC/docs/API.md) | Especificación exhaustiva de endpoints, middlewares RBAC, payloads JSON, códigos de respuesta y subida de archivos. |
-| **Modelo de Base de Datos** | [docs/DATABASE.md](file:///c:/Users/pc/Desktop/SIGER-FMC/docs/DATABASE.md) | Esquema relacional PostgreSQL, tablas, campos obligatorios, llaves foráneas e índices. |
-| **Guía de Desarrollo y UI/UX** | [docs/GUIDELINES.md](file:///c:/Users/pc/Desktop/SIGER-FMC/docs/GUIDELINES.md) | Sistema de diseño, paleta de colores por estado, reglas de componentes (Dropzone, Select, Modal) y convenciones de código. |
-| **Contexto del Proyecto** | [docs/PROJECT_CONTEXT.md](file:///c:/Users/pc/Desktop/SIGER-FMC/docs/PROJECT_CONTEXT.md) | Visión de negocio de Franyer Mobile Center, S.R.L., sucursales activas, roles operativos y reglas funcionales. |
-| **Reglas para Asistentes AI** | [docs/AI_RULES.md](file:///c:/Users/pc/Desktop/SIGER-FMC/docs/AI_RULES.md) | Restricciones estrictas de desarrollo, prohibiciones de comandos destructivos y lineamientos de codificación. |
-| **Registro de Cambios** | [docs/CHANGELOG.md](file:///c:/Users/pc/Desktop/SIGER-FMC/docs/CHANGELOG.md) | Historial cronológico de versiones y novedades en desarrollo (`[Unreleased]`). |
+| **Arquitectura Global** | [docs/ARCHITECTURE.md](./ARCHITECTURE.md) | Capas de la aplicación, ciclo de vida de tickets, aislamiento multi-sucursal y pipeline multimedia Cloudinary. |
+| **Catálogo de API REST** | [docs/API.md](./API.md) | Especificación exhaustiva de endpoints, middlewares RBAC, payloads JSON, códigos de respuesta y subida de archivos. |
+| **Modelo de Base de Datos** | [docs/DATABASE.md](./DATABASE.md) | Esquema relacional PostgreSQL, tablas, campos obligatorios, llaves foráneas e índices. |
+| **Guía de Desarrollo y UI/UX** | [docs/GUIDELINES.md](./GUIDELINES.md) | Sistema de diseño, paleta de colores por estado, reglas de componentes (Pagination, InlineConfirm, Dropzone, Select, Modal) y convenciones de código. |
+| **Contexto del Proyecto** | [docs/PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) | Visión de negocio de Franyer Mobile Center, S.R.L., sucursales activas, roles operativos y reglas funcionales. |
+| **Reglas para Asistentes AI** | [docs/AI_RULES.md](./AI_RULES.md) | Restricciones estrictas de desarrollo, prohibiciones de comandos destructivos y lineamientos de codificación. |
+| **Registro de Cambios** | [docs/CHANGELOG.md](./CHANGELOG.md) | Historial cronológico de versiones y novedades en desarrollo (`[Unreleased]`). |
 
 ---
 
 ## 🛠️ Stack Tecnológico Consolidado
 
-- **Backend:** Node.js, Express.js, PostgreSQL (`pg` Connection Pool), JWT, BcryptJS, Cloudinary SDK v2, Multer.
-- **Frontend:** React 18, Vite, React Router v6, Tailwind CSS, Lucide React, Morphicons, Sileo, Axios.
+- **Backend:** Node.js, Express.js, PostgreSQL (`pg` Connection Pool), JWT, BcryptJS, Cloudinary SDK v2, Multer, Cloudflare Turnstile (Anti-Bot condicional).
+- **Frontend:** React 18, Vite, React Router v6, Tailwind CSS, Lucide React, Morphicons, react-loading-skeleton, Sileo, Axios.
 - **Base de Datos:** PostgreSQL (`siger_fmc_db`).
 - **Almacenamiento Multimedia:** Cloudinary (Streaming en memoria, WebP `500x500`, calidad auto, carpetas `siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`).
 

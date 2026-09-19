@@ -576,6 +576,10 @@ const getServicios = async (req, res) => {
       '  sr.condiciones_garantia,\n' +
       '  sr.created_at,\n' +
       '  sr.updated_at,\n' +
+      '  sr.estado_actual_id,\n' +
+      '  sr.estado_actual_id AS estado_id,\n' +
+      '  es.codigo_estado,\n' +
+      '  es.orden_flujo,\n' +
       '  es.nombre_estado AS estado,\n' +
       '  es.color_badge AS estado_color,\n' +
       '  cd.nombre_categoria AS categoria,\n' +
@@ -665,6 +669,7 @@ const getServicioById = async (req, res) => {
       '  COALESCE((SELECT json_agg(json_build_object(\'id\', dt_tec.id, \'nombre\', dt_tec.nombre, \'apellido\', dt_tec.apellido, \'nombre_completo\', TRIM(CONCAT(dt_tec.nombre, \' \', dt_tec.apellido)), \'usuario\', dt_tec.usuario, \'foto_perfil_url\', dt_tec.foto_perfil_url) ORDER BY ta.id ASC) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), \'[]\'::json) AS tecnicos_asignados,\n' +
       '  COALESCE((SELECT json_agg(json_build_object(\'id\', ef.id, \'url\', ef.url_foto, \'url_foto\', ef.url_foto, \'public_id\', ef.public_id, \'tipo_evidencia\', ef.tipo_evidencia, \'fecha_subida\', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE AND ef.incidencia_id IS NULL AND ef.tipo_evidencia != \'INCIDENCIA\'), \'[]\'::json) AS fotos,\n' +
       '  COALESCE((SELECT json_agg(json_build_object(\'id\', ef.id, \'url\', ef.url_foto, \'url_foto\', ef.url_foto, \'public_id\', ef.public_id, \'tipo_evidencia\', ef.tipo_evidencia, \'fecha_subida\', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE AND ef.incidencia_id IS NULL AND (ef.tipo_evidencia = \'RECEPCION\' OR ef.tipo_evidencia IS NULL)), \'[]\'::json) AS fotos_recepcion,\n' +
+      '  COALESCE((SELECT json_agg(json_build_object(\'id\', ef.id, \'url\', ef.url_foto, \'url_foto\', ef.url_foto, \'public_id\', ef.public_id, \'tipo_evidencia\', ef.tipo_evidencia, \'fecha_subida\', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE AND ef.incidencia_id IS NULL AND ef.tipo_evidencia = \'ENTREGA\'), \'[]\'::json) AS fotos_entrega,\n' +
       '  COALESCE((\n' +
       '    SELECT json_agg(\n' +
       '      json_build_object(\n' +
@@ -825,6 +830,23 @@ const getServicioByTicket = async (req, res) => {
       '      AND ef.incidencia_id IS NULL\n' +
       '      AND (ef.tipo_evidencia = \'RECEPCION\' OR ef.tipo_evidencia IS NULL)\n' +
       '  ), \'[]\'::json) AS fotos_recepcion,\n' +
+      '  COALESCE((\n' +
+      '    SELECT json_agg(\n' +
+      '      json_build_object(\n' +
+      '        \'id\', ef.id,\n' +
+      '        \'url\', ef.url_foto,\n' +
+      '        \'url_foto\', ef.url_foto,\n' +
+      '        \'public_id\', ef.public_id,\n' +
+      '        \'tipo_evidencia\', ef.tipo_evidencia,\n' +
+      '        \'fecha_subida\', ef.fecha_subida\n' +
+      '      ) ORDER BY ef.id ASC\n' +
+      '    )\n' +
+      '    FROM evidencias_fotograficas ef\n' +
+      '    WHERE ef.servicio_id = sr.id\n' +
+      '      AND ef.activo = TRUE\n' +
+      '      AND ef.incidencia_id IS NULL\n' +
+      '      AND ef.tipo_evidencia = \'ENTREGA\'\n' +
+      '  ), \'[]\'::json) AS fotos_entrega,\n' +
       '  COALESCE((\n' +
       '    SELECT json_agg(\n' +
       '      json_build_object(\n' +

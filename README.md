@@ -6,10 +6,10 @@ Sistema web especializado para el taller de servicio técnico **Franyer Mobile C
 
 ## 🛠️ Stack Tecnológico
 
-- **Backend:** Node.js, Express, PostgreSQL (`pg` Connection Pool), JWT, BcryptJS, Cloudinary SDK, Multer (Memory Storage).
-- **Frontend:** React (Vite), React Router v6, Tailwind CSS (Estilo Supabase Dark/Light), Lucide React, Morphicons (Iconos animados), Sileo (Toaster), Axios.
+- **Backend:** Node.js, Express, PostgreSQL (`pg` Connection Pool), JWT, BcryptJS, Cloudinary SDK, Multer (Memory Storage), Cloudflare Turnstile (Anti-Bot condicional).
+- **Frontend:** React (Vite), React Router v6, Tailwind CSS (Estilo Supabase Dark/Light), Lucide React, Morphicons (Iconos animados), react-loading-skeleton, Sileo (Toaster), Axios.
 - **Base de Datos:** PostgreSQL (`siger_fmc_db`).
-- **Gestión Multimedia / Cloudinary:** Carga optimizada en buffer, streaming WebP (`siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`) y eliminación automática de recursos huérfanos.
+- **Gestión Multimedia / Cloudinary:** Carga optimizada en buffer, streaming WebP (`siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`), sincronización móvil vía QR y recolección automática de recursos huérfanos.
 - **Flujo de Ramas Git:**
   - `main`: Rama principal / producción estable.
   - `develop`: Rama de integración activa para desarrollo.
@@ -63,7 +63,7 @@ SIGER-FMC/
 ## ⚙️ Pasos de Instalación y Ejecución
 
 ### 1. Inicialización de la Base de Datos (PostgreSQL)
-Ejecuta el script [backend/src/db/init.sql](file:///c:/Users/pc/Desktop/SIGER-FMC/backend/src/db/init.sql) en pgAdmin, DBeaver o `psql` para crear las tablas, roles, usuario inicial y estados en la base de datos `siger_fmc_db`.
+Ejecuta el script [backend/src/db/init.sql](./backend/src/db/init.sql) en pgAdmin, DBeaver o `psql` para crear las tablas, roles, usuario inicial y estados en la base de datos `siger_fmc_db`.
 
 ### 2. Ejecución del Backend
 ```bash
