@@ -466,8 +466,11 @@ const createServicio = async (req, res) => {
 const getServicios = async (req, res) => {
   try {
     var pool = getPool();
-    var page = parseInt(req.query.page) || 1;
-    var limit = parseInt(req.query.limit) || 20;
+    var page = parseInt(req.query.page, 10) || 1;
+    var limit = parseInt(req.query.limit, 10) || 20;
+    if (page < 1) page = 1;
+    if (limit < 1) limit = 20;
+    if (limit > 100) limit = 100;
     var offset = (page - 1) * limit;
 
     // Filtros opcionales
@@ -594,16 +597,18 @@ const getServicios = async (req, res) => {
       params
     );
 
-    var total = parseInt(countRes.rows[0].count);
+    var total = parseInt(countRes.rows[0]?.count || 0, 10) || 0;
+    var totalPages = Math.ceil(total / limit) || 1;
 
     return res.status(200).json({
       ok: true,
+      servicios: dataRes.rows,
       data: dataRes.rows,
       pagination: {
         total: total,
         page: page,
         limit: limit,
-        totalPages: Math.ceil(total / limit)
+        totalPages: totalPages
       }
     });
 

@@ -5,6 +5,7 @@ import PostCreacionModal from '../components/servicios/PostCreacionModal';
 import EntregaServicioModal from '../components/servicios/EntregaServicioModal';
 import Select from '../components/common/Select';
 import Badge from '../components/common/Badge';
+import Pagination from '../components/common/Pagination';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
 import AnimatedIconButton from '../components/common/AnimatedIconButton';
 import { useAuth } from '../context/AuthContext';
@@ -200,7 +201,9 @@ export const ServiciosPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshSuccess, setRefreshSuccess] = useState(false);
-  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 50, totalPages: 1 });
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 20, totalPages: 1 });
 
   // Filtros interactivos
   const [searchTerm, setSearchTerm] = useState('');
@@ -268,11 +271,11 @@ export const ServiciosPage = () => {
     }).catch(() => { });
   }, [currentUser?.sucursal_id]);
 
-  // Consulta de órdenes con filtros activos
-  const fetchOrdenes = useCallback(async (page = 1) => {
+  // Consulta de órdenes con filtros activos y paginación
+  const fetchOrdenes = useCallback(async (targetPage = page, targetLimit = limit) => {
     setIsLoading(true);
     try {
-      const params = { page, limit: pagination.limit };
+      const params = { page: targetPage, limit: targetLimit };
       if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
       if (selectedEstado && selectedEstado !== 'all') params.estado_id = selectedEstado;
       if (selectedPrioridad !== 'all') params.prioridad = selectedPrioridad;
@@ -281,8 +284,17 @@ export const ServiciosPage = () => {
 
       const res = await getServicios(params);
       if (res.ok) {
-        setOrdenes(res.data || []);
-        setPagination(res.pagination || { total: 0, page: 1, limit: 20, totalPages: 1 });
+        const rows = res.servicios || res.data || [];
+        setOrdenes(rows);
+        const pag = res.pagination || {
+          total: rows.length,
+          page: targetPage,
+          limit: targetLimit,
+          totalPages: Math.ceil(rows.length / targetLimit) || 1
+        };
+        setPagination(pag);
+        setPage(pag.page || targetPage);
+        setLimit(pag.limit || targetLimit);
         return true;
       }
       return false;
@@ -292,11 +304,12 @@ export const ServiciosPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedSearch, selectedEstado, selectedPrioridad, selectedBranch, selectedTecnico, pagination.limit]);
+  }, [debouncedSearch, selectedEstado, selectedPrioridad, selectedBranch, selectedTecnico, page, limit]);
 
-  // Recarga reactiva al cambiar filtros
+  // Recarga reactiva al cambiar filtros: siempre reinicia a la página 1
   useEffect(() => {
-    fetchOrdenes(1);
+    setPage(1);
+    fetchOrdenes(1, limit);
   }, [debouncedSearch, selectedEstado, selectedPrioridad, selectedBranch, selectedTecnico]);
 
   const hasActiveFilters = Boolean(
@@ -307,6 +320,17 @@ export const ServiciosPage = () => {
     selectedTecnico !== 'all'
   );
 
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
+    fetchOrdenes(newPage, limit);
+  };
+
+  const handleItemsPerPageChange = (newLimit) => {
+    setLimit(newLimit);
+    setPage(1);
+    fetchOrdenes(1, newLimit);
+  };
+
   const handleClearFilters = () => {
     setSearchTerm('');
     setDebouncedSearch('');
@@ -314,11 +338,12 @@ export const ServiciosPage = () => {
     setSelectedPrioridad('all');
     setSelectedBranch('all');
     setSelectedTecnico('all');
+    setPage(1);
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    const success = await fetchOrdenes(pagination.page || 1);
+    const success = await fetchOrdenes(page, limit);
     setIsRefreshing(false);
     if (success) {
       setRefreshSuccess(true);
@@ -580,13 +605,6 @@ export const ServiciosPage = () => {
                   hasActiveFilters={hasActiveFilters}
                 />
               </div>
-            </div>
-
-            {/* Resumen de conteo */}
-            <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 pt-1">
-              <span>
-                Mostrando <strong>{sortedServicios.length}</strong> de <strong>{pagination.total}</strong> órdenes registradas
-              </span>
             </div>
           </div>
         </div>
@@ -851,40 +869,17 @@ export const ServiciosPage = () => {
             </table>
           </div>
 
-          {/* Barra inferior resumen y paginación */}
-          <div className="px-4 sm:px-6 py-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-inter shrink-0 bg-neutral-50/50 dark:bg-neutral-900/20">
-            <span>
-              Mostrando <strong>{ordenes.length}</strong> {ordenes.length === 1 ? 'orden' : 'órdenes'}{pagination.total > 0 && pagination.total !== ordenes.length ? ` (de ${pagination.total} en total)` : ''}
-            </span>
-
-            {pagination.totalPages > 1 && (
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-neutral-400 dark:text-neutral-500">
-                  Página {pagination.page} de {pagination.totalPages}
-                </span>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => fetchOrdenes(pagination.page - 1)}
-                    disabled={pagination.page <= 1 || isLoading}
-                    className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                    title="Página anterior"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fetchOrdenes(pagination.page + 1)}
-                    disabled={pagination.page >= pagination.totalPages || isLoading}
-                    className="p-1.5 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                    title="Página siguiente"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Componente Reutilizable de Paginación */}
+          <Pagination
+            currentPage={pagination.page || page}
+            totalPages={pagination.totalPages || 1}
+            totalItems={pagination.total || 0}
+            itemsPerPage={pagination.limit || limit}
+            onPageChange={handlePageChange}
+            onItemsPerPageChange={handleItemsPerPageChange}
+            pageSizeOptions={[10, 20, 50, 100]}
+            isLoading={isLoading}
+          />
         </div>
       </div>
 
