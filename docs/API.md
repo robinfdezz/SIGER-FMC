@@ -798,8 +798,9 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 - **Ruta:** `GET /api/servicios/ticket/:codigo`
 - **Acceso:** Público (Protegido condicionalmente por `verifyTurnstile` si `ENABLE_TURNSTILE === 'true'`)
 - **Headers:** `cf-turnstile-response: <token_turnstile>` (opcional si se pasa por query param `turnstileToken`)
-- **Parámetros URL:** `codigo` (ej. `FMC-2026-0001` o `FMC-SFM-6XQB-W33K`).
+- **Parámetros URL:** `codigo` (ej. `FMC-2026-0001` o `SFM-VFC9-6NND`).
 - **Respuesta Exitosa (`200 OK`):** Devuelve la orden con sus datos descriptivos de hardware, tiempos, técnicos asignados, checklist de entrada, historial de estados e incidencias públicas con fotos.
+  - *Nota sobre órdenes canceladas:* Este endpoint responde siempre `200 OK` incluso si la orden se encuentra en estado `CANCELADO_DEVUELTO`, exponiendo de forma transparente `motivo_cancelacion`, `fecha_cancelacion` y el nodo final de cancelación para que el cliente consulte el estatus de su dispositivo sin bloqueos.
 
 ---
 
@@ -1115,6 +1116,92 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
 1. **`PENDIENTE` / `COMPLETADO`**: La sesión recibe fotos desde el móvil y las preserva temporalmente mientras el operador redacta la orden de servicio en la PC.
 2. **`UTILIZADA`**: Al presionar "Guardar Orden de Servicio" (`POST /api/servicios`), la orden vincula las fotos y actualiza la sesión a `'UTILIZADA'`. Las fotos de sesiones `'UTILIZADA'` **nunca** son borradas.
 3. **`PURGADA`**: Si la orden se cancela, la ventana se cierra o expira y pasan más de 30 minutos sin ser confirmada, el Garbage Collector automático elimina las imágenes de Cloudinary (`cloudinary.uploader.destroy`) y marca la sesión como `'PURGADA'`.
+
+---
+
+### 5.14 Liquidar y Entregar Orden de Servicio
+- **Ruta:** `POST /api/servicios/:id/entregar`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`)
+- **Descripción:** Concluye el ciclo técnico y financiero de la orden de servicio en mostrador. Verifica que la orden pertenezca a la sucursal del usuario (aislamiento de sede), que no haya sido entregada previamente ni cancelada, que no existan incidencias pendientes de aprobación del cliente, liquida el saldo neto, actualiza el estado a `ENTREGADO` (`orden_flujo = 7`), registra la fecha y usuario de entrega e inserta el evento de auditoría en `historial_estados`.
+- **Body (JSON):**
+  ```json
+  {
+    "metodo_pago_entrega": "Efectivo",
+    "monto_recibido_entrega": 2500.00,
+    "observaciones_entrega": "Equipo probado y entregado con conformidad del cliente."
+  }
+  ```
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "message": "Servicio liquidado y entregado exitosamente.",
+    "data": {
+      "id": 1,
+      "codigo_ticket": "FMC-2026-0001",
+      "estado": "Entregado al Cliente",
+      "codigo_estado": "ENTREGADO",
+      "orden_flujo": 7,
+      "monto_liquidado": 2200.00,
+      "cambio_devuelto_entrega": 300.00,
+      "fecha_entrega_real": "2026-09-20T12:00:00.000Z"
+    }
+  }
+  ```
+- **Errores Posibles:**
+  - `400 Bad Request`: "No se puede liquidar o entregar una orden cancelada.", "Esta orden ya fue entregada previamente.", o "Existen repuestos pendientes de aprobación o rechazo."
+  - `403 Forbidden`: Acceso denegado a órdenes de otra sucursal o roles sin permiso.
+
+---
+
+### 5.15 Cancelar Orden de Servicio
+- **Ruta:** `POST /api/servicios/:id/cancelar`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico` de la sede)
+- **Descripción:** Da de baja formalmente una orden técnica que no continuará en reparación (ej. cliente rechaza presupuesto, equipo irreparable o desistimiento). Ejecuta una transacción atómica bloqueando el registro con `FOR UPDATE`, valida aislamiento multi-sucursal, impide cancelar órdenes previamente entregadas o ya canceladas, exige un motivo descriptivo obligatorio (mínimo 5 caracteres), actualiza el estado al catálogo `CANCELADO_DEVUELTO` (`orden_flujo = 8`), persiste `motivo_cancelacion`, `fecha_cancelacion` y `usuario_cancela_id` en `servicios_recepcion` e inserta el registro inmutable en `historial_estados`.
+- **Body (JSON):**
+  ```json
+  {
+    "motivo_cancelacion": "Cliente no aprobó el presupuesto para cambio de módulo de pantalla."
+  }
+  ```
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "message": "Orden de servicio cancelada correctamente.",
+    "data": {
+      "id": 6,
+      "codigo_ticket": "SFM-VFC9-6NND",
+      "estado_actual_id": 8,
+      "estado": "Cancelado / No Reparado",
+      "codigo_estado": "CANCELADO_DEVUELTO",
+      "estado_color": "#EF4444",
+      "orden_flujo": 8,
+      "motivo_cancelacion": "Cliente no aprobó el presupuesto para cambio de módulo de pantalla.",
+      "fecha_cancelacion": "2026-09-20T12:30:00.000Z"
+    }
+  }
+  ```
+- **Errores Posibles:**
+  - `400 Bad Request`: "El motivo de cancelación es obligatorio y debe contener al menos 5 caracteres.", "No es posible cancelar una orden que ya fue entregada al cliente.", o "Esta orden ya se encuentra cancelada."
+  - `403 Forbidden`: "Acceso denegado: no tiene permisos para cancelar órdenes de otra sucursal."
+  - `404 Not Found`: "Orden de servicio no encontrada."
+
+---
+
+### 5.16 Validar y Consultar Datos para Emisión de Comprobante / Etiqueta
+- **Ruta:** `GET /api/servicios/:id/ticket-impresion`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Descripción:** Endpoint especializado para validar la precondición de impresión antes de generar el comprobante térmico o la etiqueta de taller. Verifica que la orden exista y **bloquea la emisión para órdenes canceladas**, asegurando la integridad física y documental del taller.
+- **Parámetros URL:** `:id` (ID numérico o código de ticket).
+- **Respuesta Exitosa (`200 OK`):** Retorna los datos requeridos para la plantilla de impresión de comprobante o sticker.
+- **Errores Posibles:**
+  - `400 Bad Request`: *"No se permite emitir comprobantes o etiquetas para órdenes canceladas"* (cuando `orden_flujo === 8` o `codigo_estado` incluye `CANCEL`).
+  - `404 Not Found`: "Orden de servicio no encontrada."
+
+---
 
 ---
 

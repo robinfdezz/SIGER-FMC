@@ -236,7 +236,7 @@ export const UsuarioDetalleModal = ({
       onClose={onClose}
       customHeader={customHeader}
       footer={footer}
-      size="lg"
+      size="xl"
       height="h-auto max-h-[90vh]"
       bodyClassName="p-5 sm:p-6"
     >

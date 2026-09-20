@@ -1,11 +1,13 @@
 /**
  * Middleware para validar que el usuario autenticado posea uno de los roles autorizados.
  * @param {string[]} allowedRoles - Lista de nombres de roles permitidos (ej. ['SuperAdmin', 'Admin_Sucursal'])
+ * @param {string} [customMessage] - Mensaje personalizado en caso de rol no autorizado
  */
-const checkRole = (allowedRoles = []) => {
+const checkRole = (allowedRoles = [], customMessage = null) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
+        ok: false,
         success: false,
         message: 'No autenticado. Sesión requerida.'
       });
@@ -13,11 +15,18 @@ const checkRole = (allowedRoles = []) => {
 
     const userRole = String(req.user.rol_nombre || req.user.rol || '').toLowerCase();
     const normalizedAllowed = allowedRoles.map(r => String(r).toLowerCase());
+    const rolId = Number(req.user.rol_id);
 
-    if (!normalizedAllowed.includes(userRole)) {
+    const isMatch =
+      normalizedAllowed.includes(userRole) ||
+      (rolId === 1 && (normalizedAllowed.includes('superadmin') || normalizedAllowed.includes('admin'))) ||
+      (rolId === 2 && (normalizedAllowed.includes('admin_sucursal') || normalizedAllowed.includes('admin')));
+
+    if (!isMatch) {
       return res.status(403).json({
+        ok: false,
         success: false,
-        message: `Acceso denegado. Se requiere uno de los siguientes roles: ${allowedRoles.join(', ')}.`
+        message: customMessage || `Acceso denegado. Se requiere uno de los siguientes roles: ${allowedRoles.join(', ')}.`
       });
     }
 

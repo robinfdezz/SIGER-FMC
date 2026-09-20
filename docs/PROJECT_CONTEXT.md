@@ -49,7 +49,9 @@ Cada orden de servicio transita de manera estructurada a través de 8 estados se
    * Cierre formal en mostrador, liquidación del costo final, entrega física y emisión de condiciones de garantía (ej. 30 días).
    * **Reingreso por Garantía:** Una orden previa únicamente es admisible para un nuevo ticket de garantía si su estado formal es `ENTREGADO` (o cuenta con `fecha_entrega`). Equipos aún no retirados del taller no son elegibles para garantía.
 8. **`CANCELADO_DEVUELTO` (ID: 8 | Rojo):**
-   * Cancelación por falta de solución técnica o no aprobación del presupuesto por parte del cliente.
+   * Cancelación formal mediante `CancelarOrdenModal` por falta de solución técnica, inviabilidad o no aceptación de presupuesto por parte del cliente.
+   * Registra obligatoriamente `motivo_cancelacion`, marca temporal `fecha_cancelacion = NOW()`, referencia a `usuario_cancela_id` e hito en `historial_estados`.
+   * **Salvaguardas Defensivas:** Bloquea de forma inmediata e irreversible cualquier modificación de estado, asignación de técnicos, registro de incidencias o liquidación de entrega en taller (`400 Bad Request`). En la consulta pública se proyecta de manera transparente con el motivo y nodo terminal.
 
 *Cada cambio de estado genera un registro inmutable en la tabla `historial_estados` con fecha, usuario responsable y nota explicativa.*
 

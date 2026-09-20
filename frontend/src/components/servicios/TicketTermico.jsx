@@ -109,7 +109,20 @@ export const TicketTermico = ({
   const costo = Number(data.costo_previsto ?? data.costo_estimado ?? 0);
   const anticipo = Number(data.monto_anticipo ?? data.anticipo ?? 0);
   const descuento = Number(data.monto_descuento ?? data.descuento ?? 0);
-  const saldo = Math.max(0, costo - anticipo - descuento);
+  const total = Math.max(0, costo - descuento);
+  const saldo = Math.max(0, total - anticipo);
+
+  const tasaImpuesto = Number(data.tasa_impuesto || 18);
+  const subtotal = data.desglose_impuesto?.subtotal && Math.abs(Number(data.desglose_impuesto.subtotal) + Number(data.desglose_impuesto.monto_impuesto || 0) - total) < 0.05
+    ? Number(data.desglose_impuesto.subtotal)
+    : (data.subtotal && Math.abs(Number(data.subtotal) + Number(data.monto_impuesto || 0) - total) < 0.05
+        ? Number(data.subtotal)
+        : Math.round((total / (1 + (tasaImpuesto / 100))) * 100) / 100);
+  const montoImpuesto = data.desglose_impuesto?.monto_impuesto && Math.abs(Number(data.desglose_impuesto.subtotal || 0) + Number(data.desglose_impuesto.monto_impuesto) - total) < 0.05
+    ? Number(data.desglose_impuesto.monto_impuesto)
+    : (data.monto_impuesto && Math.abs(Number(data.subtotal || 0) + Number(data.monto_impuesto) - total) < 0.05
+        ? Number(data.monto_impuesto)
+        : Math.round((total - subtotal) * 100) / 100);
 
   // Cliente info
   const clienteNombre = data.cliente_nombre || data.nombre_cliente || (data.cliente ? `${data.cliente.nombre || ''} ${data.cliente.apellido || ''}`.trim() : '');
@@ -322,21 +335,33 @@ export const TicketTermico = ({
           <div className="border-b border-dashed border-neutral-400 pb-2 mb-2 text-[10.5px] space-y-1">
             <div className="flex justify-between">
               <span>Costo Estimado:</span>
-              <span className="font-mono">RD$ {costo.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
+              <span className="font-mono">RD$ {costo.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             {descuento > 0 && (
               <div className="flex justify-between text-neutral-700">
                 <span>Descuento:</span>
-                <span className="font-mono">- RD$ {descuento.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
+                <span className="font-mono">- RD$ {descuento.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             )}
+            <div className="flex justify-between text-neutral-700 text-[10px]">
+              <span>Subtotal:</span>
+              <span className="font-mono">RD$ {Number(subtotal || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between text-neutral-700 text-[10px]">
+              <span>ITBIS ({tasaImpuesto || 18}%):</span>
+              <span className="font-mono">RD$ {Number(montoImpuesto || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between font-semibold text-[10.5px] text-neutral-900 pt-0.5 border-t border-dotted border-neutral-300">
+              <span>TOTAL:</span>
+              <span className="font-mono">RD$ {Number(total || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
             <div className="flex justify-between text-neutral-900 font-semibold">
               <span>Anticipo Recibido:</span>
-              <span className="font-mono">- RD$ {anticipo.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
+              <span className="font-mono">- RD$ {anticipo.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between font-bold text-xs pt-1 border-t border-dotted border-neutral-300">
               <span>SALDO PENDIENTE:</span>
-              <span className="font-mono">RD$ {saldo.toLocaleString('es-DO', { minimumFractionDigits: 2 })}</span>
+              <span className="font-mono">RD$ {saldo.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
         )}

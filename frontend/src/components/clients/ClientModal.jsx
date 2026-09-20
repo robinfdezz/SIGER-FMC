@@ -226,7 +226,8 @@ export const ClientModal = ({
           ? 'Actualice la información del cliente.'
           : 'Complete el formulario para registrar un nuevo cliente en el sistema.'
       }
-      maxWidth="max-w-2xl"
+      maxWidth="max-w-3xl"
+      height="h-auto max-h-[90vh]"
     >
       <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
         {/* Cuerpo Scroleable */}

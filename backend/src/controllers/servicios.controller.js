@@ -263,7 +263,21 @@ const createServicio = async (req, res) => {
       ? sufijoTicket.replace(/^FMC-/, prefijoSucursal)
       : `${prefijoSucursal}${sufijoTicket}`;
 
-    // ── 3. Insertar la orden de servicio ─────────────────────
+    // ── 4. Obtener tasa_impuesto_defecto de la empresa y calcular impuesto ──
+    const ciaRes = await client.query('SELECT tasa_impuesto_defecto FROM datos_companhia ORDER BY id ASC LIMIT 1');
+    const tasaImpuesto = ciaRes.rows[0]?.tasa_impuesto_defecto != null
+      ? parseFloat(ciaRes.rows[0].tasa_impuesto_defecto)
+      : 18.00;
+
+    const costoPrevistoDecimal = toDecimal(costo_previsto, 0.00);
+    const montoAnticipoDecimal = toDecimal(monto_anticipo, 0.00);
+    const montoDescuentoDecimal = toDecimal(monto_descuento, 0.00);
+    const montoTotalRecepcion = Math.max(0, costoPrevistoDecimal - montoDescuentoDecimal);
+    const montoImpuesto = (montoTotalRecepcion > 0 && tasaImpuesto > 0)
+      ? Math.round((montoTotalRecepcion - (montoTotalRecepcion / (1 + (tasaImpuesto / 100)))) * 100) / 100
+      : 0.00;
+
+    // ── 5. Insertar la orden de servicio ─────────────────────
     const accesoriosFinal = isBlank(accesorios_recibidos)
       ? (isBlank(accesorios) ? null : String(accesorios).trim())
       : String(accesorios_recibidos).trim();
@@ -276,6 +290,7 @@ const createServicio = async (req, res) => {
       '  marca_equipo, modelo_equipo, num_serie_imei, datos_acceso_equipo,\n' +
       '  falla_reportada, observaciones_recepcion, accesorios_recibidos, checklist_entrada,\n' +
       '  costo_previsto, monto_anticipo, monto_descuento,\n' +
+      '  tasa_impuesto, monto_impuesto,\n' +
       '  tiempo_garantia, condiciones_garantia, fecha_entrega_estimada,\n' +
       '  servicio_origen_id, es_garantia\n' +
       ') VALUES (\n' +
@@ -285,8 +300,9 @@ const createServicio = async (req, res) => {
       '  $12, $13, $14, $15,\n' +
       '  $16, $17, $18, $19,\n' +
       '  $20, $21, $22,\n' +
-      '  $23, $24, $25,\n' +
-      '  $26, $27\n' +
+      '  $23, $24,\n' +
+      '  $25, $26, $27,\n' +
+      '  $28, $29\n' +
       ') RETURNING *',
       [
         codigo_ticket,
@@ -310,9 +326,11 @@ const createServicio = async (req, res) => {
         isBlank(observaciones_recepcion) ? null : String(observaciones_recepcion).trim(),
         accesoriosFinal,
         checklist_entrada && typeof checklist_entrada === 'object' ? JSON.stringify(checklist_entrada) : null,
-        toDecimal(costo_previsto, 0.00),
-        toDecimal(monto_anticipo, 0.00),
-        toDecimal(monto_descuento, 0.00),
+        costoPrevistoDecimal,
+        montoAnticipoDecimal,
+        montoDescuentoDecimal,
+        tasaImpuesto,
+        montoImpuesto,
         tiempoGarantia,
         isBlank(condiciones_garantia) ? null : String(condiciones_garantia).trim(),
         fecha_entrega_estimada || null,
@@ -435,6 +453,15 @@ const createServicio = async (req, res) => {
         costo_previsto: nuevaOrden.costo_previsto,
         monto_anticipo: nuevaOrden.monto_anticipo,
         monto_descuento: nuevaOrden.monto_descuento,
+        tasa_impuesto: nuevaOrden.tasa_impuesto != null ? parseFloat(nuevaOrden.tasa_impuesto) : tasaImpuesto,
+        monto_impuesto: nuevaOrden.monto_impuesto != null ? parseFloat(nuevaOrden.monto_impuesto) : montoImpuesto,
+        subtotal: Math.round((montoTotalRecepcion - montoImpuesto) * 100) / 100,
+        desglose_impuesto: {
+          subtotal: Math.round((montoTotalRecepcion - montoImpuesto) * 100) / 100,
+          tasa_impuesto: tasaImpuesto,
+          monto_impuesto: montoImpuesto,
+          total: montoTotalRecepcion
+        },
         fecha_entrega_estimada: nuevaOrden.fecha_entrega_estimada,
         estado_actual_id: nuevaOrden.estado_actual_id,
         fotos_count: fotosValidas.length,
@@ -559,6 +586,8 @@ const getServicios = async (req, res) => {
       '  sr.monto_anticipo,\n' +
       '  sr.monto_descuento,\n' +
       '  sr.costo_final_confirmado,\n' +
+      '  COALESCE(sr.tasa_impuesto, (SELECT tasa_impuesto_defecto FROM datos_companhia LIMIT 1), 18.00) AS tasa_impuesto,\n' +
+      '  COALESCE(sr.monto_impuesto, 0.00) AS monto_impuesto,\n' +
       '  sr.es_garantia,\n' +
       '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS nombre_cliente,\n' +
       '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS cliente_nombre,\n' +
@@ -646,6 +675,8 @@ const getServicioById = async (req, res) => {
     var result = await pool.query(
       'SELECT\n' +
       '  sr.*,\n' +
+      '  COALESCE(sr.tasa_impuesto, (SELECT tasa_impuesto_defecto FROM datos_companhia LIMIT 1), 18.00) AS tasa_impuesto,\n' +
+      '  COALESCE(sr.monto_impuesto, 0.00) AS monto_impuesto,\n' +
       '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS nombre_cliente,\n' +
       '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS cliente_nombre,\n' +
       '  COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,\n' +
@@ -742,7 +773,28 @@ const getServicioById = async (req, res) => {
       return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada.' });
     }
 
-    return res.status(200).json({ ok: true, data: result.rows[0] });
+    const orderData = result.rows[0];
+    const totalCosto = parseFloat(orderData.costo_final_confirmado) > 0
+      ? parseFloat(orderData.costo_final_confirmado)
+      : Math.max(0, (parseFloat(orderData.costo_previsto) || 0) - (parseFloat(orderData.monto_descuento) || 0));
+    const tasaImp = parseFloat(orderData.tasa_impuesto) || 18.00;
+    const montoImp = parseFloat(orderData.monto_impuesto) > 0
+      ? parseFloat(orderData.monto_impuesto)
+      : (totalCosto > 0 ? Math.round((totalCosto - (totalCosto / (1 + (tasaImp / 100)))) * 100) / 100 : 0.00);
+    const subtotal = Math.round((totalCosto - montoImp) * 100) / 100;
+
+    orderData.subtotal = subtotal;
+    orderData.tasa_impuesto = tasaImp;
+    orderData.monto_impuesto = montoImp;
+    orderData.total = totalCosto;
+    orderData.desglose_impuesto = {
+      subtotal,
+      tasa_impuesto: tasaImp,
+      monto_impuesto: montoImp,
+      total: totalCosto
+    };
+
+    return res.status(200).json({ ok: true, data: orderData });
 
   } catch (error) {
     console.error('Error en getServicioById:', error);
@@ -764,6 +816,8 @@ const getServicioByTicket = async (req, res) => {
       '  sr.falla_reportada, sr.observaciones_recepcion, sr.observaciones_recepcion AS observaciones, sr.accesorios_recibidos, sr.accesorios_recibidos AS accesorios,\n' +
       '  sr.prioridad, sr.es_garantia, sr.checklist_entrada,\n' +
       '  sr.costo_previsto, sr.costo_final_confirmado, sr.monto_anticipo, sr.monto_descuento, sr.monto_liquidado,\n' +
+      '  COALESCE(sr.tasa_impuesto, (SELECT tasa_impuesto_defecto FROM datos_companhia LIMIT 1), 18.00) AS tasa_impuesto,\n' +
+      '  COALESCE(sr.monto_impuesto, 0.00) AS monto_impuesto,\n' +
       '  sr.motivo_cancelacion, sr.fecha_cancelacion, sr.usuario_cancela_id,\n' +
       '  sr.fecha_entrega_estimada, sr.fecha_entrega_estimada AS fecha_estimada_entrega, sr.fecha_entrega_real, sr.created_at, sr.updated_at,\n' +
       '  es.id AS estado_id, es.codigo_estado, es.nombre_estado AS estado, es.color_badge AS estado_color, es.orden_flujo,\n' +
@@ -910,6 +964,26 @@ const getServicioByTicket = async (req, res) => {
     }
 
     const ordenTicket = result.rows[0];
+    const totalTicket = parseFloat(ordenTicket.costo_final_confirmado) > 0
+      ? parseFloat(ordenTicket.costo_final_confirmado)
+      : Math.max(0, (parseFloat(ordenTicket.costo_previsto) || 0) - (parseFloat(ordenTicket.monto_descuento) || 0));
+    const tasaTicket = parseFloat(ordenTicket.tasa_impuesto) || 18.00;
+    const montoImpTicket = parseFloat(ordenTicket.monto_impuesto) > 0
+      ? parseFloat(ordenTicket.monto_impuesto)
+      : (totalTicket > 0 ? Math.round((totalTicket - (totalTicket / (1 + (tasaTicket / 100)))) * 100) / 100 : 0.00);
+    const subtotalTicket = Math.round((totalTicket - montoImpTicket) * 100) / 100;
+
+    ordenTicket.subtotal = subtotalTicket;
+    ordenTicket.tasa_impuesto = tasaTicket;
+    ordenTicket.monto_impuesto = montoImpTicket;
+    ordenTicket.total = totalTicket;
+    ordenTicket.desglose_impuesto = {
+      subtotal: subtotalTicket,
+      tasa_impuesto: tasaTicket,
+      monto_impuesto: montoImpTicket,
+      total: totalTicket
+    };
+
     return res.status(200).json({ ok: true, data: ordenTicket });
 
   } catch (error) {
@@ -928,7 +1002,10 @@ const getTicketImpresionData = async (req, res) => {
     const { id } = req.params;
     const pool = getPool();
     const result = await pool.query(
-      `SELECT sr.id, sr.codigo_ticket, es.codigo_estado, es.orden_flujo
+      `SELECT sr.id, sr.codigo_ticket, es.codigo_estado, es.orden_flujo,
+              sr.costo_previsto, sr.costo_final_confirmado, sr.monto_anticipo, sr.monto_descuento, sr.monto_liquidado,
+              COALESCE(sr.tasa_impuesto, (SELECT tasa_impuesto_defecto FROM datos_companhia LIMIT 1), 18.00) AS tasa_impuesto,
+              COALESCE(sr.monto_impuesto, 0.00) AS monto_impuesto
        FROM servicios_recepcion sr
        JOIN estados_servicio es ON es.id = sr.estado_actual_id
        WHERE (sr.id::text = $1 OR sr.codigo_ticket = $1) AND sr.activo = TRUE`,
@@ -947,7 +1024,29 @@ const getTicketImpresionData = async (req, res) => {
       });
     }
 
-    return res.status(200).json({ ok: true, data: order });
+    const totalImp = parseFloat(order.costo_final_confirmado) > 0
+      ? parseFloat(order.costo_final_confirmado)
+      : Math.max(0, (parseFloat(order.costo_previsto) || 0) - (parseFloat(order.monto_descuento) || 0));
+    const tasa = parseFloat(order.tasa_impuesto) || 18.00;
+    const montoImpuesto = parseFloat(order.monto_impuesto) > 0
+      ? parseFloat(order.monto_impuesto)
+      : (totalImp > 0 ? Math.round((totalImp - (totalImp / (1 + (tasa / 100)))) * 100) / 100 : 0.00);
+    const subtotal = Math.round((totalImp - montoImpuesto) * 100) / 100;
+
+    return res.status(200).json({
+      ok: true,
+      data: {
+        ...order,
+        subtotal,
+        tasa_impuesto: tasa,
+        monto_impuesto: montoImpuesto,
+        total: totalImp
+      },
+      subtotal,
+      tasa_impuesto: tasa,
+      monto_impuesto: montoImpuesto,
+      total: totalImp
+    });
   } catch (error) {
     console.error('Error en getTicketImpresionData:', error);
     return res.status(500).json({ ok: false, message: 'Error al consultar datos de impresión.' });
@@ -1210,6 +1309,8 @@ const getServiciosTaller = async (req, res) => {
         sr.costo_final_confirmado,
         sr.monto_anticipo,
         sr.monto_descuento,
+        COALESCE(sr.tasa_impuesto, (SELECT tasa_impuesto_defecto FROM datos_companhia LIMIT 1), 18.00) AS tasa_impuesto,
+        COALESCE(sr.monto_impuesto, 0.00) AS monto_impuesto,
         sr.tiempo_garantia,
         sr.condiciones_garantia,
         sr.fecha_entrega_real,
@@ -1402,6 +1503,21 @@ const updateServicioEstado = async (req, res) => {
         ok: false,
         message: 'No se pueden realizar cambios de estado en una orden cancelada.'
       });
+    }
+
+    // Regla de Seguridad: Solo SuperAdmin y Admin_Sucursal pueden cambiar el estado a CANCELADO
+    if (Number(nuevoEstado.orden_flujo) === 8 || String(nuevoEstado.codigo_estado || '').toUpperCase().includes('CANCEL')) {
+      const userRole = String(req.user?.rol_nombre || req.user?.rol || '').toLowerCase();
+      const rolId = Number(req.user?.rol_id);
+      const isSuperAdminUser = rolId === 1 || userRole === 'superadmin';
+      const isAdminSucursalUser = rolId === 2 || userRole === 'admin_sucursal' || userRole === 'admin' || userRole === 'administrador';
+      if (!isSuperAdminUser && !isAdminSucursalUser) {
+        return res.status(403).json({
+          ok: false,
+          success: false,
+          message: 'No tienes permisos para desactivar órdenes de servicio'
+        });
+      }
     }
 
     await client.query('BEGIN');
@@ -2339,6 +2455,8 @@ const liquidarYEntregarServicio = async (req, res) => {
     const orderRes = await client.query(
       `SELECT sr.id, sr.codigo_ticket, sr.sucursal_id, sr.estado_actual_id,
               sr.costo_previsto, sr.costo_final_confirmado, sr.monto_anticipo, sr.monto_descuento,
+              COALESCE(sr.tasa_impuesto, (SELECT tasa_impuesto_defecto FROM datos_companhia LIMIT 1), 18.00) AS tasa_impuesto,
+              COALESCE(sr.monto_impuesto, 0.00) AS monto_impuesto,
               sr.tiempo_garantia, sr.condiciones_garantia, sr.marca_equipo, sr.modelo_equipo,
               COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS cliente,
               sr.telefono_cliente,
@@ -2427,6 +2545,15 @@ const liquidarYEntregarServicio = async (req, res) => {
 
     // Total = (costoBase || costo_previsto) + suma_repuestos_aprobados - monto_descuento
     const totalDefinitivo = Math.max(0, (costoBasePactado + sumaRepuestosAprobados) - montoDescuento);
+    // Recalcular impuesto sobre el total definitivo liquidado
+    const tasaImpuestoFinal = parseFloat(order.tasa_impuesto) > 0
+      ? parseFloat(order.tasa_impuesto)
+      : 18.00;
+    const montoImpuestoFinal = (totalDefinitivo > 0 && tasaImpuestoFinal > 0)
+      ? Math.round((totalDefinitivo - (totalDefinitivo / (1 + (tasaImpuestoFinal / 100)))) * 100) / 100
+      : 0.00;
+    const subtotalFinal = Math.round((totalDefinitivo - montoImpuestoFinal) * 100) / 100;
+
     // Balance = Total - monto_anticipo
     const balancePendiente = Math.max(0, totalDefinitivo - montoAnticipo);
 
@@ -2485,17 +2612,21 @@ const liquidarYEntregarServicio = async (req, res) => {
        SET estado_actual_id = $1,
            fecha_entrega_real = NOW(),
            costo_final_confirmado = $2,
-           usuario_entrega_id = $3,
-           metodo_pago_entrega = $4,
-           monto_liquidado = $5,
-           monto_recibido_entrega = $6,
-           cambio_devuelto_entrega = $7,
-           observaciones_entrega = $8,
+           tasa_impuesto = $3,
+           monto_impuesto = $4,
+           usuario_entrega_id = $5,
+           metodo_pago_entrega = $6,
+           monto_liquidado = $7,
+           monto_recibido_entrega = $8,
+           cambio_devuelto_entrega = $9,
+           observaciones_entrega = $10,
            updated_at = NOW()
-       WHERE id = $9`,
+       WHERE id = $11`,
       [
         estadoEntregado.id,
         totalDefinitivo,
+        tasaImpuestoFinal,
+        montoImpuestoFinal,
         usuarioId,
         finalMetodoPago,
         finalMontoLiquidado,
@@ -2565,11 +2696,17 @@ const liquidarYEntregarServicio = async (req, res) => {
         monto_recibido_entrega: finalMontoRecibido,
         cambio_devuelto_entrega: finalCambioDevuelto,
         observaciones_entrega: finalObservacionesEntrega,
+        tasa_impuesto: tasaImpuestoFinal,
+        monto_impuesto: montoImpuestoFinal,
+        subtotal: subtotalFinal,
         desglose_liquidacion: {
           costo_base: costoBasePactado,
           suma_repuestos_aprobados: sumaRepuestosAprobados,
           repuestos_aprobados: repuestosAprobados,
           monto_descuento: montoDescuento,
+          subtotal: subtotalFinal,
+          tasa_impuesto: tasaImpuestoFinal,
+          monto_impuesto: montoImpuestoFinal,
           total: totalDefinitivo,
           monto_anticipo: montoAnticipo,
           balance_liquidado: balancePendiente,
@@ -2604,7 +2741,19 @@ const cancelarServicio = async (req, res) => {
   const { id } = req.params;
   const { motivo_cancelacion } = req.body || {};
   const usuarioId = req.user?.id;
-  const isSuperAdmin = Number(req.user?.rol_id) === 1;
+  const userRole = String(req.user?.rol_nombre || req.user?.rol || '').toLowerCase();
+  const rolId = Number(req.user?.rol_id);
+  const isSuperAdmin = rolId === 1 || userRole === 'superadmin';
+  const isAdminSucursal = rolId === 2 || userRole === 'admin_sucursal' || userRole === 'admin' || userRole === 'administrador';
+
+  // Blindaje de autorización para desactivar/cancelar órdenes de servicio
+  if (!isSuperAdmin && !isAdminSucursal) {
+    return res.status(403).json({
+      ok: false,
+      success: false,
+      message: 'No tienes permisos para desactivar órdenes de servicio'
+    });
+  }
 
   if (!motivo_cancelacion || typeof motivo_cancelacion !== 'string' || motivo_cancelacion.trim().length < 5) {
     return res.status(400).json({

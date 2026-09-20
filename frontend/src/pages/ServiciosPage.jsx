@@ -282,9 +282,15 @@ export const ServiciosPage = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const userRole = String(currentUser?.rol_nombre || currentUser?.rol || '').toLowerCase();
-  const isSuperAdmin = userRole === 'superadmin';
+  const isSuperAdmin = userRole === 'superadmin' || Number(currentUser?.rol_id) === 1;
   const isTecnico = userRole === 'tecnico' || userRole.includes('tecnic') || Number(currentUser?.rol_id) === 4;
   const canAccessTaller = isSuperAdmin || userRole.includes('admin') || isTecnico;
+  const canCancelOrder = Boolean(
+    isSuperAdmin ||
+    userRole === 'admin_sucursal' ||
+    userRole.includes('admin') ||
+    [1, 2].includes(Number(currentUser?.rol_id))
+  );
 
   // Datos de empresa y sucursal para reimpresión
   const [companyData, setCompanyData] = useState(null);
@@ -1021,7 +1027,7 @@ export const ServiciosPage = () => {
                               </button>
                             )}
 
-                            {!esInactiva && (
+                            {!esInactiva && canCancelOrder && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -1121,29 +1127,31 @@ export const ServiciosPage = () => {
         }}
       />
 
-      {/* Modal de Cancelación de Orden */}
-      <CancelarOrdenModal
-        isOpen={Boolean(ordenParaCancelar)}
-        onClose={() => setOrdenParaCancelar(null)}
-        orden={ordenParaCancelar}
-        onSuccess={(updatedOrden) => {
-          setOrdenes((prev) =>
-            prev.map((o) =>
-              o.id === updatedOrden.id
-                ? {
-                    ...o,
-                    ...updatedOrden,
-                    estado: updatedOrden.estado || 'Cancelado / No Reparado',
-                    codigo_estado: updatedOrden.codigo_estado || 'CANCELADO_DEVUELTO',
-                    orden_flujo: 8,
-                    estado_color: '#EF4444'
-                  }
-                : o
-            )
-          );
-          fetchOrdenes(page, limit);
-        }}
-      />
+      {/* Modal de Cancelación de Orden (solo accesible para roles administrativos) */}
+      {canCancelOrder && (
+        <CancelarOrdenModal
+          isOpen={Boolean(ordenParaCancelar)}
+          onClose={() => setOrdenParaCancelar(null)}
+          orden={ordenParaCancelar}
+          onSuccess={(updatedOrden) => {
+            setOrdenes((prev) =>
+              prev.map((o) =>
+                o.id === updatedOrden.id
+                  ? {
+                      ...o,
+                      ...updatedOrden,
+                      estado: updatedOrden.estado || 'Cancelado / No Reparado',
+                      codigo_estado: updatedOrden.codigo_estado || 'CANCELADO_DEVUELTO',
+                      orden_flujo: 8,
+                      estado_color: '#EF4444'
+                    }
+                  : o
+              )
+            );
+            fetchOrdenes(page, limit);
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 };

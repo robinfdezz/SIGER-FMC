@@ -23,6 +23,7 @@ const getCompanyProfile = async (req, res) => {
         correo_contacto,
         direccion_fiscal,
         dominio_sistema,
+        COALESCE(tasa_impuesto_defecto, 18.00)::numeric(5,2) AS tasa_impuesto_defecto,
         logo_url,
         logo_public_id,
         created_at,
@@ -46,6 +47,7 @@ const getCompanyProfile = async (req, res) => {
           correo_contacto: '',
           direccion_fiscal: '',
           dominio_sistema: 'https://franyermobilecenter.com',
+          tasa_impuesto_defecto: 18.00,
           logo_url: null,
           logo_public_id: null,
           created_at: null,
@@ -236,6 +238,9 @@ const updateCompanyProfile = async (req, res) => {
     const currentRes = await pool.query('SELECT id, logo_url, logo_public_id FROM datos_companhia ORDER BY id ASC LIMIT 1');
     const cleanLogoUrl = logo_url && String(logo_url).trim().length > 0 ? String(logo_url).trim() : null;
     const cleanLogoPublicId = cleanLogoUrl && logo_public_id && String(logo_public_id).trim().length > 0 ? String(logo_public_id).trim() : null;
+    const cleanTasaImpuesto = req.body.tasa_impuesto_defecto !== undefined && !isNaN(parseFloat(req.body.tasa_impuesto_defecto))
+      ? Math.max(0, Math.min(100, parseFloat(req.body.tasa_impuesto_defecto)))
+      : null;
 
     let savedCompany;
 
@@ -270,8 +275,9 @@ const updateCompanyProfile = async (req, res) => {
           dominio_sistema = $6,
           logo_url = $7,
           logo_public_id = $8,
+          tasa_impuesto_defecto = COALESCE($9, tasa_impuesto_defecto, 18.00),
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $9
+        WHERE id = $10
         RETURNING 
           id,
           nombre_empresa,
@@ -280,6 +286,7 @@ const updateCompanyProfile = async (req, res) => {
           correo_contacto,
           direccion_fiscal,
           dominio_sistema,
+          tasa_impuesto_defecto,
           logo_url,
           logo_public_id,
           created_at,
@@ -295,6 +302,7 @@ const updateCompanyProfile = async (req, res) => {
         cleanDominio,
         cleanLogoUrl,
         cleanLogoPublicId,
+        cleanTasaImpuesto,
         current.id
       ]);
 
@@ -310,8 +318,9 @@ const updateCompanyProfile = async (req, res) => {
           direccion_fiscal,
           dominio_sistema,
           logo_url,
-          logo_public_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          logo_public_id,
+          tasa_impuesto_defecto
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 18.00))
         RETURNING 
           id,
           nombre_empresa,
@@ -320,6 +329,7 @@ const updateCompanyProfile = async (req, res) => {
           correo_contacto,
           direccion_fiscal,
           dominio_sistema,
+          tasa_impuesto_defecto,
           logo_url,
           logo_public_id,
           created_at,
@@ -334,7 +344,8 @@ const updateCompanyProfile = async (req, res) => {
         cleanDireccion,
         cleanDominio,
         cleanLogoUrl,
-        cleanLogoPublicId
+        cleanLogoPublicId,
+        cleanTasaImpuesto
       ]);
 
       savedCompany = insertRes.rows[0];

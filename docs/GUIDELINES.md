@@ -283,11 +283,33 @@ frontend/
    * **Estética:** Bordes redondeados `rounded-xl`, sombra suave, transiciones y variantes consistentes con el diseño de la aplicación.
 
 7. **`Badge.jsx` (Insignia / Chip de Estado):**
-   * **Props:** `children`, `variant` (`'success' | 'danger' | 'warning' | 'info' | 'neutral'`), `size` (`'sm' | 'md'`), `showDot` (`boolean`, por defecto: `true`), `icon` (componente funcional de `lucide-react`, ej. `CheckCircle2`, `XCircle`, `Sparkles`), `className`.
+   * **Props:** `children`, `variant` (`'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'minimal'`), `size` (`'sm' | 'md'`), `showDot` (`boolean`, por defecto: `true`), `icon` (componente funcional de `lucide-react`, ej. `CheckCircle2`, `XCircle`, `Sparkles`), `className`.
    * **Comportamiento y Renderizado:**
      * Si se pasa la prop `icon`, se renderiza con dimensionamiento adaptativo proporcional (`w-3 h-3` para `size="sm"` y `w-3.5 h-3.5` para `size="md"`) heredando el color semántico de la variante.
      * Si no se pasa `icon` y `showDot` es `true`, renderiza el punto indicador circular (`w-1.5 h-1.5 rounded-full`).
+     * **Variante Minimalista (`variant="minimal"` / `badgeVariant="minimal"`):** Renderiza una presentación limpia y en línea con texto e icono al color semántico, sin fondos opacos pesados ni bordes gruesos. Estandarizado para roles en tablas maestras y elementos de checklist técnico en modales (`DeviceChecklistPicker`, `OrdenDetalleModal`, `FichaTecnicaModal`).
    * **Estética:** Bordes suaves `rounded-lg`, padding equilibrado y tipografía `font-medium text-xs`.
+
+### 8.4 Homologación de Modales de Alta Densidad y Flujos Críticos (`OrdenDetalleModal.jsx`, `CancelarOrdenModal.jsx`)
+
+1. **Dimensiones y Espaciado:**
+   * Modales de confirmación o acción destructiva (ej. `CancelarOrdenModal`): Ancho equilibrado `max-w-xl` o `max-w-2xl` para evitar interfaces comprimidas o textos forzados.
+   * Modales de inspección y visor 360° (ej. `OrdenDetalleModal`): Ancho extendido `max-w-4xl` a `max-w-5xl` con scroll interno en el cuerpo y pie de acciones limpio sin botones redundantes.
+
+2. **Cabecera Jerarquizada (Header):**
+   * Eliminar recuadros o contenedores circulares estridentes con iconos gigantes (ej. círculos rojos de bloqueo).
+   * Título principal limpio en tipografía institucional Sora/Inter (`text-xl font-bold`).
+   * Subtítulo con metadatos contextuales en una sola línea sutil:
+     * Código de ticket con badge destacado monoespaciado (`font-mono font-semibold`).
+     * Nombre del cliente acompañado de su icono (`<User className="w-3.5 h-3.5" />`).
+     * Equipo acompañado del icono representativo (`<Smartphone className="w-3.5 h-3.5" />`).
+
+3. **Desduplicación de Marcas y Modelos (`formatDeviceName`):**
+   * En cualquier componente que proyecte la información del equipo, aplicar la utilidad `formatDeviceName(marca, modelo)`.
+   * Si el modelo ya inicia con el nombre de la marca (ej. marca: *"Samsung"*, modelo: *"Samsung Galaxy S22"*), la utilidad remueve la duplicidad para mostrar limpiamente *"Samsung Galaxy S22"*.
+
+4. **Navegación Profunda (Deep Linking) a Taller:**
+   * En modales informativos de órdenes (`OrdenDetalleModal`), incluir acceso directo a la mesa técnica mediante el botón *"Ir al Banco de Trabajo"* con parámetro de consulta (`/taller?buscar={codigo_ticket}`) para agilizar la transición operativa.
 
 ---
 

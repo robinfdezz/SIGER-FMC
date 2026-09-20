@@ -546,7 +546,7 @@ export const OrdenDetalleModal = ({
         onClose={onClose}
         customHeader={customHeader}
         footer={footer}
-        size="2xl"
+        size="3xl"
         height="h-auto max-h-[90vh]"
         bodyClassName="p-5 sm:p-6 overflow-y-auto space-y-6"
       >

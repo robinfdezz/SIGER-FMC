@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import Button from '../common/Button';
 import { cancelarServicio } from '../../services/servicios.service';
+import { useAuth } from '../../context/AuthContext';
 import { sileo } from 'sileo';
 
 /**
@@ -65,7 +66,17 @@ export const CancelarOrdenModal = ({
     };
   }, [isOpen]);
 
-  if (!isOpen || !orden) return null;
+  const { user: currentUser } = useAuth();
+  const userRole = String(currentUser?.rol_nombre || currentUser?.rol || '').toLowerCase();
+  const isSuperAdmin = userRole === 'superadmin' || Number(currentUser?.rol_id) === 1;
+  const isAuthorized = Boolean(
+    isSuperAdmin ||
+    userRole === 'admin_sucursal' ||
+    userRole.includes('admin') ||
+    [1, 2].includes(Number(currentUser?.rol_id))
+  );
+
+  if (!isOpen || !orden || !isAuthorized) return null;
 
   const rawTicket = String(orden.codigo_ticket || orden.codigo_orden || orden.id || '');
   const codigoTicket = rawTicket.startsWith('#') ? rawTicket.slice(1) : rawTicket;

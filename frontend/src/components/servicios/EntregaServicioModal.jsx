@@ -123,13 +123,12 @@ export const EntregaServicioModal = ({
         montoDescuento: 0,
         montoAnticipo: 0,
         total: 0,
-        balance: 0
+        balance: 0,
+        tasaImpuesto: 18,
+        subtotal: 0,
+        montoImpuesto: 0
       };
     }
-
-    const costoBase = parseFloat(activeOrder.costo_final_confirmado) > 0
-      ? parseFloat(activeOrder.costo_final_confirmado)
-      : (parseFloat(activeOrder.costo_previsto) || 0);
 
     const incidencias = Array.isArray(activeOrder.incidencias) ? activeOrder.incidencias : [];
     const repuestosAprobados = incidencias.filter(
@@ -143,8 +142,42 @@ export const EntregaServicioModal = ({
     const montoDescuento = parseFloat(activeOrder.monto_descuento) || 0;
     const montoAnticipo = parseFloat(activeOrder.monto_anticipo) || 0;
 
-    const total = Math.max(0, (costoBase + sumaRepuestos) - montoDescuento);
+    const totalConfirmado = parseFloat(
+      activeOrder.costo_final_confirmado ??
+      activeOrder.costo_final ??
+      activeOrder.total_liquidado ??
+      activeOrder.monto_total ??
+      0
+    );
+
+    const costoEstimadoRaw = parseFloat(
+      activeOrder.costo_estimado ??
+      activeOrder.presupuesto_base ??
+      activeOrder.mano_obra ??
+      activeOrder.costo_previsto ??
+      0
+    );
+
+    let costoBase = costoEstimadoRaw > 0 ? costoEstimadoRaw : 0;
+    if (costoBase === 0 && totalConfirmado > 0) {
+      costoBase = Math.max(0, totalConfirmado - sumaRepuestos + montoDescuento);
+    } else if (costoBase > 0 && sumaRepuestos > 0 && Math.abs(costoBase - totalConfirmado) < 0.05) {
+      costoBase = Math.max(0, totalConfirmado - sumaRepuestos + montoDescuento);
+    }
+
+    const total = totalConfirmado > 0 && Math.abs(totalConfirmado - (costoBase + sumaRepuestos - montoDescuento)) < 0.05
+      ? totalConfirmado
+      : Math.max(0, (costoBase + sumaRepuestos) - montoDescuento);
+
     const balance = Math.max(0, total - montoAnticipo);
+
+    const tasaImpuesto = Number(activeOrder?.tasa_impuesto || 18);
+    const subtotal = activeOrder?.desglose_impuesto?.subtotal && Math.abs(Number(activeOrder.desglose_impuesto.subtotal) + Number(activeOrder.desglose_impuesto.monto_impuesto || 0) - total) < 0.05
+      ? Number(activeOrder.desglose_impuesto.subtotal)
+      : Math.round((total / (1 + (tasaImpuesto / 100))) * 100) / 100;
+    const montoImpuesto = activeOrder?.desglose_impuesto?.monto_impuesto && Math.abs(Number(activeOrder.desglose_impuesto.subtotal || 0) + Number(activeOrder.desglose_impuesto.monto_impuesto) - total) < 0.05
+      ? Number(activeOrder.desglose_impuesto.monto_impuesto)
+      : Math.round((total - subtotal) * 100) / 100;
 
     return {
       costoBase,
@@ -153,7 +186,10 @@ export const EntregaServicioModal = ({
       montoDescuento,
       montoAnticipo,
       total,
-      balance
+      balance,
+      tasaImpuesto,
+      subtotal,
+      montoImpuesto
     };
   }, [activeOrder]);
 
@@ -408,6 +444,22 @@ export const EntregaServicioModal = ({
                     </span>
                   </div>
                 )}
+
+                {/* Subtotal (Base Imponible) */}
+                <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-inter">
+                  <span>Subtotal (Base Imponible):</span>
+                  <span className="font-mono">
+                    RD$ {Number(finanzas?.subtotal || 0).toFixed(2)}
+                  </span>
+                </div>
+
+                {/* ITBIS ({tasa}% incl.) */}
+                <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 font-inter">
+                  <span>ITBIS ({finanzas?.tasaImpuesto || 18}% incl.):</span>
+                  <span className="font-mono">
+                    RD$ {Number(finanzas?.montoImpuesto || 0).toFixed(2)}
+                  </span>
+                </div>
 
                 {/* Total General de la Orden */}
                 <div className="flex items-center justify-between text-xs font-semibold text-neutral-800 dark:text-neutral-200 pt-2 border-t border-neutral-200/80 dark:border-neutral-800 font-inter">

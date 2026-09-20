@@ -815,7 +815,7 @@ export const FichaTecnicaModal = ({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        size="2xl"
+        size="3xl"
         height="h-[85vh] sm:h-[90vh]"
         title={
           <div className="flex items-center gap-1.5 flex-wrap">

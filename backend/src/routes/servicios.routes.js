@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middlewares/authMiddleware');
+const { checkRole } = require('../middlewares/roleMiddleware');
 const verifyTurnstile = require('../middlewares/turnstile.middleware');
 const { upload, handleMulterErrors } = require('../middlewares/upload');
 const {
@@ -66,8 +67,15 @@ router.delete('/:id/tecnicos/:tecnicoId', removeTecnicoServicio);
 // POST /api/servicios/:id/entregar - Liquidación y entrega de equipo al cliente
 router.post('/:id/entregar', liquidarYEntregarServicio);
 
-// POST /api/servicios/:id/cancelar - Cancelación formal de orden de servicio
-router.post('/:id/cancelar', cancelarServicio);
+// POST /api/servicios/:id/cancelar - Cancelación formal de orden de servicio (restringido a SuperAdmin y Admin_Sucursal)
+router.post(
+  '/:id/cancelar',
+  checkRole(
+    ['SuperAdmin', 'Admin_Sucursal', 'admin', 'superadmin'],
+    'No tienes permisos para desactivar órdenes de servicio'
+  ),
+  cancelarServicio
+);
 
 // POST /api/servicios
 router.post('/', createServicio);

@@ -19,6 +19,7 @@
 | `correo_contacto` | VARCHAR(100) | NO | Correo oficial de contacto |
 | `direccion_fiscal` | TEXT | NO | Dirección fiscal de la matriz |
 | `dominio_sistema` | VARCHAR(150) | NO | URL base/origen del sistema web para la construcción de enlaces de seguimiento QR (Default: 'https://franyermobilecenter.com') |
+| `tasa_impuesto_defecto` | NUMERIC(5,2) | NO | Porcentaje base de impuesto (ITBIS) configurado para la empresa (Default: 18.00) |
 | `logo_url` | TEXT | SÍ | URL del logotipo de la empresa |
 | `logo_public_id` | VARCHAR(150) | SÍ | ID único del archivo en Cloudinary para gestión y borrado del logotipo |
 | `created_at` | TIMESTAMPTZ | SÍ | Fecha de creación (CURRENT_TIMESTAMP) |
@@ -175,6 +176,8 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | `costo_previsto` | NUMERIC(10,2)| NO | Presupuesto inicial (Default: 0.00) |
 | `monto_anticipo` | NUMERIC(10,2)| NO | Abono o pago inicial dejado por el cliente (Default: 0.00) |
 | `monto_descuento`| NUMERIC(10,2)| NO | Descuento aplicado (Default: 0.00) |
+| `tasa_impuesto` | NUMERIC(5,2) | NO | Porcentaje de impuesto aplicado al ticket al momento de su creación (Default: 18.00) |
+| `monto_impuesto` | NUMERIC(10,2) | NO | Monto monetario retenido por concepto de impuesto en el ticket (Default: 0.00) |
 | `costo_final_confirmado`| NUMERIC(10,2)| NO | Monto final a facturar (Default: 0.00) |
 | `tiempo_garantia`| INTEGER | NO | Periodo de garantía en cantidad de días de cobertura (Default: 30) |
 | `condiciones_garantia`| TEXT | SÍ | Términos y exclusiones de garantía |
@@ -186,6 +189,9 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | `monto_recibido_entrega`| NUMERIC(10,2)| NO | Monto monetario entregado por el cliente al retirar (Default: 0.00) |
 | `cambio_devuelto_entrega`| NUMERIC(10,2)| NO | Devuelta o cambio entregado al cliente (Default: 0.00) |
 | `observaciones_entrega`| TEXT | SÍ | Notas finales y pruebas de conformidad al momento del despacho |
+| `motivo_cancelacion` | TEXT | SÍ | Motivo justificado de cancelación de la orden técnica |
+| `fecha_cancelacion`  | TIMESTAMPTZ | SÍ | Fecha y hora en que se canceló formalmente la orden |
+| `usuario_cancela_id` | INT | SÍ | FK -> `usuarios(id)` ON DELETE RESTRICT (Usuario que dio de baja la orden) |
 | `created_at` | TIMESTAMPTZ | SÍ | Timestamp de creación |
 | `updated_at` | TIMESTAMPTZ | SÍ | Timestamp de actualización |
 | `activo` | BOOLEAN | NO | Estado lógico (Default: TRUE) |
@@ -197,6 +203,7 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 > - `chk_servicio_no_autoreferencia`: `CHECK (id != servicio_origen_id)`
 > - `fk_servicio_garantia_origen`: `FOREIGN KEY (servicio_origen_id) REFERENCES servicios_recepcion(id) ON UPDATE CASCADE ON DELETE RESTRICT`
 > - `fk_servicio_usuario_entrega`: `FOREIGN KEY (usuario_entrega_id) REFERENCES datos_trabajadores(id) ON DELETE RESTRICT`
+> - `fk_servicio_usuario_cancela`: `FOREIGN KEY (usuario_cancela_id) REFERENCES usuarios(id) ON DELETE RESTRICT`
 
 #### Columnas de Liquidación y Entrega de Equipos (`servicios_recepcion`)
 Para formalizar el cierre contable, la entrega física y la emisión de comprobantes de salida, la tabla gestiona los siguientes campos:
@@ -207,6 +214,12 @@ Para formalizar el cierre contable, la entrega física y la emisión de comproba
 5. `monto_recibido_entrega` (`NUMERIC(10,2)`): Monto monetario entregado por el cliente en caja (usado para transacciones en efectivo).
 6. `cambio_devuelto_entrega` (`NUMERIC(10,2)`): Importe monetario devuelto como cambio o devuelta ($\text{monto\_recibido\_entrega} - \text{monto\_liquidado}$).
 7. `observaciones_entrega` (`TEXT`): Notas finales de conformidad estética y técnica asentadas en el acto de entrega.
+
+#### Columnas de Cancelación de Órdenes (`servicios_recepcion`)
+Para dar soporte al flujo formal de cancelación de servicios técnicos que salen del taller sin solución o sin aprobación del cliente:
+1. `motivo_cancelacion` (`TEXT`): Justificación obligatoria de al menos 5 caracteres (ej. "Cliente no aprueba presupuesto de repuesto", "Equipo irreparable por sulfatación en placa").
+2. `fecha_cancelacion` (`TIMESTAMPTZ`): Timestamp exacto de la baja técnica.
+3. `usuario_cancela_id` (`INT`, FK -> `usuarios(id)`): Identificador del operador o técnico que procesó la cancelación.
 
 #### Esquema JSONB: `datos_acceso_equipo` (Credenciales y Seguridad del Equipo)
 Estructura persistida para resguardar el método de desbloqueo configurado en `DeviceSecurityPicker.jsx` y renderizado en comprobantes / stickers:

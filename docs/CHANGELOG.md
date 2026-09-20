@@ -9,38 +9,39 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 ## [Unreleased]
 
 ### Added
-- **Protección Anti-Bot con Cloudflare Turnstile (`TurnstileWidget.jsx` & `turnstile.middleware.js`):**
-  - Widget frontend condicional gobernado por feature flags (`VITE_ENABLE_TURNSTILE`, `ENABLE_TURNSTILE`) con soporte automático de modo oscuro y reintentos silenciosos.
-  - Middleware backend de verificación en el endpoint oficial de Cloudflare (`https://challenges.cloudflare.com/turnstile/v0/siteverify`), extrayendo el token desde cabeceras (`cf-turnstile-response`), query params o body.
-  - Integración en rutas críticas y públicas: Login (`POST /api/auth/login`) y Consulta de Órdenes (`GET /api/servicios/ticket/:codigo`).
-- **Arquitectura de Paginación Universal en Frontend y Backend (`Pagination.jsx`):**
-  - Componente UI reutilizable (`frontend/src/components/common/Pagination.jsx`) con diseño minimalista neutro, selector de registros por página (`[10, 20, 50, 100]`), leyenda "Mostrando {start} a {end} de {total} registros", botones `<` y `>` y navegación numerada responsiva.
-  - Estandarización de endpoints backend con parámetros `page` y `limit` (max 100) retornando metadata unificada `pagination: { total, page, limit, totalPages }`:
-    - `GET /api/servicios` (`servicios.controller.js`)
-    - `GET /api/clientes` (`clients.controller.js`) con retrocompatibilidad dual (`clientes` y `data`).
-    - `GET /api/trabajadores` (`workers.controller.js`) con soporte de paginación opcional / activa (`paginate=true` o paso de `page`/`limit`).
-  - Integración en vistas principales: `ServiciosPage.jsx`, `ClientsPage.jsx`, `WorkersPage.jsx` y `BancoTrabajoPage.jsx` (vista tabla).
-- **Extensión del Microcomponente Inline de Confirmación (`InlineConfirmButton.jsx`):**
-  - Soporte de tamaño estándar `size="md"` (`h-10`, `px-4`, `text-sm font-medium`, `rounded-xl`), además de la variante compacta original `size="sm"`.
-  - Hook de pre-validación asíncrona `onBeforeConfirm`: permite interceptar el primer clic para validar formularios antes de alternar al estado de confirmación `¿Guardar? [✓] [✕]`.
-  - Corrección de estilos hover en variante `primary` asegurando rojo corporativo (`bg-red-600 hover:bg-red-700 active:bg-red-800`).
-  - Reutilización extendida en:
-    - Botón de cobro y entrega en `EntregaServicioModal.jsx` ("Confirmar Entrega y Cobro" -> "¿Confirmar entrega?").
-    - Botón de guardado en `PrintingTab.jsx` ("Guardar" -> "¿Guardar?").
-    - Botón de guardado de perfil de empresa en `CompanyProfileTab.jsx` ("Guardar Cambios" -> "¿Guardar?").
-- **Esqueleto de Carga Preciso (Shimmer) con `react-loading-skeleton` en Consulta Pública (`EstadoOrdenPage.jsx`):**
-  - Dependencia `react-loading-skeleton` integrada con hoja de estilos global en `main.jsx`.
-  - Configuración adaptativa `<SkeletonTheme>` sincronizada con `ThemeContext` (colores claros `#e5e7eb` / `#f3f4f6` y oscuros `#262626` / `#404040` con `borderRadius="0.75rem"`).
-  - Réplica geométrica 1:1 del layout real de la orden para eliminar el salto de diseño (*CLS*): Stepper de 5 nodos, tarjeta de equipo, tarjeta de tiempos y técnicos, rejilla de 10 casillas del checklist de hardware y línea de tiempo histórica.
+- **Flujo Integral de Cancelación de Órdenes de Servicio (`POST /api/servicios/:id/cancelar` & `CancelarOrdenModal.jsx`):**
+  - **Backend Transaccional:** Endpoint dedicado `POST /api/servicios/:id/cancelar` protegido por transacción atómica (`FOR UPDATE`), validación multi-sucursal defensiva y reglas estrictas de ciclo de vida (impide cancelar órdenes en estado `ENTREGADO` o previamente canceladas con HTTP `400 Bad Request`).
+  - **Auditoría e Inmutabilidad:** Exige `motivo_cancelacion` obligatorio (mínimo 5 caracteres), actualiza el estado al catálogo `CANCELADO_DEVUELTO` (`orden_flujo = 8`), persiste `motivo_cancelacion`, `fecha_cancelacion` y `usuario_cancela_id` en `servicios_recepcion` e inserta el evento de auditoría en `historial_estados`.
+  - **Modal Homologado (`CancelarOrdenModal.jsx`):** Interfaz modal amplia (`max-w-xl sm:max-w-2xl`) con cabecera limpia y metadatos destacados (código `# Ticket` resaltado en monoespaciado con icono `Hash` rojo, cliente con icono `User` y dispositivo con icono dinámico según categoría), aviso de advertencia tipográfico directo sobre el fondo sin contenedores invasivos, y botones estandarizados ("Volver" y "Confirmar Cancelación").
+- **Endpoint Dedicado para Emisión de Comprobantes (`GET /api/servicios/:id/ticket-impresion`):**
+  - Separación de responsabilidades entre consulta pública y emisión física: endpoint especializado `getTicketImpresionData` que valida y rechaza formalmente la generación de comprobantes térmicos o stickers para órdenes canceladas con HTTP `400 Bad Request` (*"No se permite emitir comprobantes o etiquetas para órdenes canceladas"*).
+- **Blindaje Defensivo de Integridad ante Órdenes Canceladas:**
+  - Bloqueo estricto con HTTP `400 Bad Request` en todas las operaciones de mutación técnica en taller para órdenes canceladas:
+    - `updateServicioEstado`: Impide transición o avance de estado en órdenes canceladas.
+    - `assignTecnicoServicio` y `removeTecnicoServicio`: Bloquea asignación y desasignación de colaboradores.
+    - `createIncidenciaServicio` y `updateAprobacionIncidencia`: Bloquea registro de repuestos e incidencias adicionales.
+    - `liquidarYEntregarServicio`: Bloquea liquidación financiera o entrega de equipos dados de baja.
 
 ### Changed
-- **Sincronización de Paneles de Impresión (`PrintingTab.jsx`):**
-  - Renderizado condicional del panel izquierdo de configuración vinculado a la pestaña activa del visualizador en vivo (`previewMode === 'etiqueta'` para Stickers y `'ticket'` para Comprobantes Térmicos), con transiciones suaves `animate-in fade-in duration-200` y preservación íntegra del estado de ambas plantillas.
-- **Filtro Homologado de Estados en Órdenes (`ServiciosPage.jsx`):**
-  - Homologación estética del dropdown "Todos los Estados" mostrando el icono cromático correspondiente y badge temático idéntico al filtro de prioridades.
-- **Limpieza de Interfaz en Taller y Tablas:**
-  - Retiro de la leyenda explicativa redundante `(Asigna técnico)` en el botón de avance de `TallerCard.jsx`.
-  - Eliminación de contadores de registros duplicados en cabeceras de tablas tras la adopción del pie de paginación unificado.
+- **Liberación de Consulta Pública para Órdenes Canceladas (`getServicioByTicket` & `EstadoOrdenPage.jsx`):**
+  - Se eliminó el bloqueo `400` del endpoint de seguimiento online (`GET /api/servicios/ticket/:codigo`), garantizando que clientes y técnicos puedan consultar órdenes canceladas de forma transparente con sus metadatos (`motivo_cancelacion`, `fecha_cancelacion`).
+  - **Limpieza Visual en Consulta Pública (`EstadoOrdenPage.jsx`):**
+    - Retiro del banner superior redundante para priorizar una vista limpia y directa del buscador al stepper.
+    - Stepper de seguimiento actualizado con nodo terminal `Cancelado` completado con icono `<X />` en rojo institucional y trazo de conexión continuo.
+    - Reubicación contextual en tarjeta "Tiempos y Personal": el campo "Fecha Est. Entrega" conmuta a "Fecha de Cancelación" y se proyecta el bloque tipográfico de "Motivo de Cancelación" si está presente.
+- **Refactorización de Tabla de Servicios (`ServiciosPage.jsx`):**
+  - Fila completamente interactiva (`cursor-pointer` y `onClick`) para abrir los detalles de la orden, retirando el botón redundante de visualización con icono de ojo (`<Eye />`).
+  - Ocultamiento contextual en la columna de acciones: los botones de impresión (`<Printer />`) y de cancelación (`<Ban />`) se ocultan automáticamente en filas de órdenes canceladas o inactivas.
+- **Pie de Modal Contextual en `OrdenDetalleModal.jsx`:**
+  - Retiro del botón de cancelación del pie del modal (centralizándolo exclusivamente en las acciones de la tabla general).
+  - El botón "Abrir en Banco de Trabajo" se oculta automáticamente si la orden está entregada o cancelada, dejando el pie del modal oculto sin líneas divisorias vacías.
+  - Normalización defensiva de nombres de dispositivos (`formatDeviceName`), corrigiendo casos de duplicidad de marca y modelo (ej. "Google Pixel Google Pixel 7 Pro" -> "Google Pixel · 7 Pro").
+- **Homologación de Insignias de Checklist a Variante Minimalista:**
+  - Actualización de `<DeviceChecklistPicker />` con `badgeVariant="minimal"` en `OrdenDetalleModal.jsx` y en la Ficha Técnica del Banco de Trabajo (`FichaTecnicaModal.jsx`).
+  - Soporte bidireccional en `DeviceChecklistPicker.jsx` para variantes `'minimal'` y `'minimalist'`.
+- **Automatización del Entorno de Desarrollo (`.vscode/tasks.json`):**
+  - Tarea `Dev: Frontend` migrada a `type: "shell"` ejecutando `npm run dev -- --host` en el directorio `${workspaceFolder}/frontend` para habilitar acceso por red local.
+  - Corrección de esquema de la tarea compuesta `🚀 Iniciar Entorno Completo`: reubicación de `isDefault` dentro de `group: { kind: "build", isDefault: true }` y adición de `"problemMatcher": []`, resolviendo el aviso `Missing property "customize"`.
 
 ---
 

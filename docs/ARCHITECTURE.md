@@ -86,16 +86,21 @@ frontend/
 │   │   │   ├── BranchesTab.jsx       # Gestión de sedes y datos operativos
 │   │   │   └── PrintingTab.jsx       # Personalización sincronizada de Tickets y Stickers
 │   │   ├── servicios/       # Modales y comprobantes de recepción y despacho
-│   │   │   ├── ServiceTimeline.jsx      # Línea de tiempo unificada (taller y portal público)
-│   │   │   ├── EntregaServicioModal.jsx # Modal de liquidación y cobro con InlineConfirmButton
-│   │   │   ├── PostEntregaModal.jsx     # Diálogo post-despacho y disparador de recibo
-│   │   │   ├── ReciboEntregaTermico.jsx # Comprobante térmico de salida y liquidación
-│   │   │   ├── TicketTermico.jsx        # Ticket térmico original de recepción
-│   │   │   ├── StickerTermico.jsx       # Etiqueta adhesiva térmica con QR
-│   │   │   ├── PostCreacionModal.jsx    # Diálogo post-creación y selector de reimpresión
+│   │   │   ├── CancelarOrdenModal.jsx   # Modal de cancelación de orden con motivo y confirmación
+│   │   │   ├── ClientQuickSelect.jsx    # Selector y búsqueda rápida de clientes en mostrador
+│   │   │   ├── DeviceChecklistPicker.jsx# Inspección física y checklist funcional (variante minimal)
 │   │   │   ├── DevicePhotoUploader.jsx  # Subida de evidencias a Cloudinary
 │   │   │   ├── DeviceSecurityPicker.jsx # Diseñador de patrones gráficos y contraseñas
-│   │   │   └── QrUploadModal.jsx        # Modal de sincronización QR para fotos móviles
+│   │   │   ├── EntregaServicioModal.jsx # Modal de liquidación y cobro con InlineConfirmButton
+│   │   │   ├── OrdenDetalleModal.jsx    # Visor 360° de orden con deep linking a taller y bitácora
+│   │   │   ├── PostCreacionModal.jsx    # Diálogo post-creación y selector de reimpresión
+│   │   │   ├── PostEntregaModal.jsx     # Diálogo post-despacho y disparador de recibo
+│   │   │   ├── QrUploadModal.jsx        # Modal de sincronización QR para fotos móviles
+│   │   │   ├── ReciboEntregaTermico.jsx # Comprobante térmico de salida y liquidación
+│   │   │   ├── ServiceTimeline.jsx      # Línea de tiempo unificada (taller y portal público)
+│   │   │   ├── StepperHeader.jsx        # Encabezado modular de fases del stepper de recepción
+│   │   │   ├── StickerTermico.jsx       # Etiqueta adhesiva térmica con QR
+│   │   │   └── TicketTermico.jsx        # Ticket térmico original de recepción
 │   │   ├── taller/          # Componentes de mesa de trabajo técnica
 │   │   │   ├── FichaTecnicaModal.jsx    # Ficha técnica, incidencias y timeline unificado
 │   │   │   ├── TallerCard.jsx           # Tarjeta de orden en banco de trabajo
@@ -345,6 +350,50 @@ Arquitectura desacoplada en tres componentes especializados para la culminación
 4. **Reapertura y Reimpresión desde Tablas Maestras (`ServiciosPage.jsx` & `PostCreacionModal.jsx`):**
    - Detección normalizada y tolerante a mayúsculas/minúsculas de órdenes despachadas (`estadoNormalizado.includes('ENTREG') || orden_flujo === 7 || estado_id === 7 || fecha_entrega_real`).
    - Al abrir el diálogo de impresión de una orden entregada, destaca prioritariamente el botón rojo **"Recibo de Entrega y Liquidación"** (renderizando `ReciboEntregaTermico`), manteniendo accesibles de forma secundaria el ticket de recepción original y los stickers.
+
+### 4.7 Arquitectura de Cancelación de Órdenes y Salvaguardas Defensivas de Taller
+
+Para garantizar la integridad operativa y contable del taller frente a equipos dados de baja o presupuestos rechazados por clientes:
+
+```
+                              [Orden Activa (Recibido..Listo)]
+                                             │
+                                             │ POST /api/servicios/:id/cancelar
+                                             ▼
+                               [CANCELADO_DEVUELTO (ID 8)]
+                                ├── motivo_cancelacion
+                                ├── fecha_cancelacion
+                                └── usuario_cancela_id
+                                             │
+             ┌───────────────────────────────┴───────────────────────────────┐
+             ▼                                                               ▼
+  [Consulta Pública /estado]                                   [Operaciones de Taller y Mutaciones]
+  - Visualización transparente                                 - updateServicioEstado ────► [400 Bloqueado]
+  - Stepper con nodo terminal (X roja)                         - assignTecnicoServicio ───► [400 Bloqueado]
+  - Motivo visible en Tiempos y Personal                       - createIncidencia ────────► [400 Bloqueado]
+  - Sin banners invasivos de alerta                            - liquidarYEntregar ───────► [400 Bloqueado]
+                                                               - ticket-impresion ────────► [400 Bloqueado]
+```
+
+1. **Flujo Transaccional de Cancelación (`POST /api/servicios/:id/cancelar`):**
+   - Requiere obligatoriamente un `motivo_cancelacion` descriptivo (longitud mínima validada en backend y frontend).
+   - Registra en `servicios_recepcion`: `estado_id = 8` (`CANCELADO_DEVUELTO`), `motivo_cancelacion`, `fecha_cancelacion = NOW()` y `usuario_cancela_id = req.user.id`.
+   - Inserta atómicamente el hito en `historial_estados` con la nota de cambio explicativa para auditoría.
+
+2. **Salvaguardas Defensivas en Backend (HTTP 400):**
+   - Todos los controladores y servicios de mutación operativa de taller validan el estado de la orden antes de procesar cambios:
+     * **`updateServicioEstado`:** Rechaza transiciones con `400 Bad Request` (*"No se puede modificar el estado de una orden cancelada"*).
+     * **`assignTecnicoServicio` / `removeTecnicoServicio`:** Rechaza asignaciones y desasignaciones con `400 Bad Request` (*"No se pueden asignar/desasignar técnicos a una orden cancelada"*).
+     * **`createIncidenciaServicio` / `updateAprobacionIncidencia`:** Impide registrar o alterar incidencias y costos adicionales con `400 Bad Request`.
+     * **`liquidarYEntregarServicio`:** Bloquea liquidaciones y cierres de caja con `400 Bad Request` (*"No se puede liquidar ni entregar una orden cancelada"*).
+
+3. **Separación de Responsabilidades: Consulta Pública vs. Emisión Física:**
+   - **Consulta Pública (`GET /api/servicios/ticket/:codigo` / `consultarEstadoPublico`):** NUNCA bloquea la consulta de órdenes canceladas. Proyecta de manera transparente el estado de la orden para que el cliente conozca el motivo de detención del trabajo, integrando los datos de cancelación dentro del bloque contextual "Tiempos y Personal" y marcando el stepper con un nodo terminal rojo `<X />`.
+   - **Emisión e Impresión Física (`GET /api/servicios/:id/ticket-impresion`):** Endpoint de validación estricta previo a la generación de comprobantes que bloquea la emisión con `400 Bad Request` (*"No se permite emitir comprobantes o etiquetas para órdenes canceladas"*).
+
+4. **Componentes Visuales Homologados:**
+   - **`CancelarOrdenModal.jsx`:** Ventana modal con ancho adaptado (`max-w-xl`), cabecera homologada sin iconos de bloqueo discordantes, metadatos contextuales jerarquizados (código de ticket con badge destacado, cliente con icono `<User />`, equipo con icono `<Smartphone />`), área de texto con validación reactiva y botón de confirmación inline destructivo.
+   - **`OrdenDetalleModal.jsx`:** Visor integral 360° de la orden con botón de enlace directo al banco de trabajo (`/taller?buscar=SFM-...`), desglose financiero, checklist con badges minimalistas (`badgeVariant="minimal"`), historial de estados e incidencias unificado, y formateo inteligente de dispositivo (`formatDeviceName`) para prevenir duplicidades de marca/modelo.
 
 ---
 
