@@ -3,12 +3,17 @@ const cors = require('cors');
 const morgan = require('morgan');
 require('dotenv').config();
 
+// Middlewares
+const { stripEmojisMiddleware } = require('./middlewares/stripEmojis.middleware');
+
 // Rutas
 const authRoutes = require('./routes/auth.routes');
 const workersRoutes = require('./routes/workers.routes');
 const clientsRoutes = require('./routes/clients.routes');
 const catalogsRoutes = require('./routes/catalogs.routes');
 const configuracionRoutes = require('./routes/configuracion.routes');
+const serviciosRoutes = require('./routes/servicios.routes');
+const uploadSessionRoutes = require('./routes/uploadSession.routes');
 
 const app = express();
 
@@ -35,6 +40,7 @@ app.use(cors({
 // Middlewares estándar
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(stripEmojisMiddleware);
 
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
@@ -74,6 +80,13 @@ app.use('/api/catalogos', catalogsRoutes);
 app.use('/api/sucursales', catalogsRoutes);
 app.use('/api/roles', catalogsRoutes);
 app.use('/api/configuracion', configuracionRoutes);
+app.use('/api/servicios', serviciosRoutes);
+app.use('/api/upload-session', uploadSessionRoutes);
+
+// Alias directo para el selector de categorias en el modulo de recepcion
+app.use('/api/categorias-dispositivos', catalogsRoutes);
+// Alias directo para estados de servicio
+app.use('/api/estados-servicio', catalogsRoutes);
 
 // Manejador de rutas no encontradas (404)
 app.use((req, res) => {

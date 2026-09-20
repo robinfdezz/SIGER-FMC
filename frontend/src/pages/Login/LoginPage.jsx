@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Check
 } from 'lucide-react';
+import TurnstileWidget from '../../components/common/TurnstileWidget';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clientError, setClientError] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -81,11 +83,18 @@ const LoginPage = () => {
       return;
     }
 
+    const isTurnstileEnabled = import.meta.env.VITE_ENABLE_TURNSTILE === 'true';
+    if (isTurnstileEnabled && !turnstileToken) {
+      setClientError('Por favor complete la verificación de seguridad.');
+      return;
+    }
+
     setIsSubmitting(true);
     const result = await login({
       usuario: cleanUser,
       password: formData.password,
-      rememberMe: formData.rememberMe
+      rememberMe: formData.rememberMe,
+      turnstileToken: turnstileToken || undefined
     });
     setIsSubmitting(false);
 
@@ -223,6 +232,16 @@ const LoginPage = () => {
                 </span>
               </label>
             </div>
+
+            {/* Widget Anti-bot Cloudflare Turnstile (Renderizado condicional por Feature Flag) */}
+            <TurnstileWidget
+              onVerify={(token) => {
+                setTurnstileToken(token);
+                if (clientError) setClientError('');
+              }}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => setTurnstileToken(null)}
+            />
 
             <div className="pt-2">
               <button

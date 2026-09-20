@@ -1,16 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import ClientModal from '../components/clients/ClientModal';
+import ClienteDetalleModal from '../components/clients/ClienteDetalleModal';
 import ConfirmModal from '../components/common/ConfirmModal';
 import Select from '../components/common/Select';
 import Badge from '../components/common/Badge';
+import Pagination from '../components/common/Pagination';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
+import AnimatedIconButton from '../components/common/AnimatedIconButton';
 import { useAuth } from '../context/AuthContext';
 import { getClients, toggleClientStatus } from '../services/clients.service';
 import { sileo } from 'sileo';
+import { RotateCcw } from 'lucide';
 import {
   UserPlus,
   Search,
+  Eye,
   Edit2,
   Power,
   Phone,
@@ -21,7 +26,9 @@ import {
   CreditCard,
   Calendar,
   CheckCircle2,
-  XCircle
+  XCircle,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 
 export const ClientsPage = () => {
@@ -35,12 +42,20 @@ export const ClientsPage = () => {
 
   const [clients, setClients] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 20, totalPages: 1 });
 
   // Estados de modales
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedClienteView, setSelectedClienteView] = useState(null);
 
   // Estado de modal de confirmación para toggle de estado
   const [confirmModalState, setConfirmModalState] = useState({
@@ -56,71 +71,173 @@ export const ClientsPage = () => {
     { id: 'inactive', label: 'Solo Inactivos' }
   ], []);
 
-  // Carga de datos
-  const fetchClients = async () => {
+  // Debounce para búsqueda
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  // Carga de datos con paginación
+  const fetchClients = useCallback(async (targetPage = page, targetLimit = limit) => {
     try {
       setIsLoading(true);
-      const res = await getClients({ limit: 100 });
-      if (res.success) {
-        setClients(res.data || []);
+      const params = {
+        page: targetPage,
+        limit: targetLimit,
+        estado: selectedStatus
+      };
+      if (debouncedSearch.trim()) {
+        params.q = debouncedSearch.trim();
       }
+
+      const res = await getClients(params);
+
+      // Normalizar la extracción de datos con fallbacks seguros
+      const items = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.clientes)
+            ? res.clientes
+            : Array.isArray(res?.data?.clientes)
+              ? res.data.clientes
+              : Array.isArray(res?.data?.data)
+                ? res.data.data
+                : [];
+
+      setClients(items);
+
+      // Normalizar la paginación con valores seguros por defecto
+      const pag = res?.pagination || res?.data?.pagination || {
+        total: items.length,
+        page: Number(targetPage) || 1,
+        limit: Number(targetLimit) || 20,
+        totalPages: Math.ceil(items.length / (Number(targetLimit) || 20)) || 1
+      };
+
+      const safeTotal = Number(pag.total) >= 0 ? Number(pag.total) : items.length;
+      const safePage = Number(pag.page) || Number(targetPage) || 1;
+      const safeLimit = Number(pag.limit) || Number(targetLimit) || 20;
+      const safeTotalPages = Number(pag.totalPages) || Math.ceil(safeTotal / safeLimit) || 1;
+
+      setPagination({
+        total: safeTotal,
+        page: safePage,
+        limit: safeLimit,
+        totalPages: safeTotalPages
+      });
+      setPage(safePage);
+      setLimit(safeLimit);
+      return true;
     } catch (error) {
       console.error('Error al cargar clientes:', error);
+      setClients([]);
+      setPagination({ total: 0, page: 1, limit: 20, totalPages: 1 });
       sileo.error({
         title: 'Error de carga',
         description: 'No se pudo obtener el listado de clientes del servidor.'
       });
+      return false;
     } finally {
       setIsLoading(false);
     }
+  }, [debouncedSearch, selectedStatus, page, limit]);
+
+  // Recarga reactiva al cambiar filtros (reinicia a página 1)
+  useEffect(() => {
+    setPage(1);
+    fetchClients(1, limit);
+  }, [debouncedSearch, selectedStatus]);
+
+  const handlePageChange = (newPage) => {
+    setPage(newPage);
+    fetchClients(newPage, limit);
   };
 
-  useEffect(() => {
-    fetchClients();
-  }, []);
+  const handleItemsPerPageChange = (newLimit) => {
+    setLimit(newLimit);
+    setPage(1);
+    fetchClients(1, newLimit);
+  };
 
-  // Filtrado de clientes en cliente para búsqueda reactiva
-  const filteredClients = useMemo(() => {
-    return clients.filter((c) => {
-      // 1. Filtro por término de búsqueda
-      if (searchTerm.trim()) {
-        const term = searchTerm.toLowerCase().trim();
-        const fullName = `${c.nombre} ${c.apellido || ''}`.toLowerCase();
-        const cedula = (c.cedula_rnc || '').toLowerCase();
-        const telefono = (c.telefono || '').toLowerCase();
-        const telefonoExtra = (c.telefono_adicional || '').toLowerCase();
-        const email = (c.correo || '').toLowerCase();
-        const direccion = (c.direccion || '').toLowerCase();
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setDebouncedSearch('');
+    setSelectedStatus('all');
+    setPage(1);
+  };
 
-        if (
-          !fullName.includes(term) &&
-          !cedula.includes(term) &&
-          !telefono.includes(term) &&
-          !telefonoExtra.includes(term) &&
-          !email.includes(term) &&
-          !direccion.includes(term)
-        ) {
-          return false;
-        }
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    const success = await fetchClients(page, limit);
+    setIsRefreshing(false);
+    if (success) {
+      setRefreshSuccess(true);
+    }
+  };
+
+  const [sortConfig, setSortConfig] = useState({ key: 'registro', direction: 'desc' });
+
+  const handleSort = (columnKey) => {
+    setSortConfig((prev) => ({
+      key: columnKey,
+      direction: prev.key === columnKey && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedClients = useMemo(() => {
+    const items = Array.isArray(clients) ? [...clients] : [];
+    if (!sortConfig.key) return items;
+
+    return items.sort((a, b) => {
+      let valA = '';
+      let valB = '';
+
+      switch (sortConfig.key) {
+        case 'cliente':
+          valA = `${a.nombre || ''} ${a.apellido || ''}`.trim().toLowerCase();
+          valB = `${b.nombre || ''} ${b.apellido || ''}`.trim().toLowerCase();
+          break;
+        case 'contacto':
+          valA = (a.cedula_rnc || a.telefono || a.correo || '').toLowerCase();
+          valB = (b.cedula_rnc || b.telefono || b.correo || '').toLowerCase();
+          break;
+        case 'direccion':
+          valA = (a.direccion || '').toLowerCase();
+          valB = (b.direccion || '').toLowerCase();
+          break;
+        case 'estado':
+          valA = a.activo ? 1 : 0;
+          valB = b.activo ? 1 : 0;
+          return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        case 'registro':
+        default:
+          valA = new Date(a.created_at || 0).getTime();
+          valB = new Date(b.created_at || 0).getTime();
+          return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
       }
 
-      // 2. Filtro por Estado
-      if (selectedStatus === 'active' && !c.activo) return false;
-      if (selectedStatus === 'inactive' && c.activo) return false;
-
-      return true;
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
     });
-  }, [clients, searchTerm, selectedStatus]);
+  }, [clients, sortConfig]);
+
+  const renderSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) return null;
+    return sortConfig.direction === 'asc' ? (
+      <ChevronUp size={13} strokeWidth={2.5} className="text-red-600 dark:text-red-400 shrink-0 transition-transform" />
+    ) : (
+      <ChevronDown size={13} strokeWidth={2.5} className="text-red-600 dark:text-red-400 shrink-0 transition-transform" />
+    );
+  };
 
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
     selectedStatus !== 'all'
   );
-
-  const handleClearFilters = () => {
-    setSearchTerm('');
-    setSelectedStatus('all');
-  };
 
   const getInitials = (nombre, apellido) => {
     const n = nombre ? nombre.charAt(0).toUpperCase() : '';
@@ -136,6 +253,11 @@ export const ClientsPage = () => {
   const handleOpenEditModal = (client) => {
     setSelectedClient(client);
     setIsModalOpen(true);
+  };
+
+  const handleOpenViewModal = (client) => {
+    setSelectedClienteView(client);
+    setIsViewModalOpen(true);
   };
 
   // Manejo de alternado de estado lógico
@@ -180,13 +302,7 @@ export const ClientsPage = () => {
   };
 
   const handleModalSuccess = (savedClient) => {
-    setClients((prev) => {
-      const exists = prev.some((c) => c.id === savedClient.id);
-      if (exists) {
-        return prev.map((c) => (c.id === savedClient.id ? savedClient : c));
-      }
-      return [savedClient, ...prev];
-    });
+    fetchClients(page, limit);
   };
 
   const activeCount = useMemo(() => clients.filter((c) => c.activo).length, [clients]);
@@ -208,14 +324,15 @@ export const ClientsPage = () => {
             </div>
 
             <div className="flex items-center gap-2.5 shrink-0">
-              <button
-                onClick={fetchClients}
-                disabled={isLoading}
+              <AnimatedIconButton
+                icon={RotateCcw}
+                loading={isRefreshing}
+                success={refreshSuccess}
+                onSuccessEnd={() => setRefreshSuccess(false)}
+                onClick={handleRefresh}
                 title="Refrescar lista"
-                className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                <RefreshCw size={17} className={isLoading ? 'animate-spin' : ''} />
-              </button>
+                ariaLabel="Refrescar lista de clientes"
+              />
               {canCreateEdit && (
                 <button
                   onClick={handleOpenCreateModal}
@@ -264,28 +381,63 @@ export const ClientsPage = () => {
                 />
               </div>
             </div>
-
-            {/* Resumen de conteo */}
-            <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 pt-1">
-              <span>
-                Mostrando <strong>{filteredClients.length}</strong> de <strong>{clients.length}</strong> clientes registrados
-              </span>
-            </div>
           </div>
         </div>
 
         {/* Tabla de Clientes */}
-        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
-                  <th className="py-3.5 px-4 sm:px-6">Cliente</th>
-                  <th className="py-3.5 px-4 sm:px-6">Contacto</th>
-                  <th className="py-3.5 px-4 sm:px-6">Dirección</th>
-                  <th className="py-3.5 px-4 sm:px-6">Registro</th>
-                  <th className="py-3.5 px-4 sm:px-6 text-center">Estado</th>
-                  <th className="py-3.5 px-4 sm:px-6 text-right">Acciones</th>
+        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden flex flex-col">
+          <div className="w-full overflow-x-auto overflow-y-auto h-[560px] relative">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead className="sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs">
+                <tr className="border-b border-neutral-200 dark:border-neutral-800 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
+                  <th
+                    onClick={() => handleSort('cliente')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[19%] min-w-[150px] cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Cliente</span>
+                      {renderSortIcon('cliente')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('contacto')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Contacto</span>
+                      {renderSortIcon('contacto')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('direccion')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Dirección</span>
+                      {renderSortIcon('direccion')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('registro')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[145px] min-w-[135px] whitespace-nowrap cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Registro</span>
+                      {renderSortIcon('registro')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('estado')}
+                    className="py-3 px-3 sm:px-4.5 text-center bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[110px] cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>Estado</span>
+                      {renderSortIcon('estado')}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2.5 sm:px-3 text-center w-[80px] bg-neutral-50 dark:bg-[#141416] sticky top-0">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
@@ -298,7 +450,7 @@ export const ClientsPage = () => {
                       </div>
                     </td>
                   </tr>
-                ) : filteredClients.length === 0 ? (
+                ) : sortedClients.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-neutral-400">
                       <div className="flex flex-col items-center justify-center gap-2">
@@ -315,7 +467,7 @@ export const ClientsPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredClients.map((client) => {
+                  (sortedClients || []).map((client) => {
                     const fullName = `${client.nombre} ${client.apellido || ''}`.trim();
                     const initials = getInitials(client.nombre, client.apellido);
                     const formattedDate = client.created_at
@@ -329,24 +481,28 @@ export const ClientsPage = () => {
                     return (
                       <tr
                         key={client.id}
-                        className={`hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all ${
+                        onClick={() => handleOpenViewModal(client)}
+                        className={`hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all cursor-pointer ${
                           client.activo ? '' : 'opacity-50 hover:opacity-100'
                         }`}
                       >
                         {/* Columna 1: Cliente (Avatar + Nombre + Cédula) */}
-                        <td className="py-3.5 px-4 sm:px-6">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-sm shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden relative font-outfit">
+                        <td className="py-3 px-3 sm:px-4.5 align-middle">
+                          <div
+                            className="flex items-center gap-2.5 group"
+                            title="Ver detalles del cliente"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 group-hover:scale-105 group-hover:bg-red-200 dark:group-hover:bg-red-900/80 flex items-center justify-center font-bold text-xs shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden relative font-outfit transition-all">
                               {initials}
                             </div>
                             <div className="min-w-0">
-                              <p className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm">
+                              <p className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm whitespace-normal break-words leading-snug group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
                                 {fullName}
                               </p>
                               <div className="flex items-center gap-1.5 mt-0.5 text-xs text-neutral-400">
-                                <CreditCard size={12} className="shrink-0" />
-                                <span className="font-mono text-xs text-neutral-500 dark:text-neutral-400">
-                                  {client.cedula_rnc}
+                                <CreditCard size={11} className="shrink-0" />
+                                <span className="font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
+                                  {client.cedula_rnc || 'Sin documento'}
                                 </span>
                               </div>
                             </div>
@@ -385,7 +541,7 @@ export const ClientsPage = () => {
                         </td>
 
                         {/* Columna 4: Fecha de Registro */}
-                        <td className="py-3.5 px-4 sm:px-6">
+                        <td className="py-3.5 px-3 sm:px-4.5 align-middle whitespace-nowrap">
                           <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 font-mono">
                             <Calendar size={12} className="text-neutral-400 shrink-0" />
                             <span>{formattedDate}</span>
@@ -393,34 +549,52 @@ export const ClientsPage = () => {
                         </td>
 
                         {/* Columna 5: Estado */}
-                        <td className="py-3.5 px-4 sm:px-6 text-center">
+                        <td className="py-3.5 px-4 sm:px-6 text-center align-middle">
                           <Badge
-                            variant={client.activo ? 'success' : 'neutral'}
+                            variant="minimal"
+                            color={client.activo ? 'success' : 'neutral'}
                             icon={client.activo ? CheckCircle2 : XCircle}
+                            className="font-medium"
                           >
                             {client.activo ? 'Activo' : 'Inactivo'}
                           </Badge>
                         </td>
 
-                        {/* Columna 6: Acciones (Homologadas con WorkersPage.jsx) */}
-                        <td className="py-3.5 px-4 sm:px-6 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                        {/* Columna 6: Acciones */}
+                        <td className="py-3 px-2.5 sm:px-3 text-center align-middle">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenViewModal(client);
+                              }}
+                              title="Ver detalles del cliente"
+                              className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                            >
+                              <Eye size={16} />
+                            </button>
                             {canCreateEdit && (
                               <button
-                                onClick={() => handleOpenEditModal(client)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditModal(client);
+                                }}
                                 title="Editar cliente"
-                                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                               >
-                                <Edit2 size={16} />
+                                <Edit2 size={15} />
                               </button>
                             )}
                             {canToggleStatus && (
                               <button
-                                onClick={() => handleOpenConfirmToggle(client)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenConfirmToggle(client);
+                                }}
                                 title={client.activo ? 'Desactivar cliente' : 'Activar cliente'}
-                                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                               >
-                                <Power size={16} />
+                                <Power size={15} />
                               </button>
                             )}
                             {isReadOnlyRole && (
@@ -437,8 +611,31 @@ export const ClientsPage = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Paginación Reutilizable */}
+          <Pagination
+            currentPage={Number(pagination?.page) || Number(page) || 1}
+            totalPages={Number(pagination?.totalPages) || 1}
+            totalItems={Number(pagination?.total) >= 0 ? Number(pagination.total) : 0}
+            itemsPerPage={Number(pagination?.limit) || Number(limit) || 20}
+            onPageChange={handlePageChange}
+            onItemsPerPageChange={handleItemsPerPageChange}
+            pageSizeOptions={[10, 20, 50, 100]}
+            isLoading={isLoading || isRefreshing}
+          />
         </div>
       </div>
+
+      {/* Modal de Detalle / Ficha del Cliente */}
+      <ClienteDetalleModal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedClienteView(null);
+        }}
+        cliente={selectedClienteView}
+        onEdit={canCreateEdit ? (c) => handleOpenEditModal(c) : null}
+      />
 
       {/* Modal de Creación / Edición */}
       <ClientModal

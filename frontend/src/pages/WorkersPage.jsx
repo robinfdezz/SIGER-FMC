@@ -1,17 +1,22 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import WorkerModal from '../components/workers/WorkerModal';
+import UsuarioDetalleModal from '../components/workers/UsuarioDetalleModal';
 import ConfirmModal from '../components/common/ConfirmModal';
 import Select from '../components/common/Select';
 import Badge from '../components/common/Badge';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
+import AnimatedIconButton from '../components/common/AnimatedIconButton';
+import Pagination from '../components/common/Pagination';
 import { getWorkers, toggleWorkerStatus } from '../services/workers.service';
 import { getRoles, getSucursales } from '../services/catalogs.service';
 import { useAuth } from '../context/AuthContext';
 import { sileo } from 'sileo';
+import { RotateCcw } from 'lucide';
 import {
   UserPlus,
   Search,
+  Eye,
   Edit2,
   Power,
   Store,
@@ -20,38 +25,54 @@ import {
   RefreshCw,
   Users,
   CheckCircle2,
-  XCircle
+  XCircle,
+  ShieldCheck,
+  Shield,
+  ClipboardList,
+  Wrench,
+  User,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 
-const formatRoleName = (rolNombre) => {
-  switch (rolNombre) {
-    case 'SuperAdmin':
-      return 'Super Admin';
-    case 'Admin_Sucursal':
-      return 'Admin Sucursal';
-    case 'Secretaria':
-      return 'Secretaria';
-    case 'Tecnico':
-      return 'Técnico';
-    default:
-      return rolNombre || 'Sin Rol';
+const getRoleConfig = (rolNombre) => {
+  const normalized = (rolNombre || '').toLowerCase().replace(/[\s_-]/g, '');
+  if (normalized.includes('superadmin')) {
+    return {
+      label: 'Super Admin',
+      icon: ShieldCheck,
+      color: 'danger'
+    };
   }
+  if (normalized.includes('admin')) {
+    return {
+      label: 'Admin Sucursal',
+      icon: Shield,
+      color: 'warning'
+    };
+  }
+  if (normalized.includes('secretaria')) {
+    return {
+      label: 'Secretaria',
+      icon: ClipboardList,
+      color: 'purple'
+    };
+  }
+  if (normalized.includes('tecnic')) {
+    return {
+      label: 'Técnico',
+      icon: Wrench,
+      color: 'info'
+    };
+  }
+  return {
+    label: rolNombre || 'Sin Rol',
+    icon: User,
+    color: 'neutral'
+  };
 };
 
-const getRoleBadgeStyle = (rolNombre) => {
-  switch (rolNombre) {
-    case 'SuperAdmin':
-      return 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border-red-200/80 dark:border-red-800/60';
-    case 'Admin_Sucursal':
-      return 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/60';
-    case 'Tecnico':
-      return 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 border-blue-200/80 dark:border-blue-800/60';
-    case 'Secretaria':
-      return 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border-purple-200/80 dark:border-purple-800/60';
-    default:
-      return 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700';
-  }
-};
+const formatRoleName = (rolNombre) => getRoleConfig(rolNombre).label;
 
 const extractArray = (res) => {
   if (Array.isArray(res)) return res;
@@ -73,17 +94,47 @@ const WorkersPage = () => {
   const [roles, setRoles] = useState([]);
   const [sucursales, setSucursales] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [isResetting, setIsResetting] = useState(false);
 
+  // Paginación
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 1
+  });
+
+  // Debounce para el buscador textual
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Al cambiar cualquier filtro, reiniciar a la página 1
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, selectedRole, selectedBranch, selectedStatus]);
+
   // Estado del Modal de Usuario
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingWorker, setEditingWorker] = useState(null);
+
+  // Estado del Modal de Detalle de Usuario
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedWorkerForView, setSelectedWorkerForView] = useState(null);
 
   // Estado del Modal de Confirmación
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -110,27 +161,70 @@ const WorkersPage = () => {
     return false;
   };
 
-  const fetchInitialData = async () => {
-    setIsLoading(true);
+  const fetchCatalogs = async () => {
     try {
-      const [workersRes, rolesRes, branchesRes] = await Promise.all([
-        getWorkers().catch(() => ({ data: [] })),
+      const [rolesRes, branchesRes] = await Promise.all([
         getRoles().catch(() => ({ data: [] })),
         getSucursales().catch(() => ({ data: [] }))
       ]);
-      setWorkers(extractArray(workersRes));
       setRoles(extractArray(rolesRes));
       setSucursales(extractArray(branchesRes));
     } catch (error) {
-      console.error('Error al cargar datos de usuarios:', error);
-    } finally {
-      setIsLoading(false);
+      console.error('Error al cargar catálogos:', error);
     }
   };
 
   useEffect(() => {
-    fetchInitialData();
+    fetchCatalogs();
   }, []);
+
+  const fetchWorkersData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
+    try {
+      const params = {
+        page,
+        limit,
+        q: debouncedSearch.trim() || undefined,
+        rol_id: selectedRole || undefined,
+        sucursal_id: selectedBranch !== 'all' ? selectedBranch : undefined,
+        activo: selectedStatus === 'all' ? undefined : selectedStatus === 'active' ? 'true' : 'false'
+      };
+      const res = await getWorkers(params);
+      const data = extractArray(res);
+      setWorkers(data);
+      if (res?.pagination) {
+        setPagination(res.pagination);
+      } else {
+        setPagination({
+          total: data.length,
+          page: 1,
+          limit: data.length || 20,
+          totalPages: 1
+        });
+      }
+    } catch (error) {
+      console.error('Error al cargar datos de usuarios:', error);
+    } finally {
+      if (!isSilent) setIsLoading(false);
+    }
+  }, [page, limit, debouncedSearch, selectedRole, selectedBranch, selectedStatus]);
+
+  useEffect(() => {
+    fetchWorkersData();
+  }, [fetchWorkersData]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([fetchCatalogs(), fetchWorkersData(true)]);
+      setRefreshSuccess(true);
+      setTimeout(() => setRefreshSuccess(false), 2000);
+    } catch {
+      // error handled in fetchWorkersData
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleOpenCreateModal = () => {
     setEditingWorker(null);
@@ -147,6 +241,11 @@ const WorkersPage = () => {
     }
     setEditingWorker(worker);
     setIsModalOpen(true);
+  };
+
+  const handleOpenViewModal = (worker) => {
+    setSelectedWorkerForView(worker);
+    setIsViewModalOpen(true);
   };
 
   // Abrir confirmación antes de alternar estado
@@ -215,50 +314,80 @@ const WorkersPage = () => {
     setSelectedRole('');
     setSelectedBranch('all');
     setSelectedStatus('all');
+    setPage(1);
   };
 
-  // Filtrado de usuarios
-  const filteredWorkers = useMemo(() => {
-    return workers.filter((w) => {
-      // 1. Filtro por término de búsqueda (nombre, apellido, usuario, cedula, correo)
-      if (searchTerm.trim()) {
-        const term = searchTerm.toLowerCase().trim();
-        const fullName = `${w.nombre} ${w.apellido}`.toLowerCase();
-        const username = (w.usuario || '').toLowerCase();
-        const cedula = (w.cedula || '').toLowerCase();
-        const email = (w.correo || '').toLowerCase();
+  const filteredWorkers = workers;
 
-        if (
-          !fullName.includes(term) &&
-          !username.includes(term) &&
-          !cedula.includes(term) &&
-          !email.includes(term)
-        ) {
-          return false;
+  const [sortConfig, setSortConfig] = useState({ key: 'usuario', direction: 'asc' });
+
+  const handleSort = (columnKey) => {
+    setSortConfig((prev) => ({
+      key: columnKey,
+      direction: prev.key === columnKey && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortedWorkers = useMemo(() => {
+    const items = [...workers];
+    if (!sortConfig.key) return items;
+
+    // Jerarquía de roles: Super Admin > Admin Sucursal > Secretaria > Técnico
+    const getRoleRank = (worker) => {
+      const normalized = (worker.rol_nombre || '').toLowerCase().replace(/[\s_-]/g, '');
+      if (normalized.includes('superadmin')) return 4;
+      if (normalized.includes('admin')) return 3;
+      if (normalized.includes('secretaria')) return 2;
+      if (normalized.includes('tecnic')) return 1;
+      return 0;
+    };
+
+    return items.sort((a, b) => {
+      let valA = '';
+      let valB = '';
+
+      switch (sortConfig.key) {
+        case 'usuario':
+          valA = `${a.nombre || ''} ${a.apellido || ''} ${a.usuario || ''}`.trim().toLowerCase();
+          valB = `${b.nombre || ''} ${b.apellido || ''} ${b.usuario || ''}`.trim().toLowerCase();
+          break;
+        case 'contacto':
+          valA = (a.cedula || a.correo || a.telefono || '').toLowerCase();
+          valB = (b.cedula || b.correo || b.telefono || '').toLowerCase();
+          break;
+        case 'rol': {
+          const rankA = getRoleRank(a);
+          const rankB = getRoleRank(b);
+          if (rankA !== rankB) {
+            return sortConfig.direction === 'asc' ? rankA - rankB : rankB - rankA;
+          }
+          // Si tienen el mismo rol jerárquico, ordenar por sucursal / nombre
+          valA = (a.sucursal_nombre || a.nombre || '').toLowerCase();
+          valB = (b.sucursal_nombre || b.nombre || '').toLowerCase();
+          break;
         }
+        case 'estado':
+          valA = a.activo ? 1 : 0;
+          valB = b.activo ? 1 : 0;
+          return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+        default:
+          return 0;
       }
 
-      // 2. Filtro por Rol
-      if (selectedRole && String(w.rol_id) !== String(selectedRole)) {
-        return false;
-      }
-
-      // 3. Filtro por Sucursal
-      if (selectedBranch && selectedBranch !== 'all') {
-        if (selectedBranch === 'global') {
-          if (w.sucursal_id !== null && w.sucursal_id !== undefined) return false;
-        } else if (String(w.sucursal_id) !== String(selectedBranch)) {
-          return false;
-        }
-      }
-
-      // 4. Filtro por Estado
-      if (selectedStatus === 'active' && !w.activo) return false;
-      if (selectedStatus === 'inactive' && w.activo) return false;
-
-      return true;
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
     });
-  }, [workers, searchTerm, selectedRole, selectedBranch, selectedStatus]);
+  }, [filteredWorkers, sortConfig]);
+
+  const renderSortIcon = (columnKey) => {
+    if (sortConfig.key !== columnKey) return null;
+    return sortConfig.direction === 'asc' ? (
+      <ChevronUp size={13} strokeWidth={2.5} className="text-red-600 dark:text-red-400 shrink-0 transition-transform" />
+    ) : (
+      <ChevronDown size={13} strokeWidth={2.5} className="text-red-600 dark:text-red-400 shrink-0 transition-transform" />
+    );
+  };
 
   // Opciones formateadas para los componentes Select
   const roleOptions = useMemo(() => [
@@ -307,14 +436,15 @@ const WorkersPage = () => {
             </div>
 
             <div className="flex items-center gap-2.5 shrink-0">
-              <button
-                onClick={fetchInitialData}
-                disabled={isLoading}
+              <AnimatedIconButton
+                icon={RotateCcw}
+                loading={isRefreshing}
+                success={refreshSuccess}
+                onSuccessEnd={() => setRefreshSuccess(false)}
+                onClick={handleRefresh}
                 title="Refrescar lista"
-                className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                <RefreshCw size={17} className={isLoading ? 'animate-spin' : ''} />
-              </button>
+                ariaLabel="Refrescar lista de usuarios"
+              />
               <button
                 onClick={handleOpenCreateModal}
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl shadow-xs hover:shadow-md transition-all font-inter cursor-pointer"
@@ -383,27 +513,54 @@ const WorkersPage = () => {
                 />
               </div>
             </div>
-
-            {/* Resumen de conteo */}
-            <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 pt-1">
-              <span>
-                Mostrando <strong>{filteredWorkers.length}</strong> de <strong>{workers.length}</strong> usuarios registrados
-              </span>
-            </div>
           </div>
         </div>
 
         {/* Tabla de Usuarios */}
-        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
-                  <th className="py-3.5 px-4 sm:px-6">Usuario</th>
-                  <th className="py-3.5 px-4 sm:px-6">Cédula y Contacto</th>
-                  <th className="py-3.5 px-4 sm:px-6">Rol y Sucursal</th>
-                  <th className="py-3.5 px-4 sm:px-6 text-center">Estado</th>
-                  <th className="py-3.5 px-4 sm:px-6 text-right">Acciones</th>
+        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden flex flex-col">
+          <div className="w-full overflow-x-auto overflow-y-auto h-[560px] relative">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead className="sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs">
+                <tr className="border-b border-neutral-200 dark:border-neutral-800 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
+                  <th
+                    onClick={() => handleSort('usuario')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[26%] cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Usuario</span>
+                      {renderSortIcon('usuario')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('contacto')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Cédula y Contacto</span>
+                      {renderSortIcon('contacto')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('rol')}
+                    className="py-3 px-3 sm:px-4.5 bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Rol y Sucursal</span>
+                      {renderSortIcon('rol')}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('estado')}
+                    className="py-3 px-3 sm:px-4.5 text-center bg-neutral-50 dark:bg-[#141416] sticky top-0 cursor-pointer select-none transition-colors hover:text-neutral-900 dark:hover:text-white group"
+                  >
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>Estado</span>
+                      {renderSortIcon('estado')}
+                    </div>
+                  </th>
+                  <th className="py-3 px-2.5 sm:px-3 text-center w-[80px] bg-neutral-50 dark:bg-[#141416] sticky top-0">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
@@ -416,7 +573,7 @@ const WorkersPage = () => {
                       </div>
                     </td>
                   </tr>
-                ) : filteredWorkers.length === 0 ? (
+                ) : sortedWorkers.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-12 text-center text-neutral-400">
                       <div className="flex flex-col items-center justify-center gap-2">
@@ -431,17 +588,18 @@ const WorkersPage = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredWorkers.map((worker) => (
+                  sortedWorkers.map((worker) => (
                     <tr
                       key={worker.id}
-                      className={`hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all ${worker.activo ? '' : 'opacity-50 hover:opacity-100'
+                      onClick={() => handleOpenViewModal(worker)}
+                      className={`hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all cursor-pointer ${worker.activo ? '' : 'opacity-50 hover:opacity-100'
                         }`}
                     >
                       {/* Columna 1: Trabajador / Usuario */}
-                      <td className="py-3.5 px-4 sm:px-6">
-                        <div className="flex items-center gap-3">
+                      <td className="py-3 px-3 sm:px-4.5">
+                        <div className="flex items-center gap-2.5">
                           {/* Avatar / Foto de Perfil / Iniciales */}
-                          <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-sm shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden relative">
+                          <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-xs shrink-0 border border-red-200/60 dark:border-red-900/40 overflow-hidden relative">
                             {worker.foto_perfil_url ? (
                               <img
                                 src={worker.foto_perfil_url}
@@ -490,52 +648,81 @@ const WorkersPage = () => {
 
                       {/* Columna 3: Rol y Sucursal */}
                       <td className="py-3.5 px-4 sm:px-6">
-                        <div className="space-y-1.5">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border ${getRoleBadgeStyle(
-                              worker.rol_nombre
-                            )}`}
-                          >
-                            {formatRoleName(worker.rol_nombre)}
-                          </span>
-                          <p className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
-                            <Store size={12} className="text-neutral-400" />
-                            {worker.sucursal_nombre || 'Todas las Sucursales (Global)'}
-                          </p>
-                        </div>
+                        {(() => {
+                          const role = getRoleConfig(worker.rol_nombre);
+                          const RoleIcon = role.icon;
+                          return (
+                            <div className="space-y-1">
+                              <div>
+                                <Badge
+                                  variant="minimal"
+                                  color={role.color}
+                                  icon={RoleIcon}
+                                  className="font-semibold text-xs"
+                                >
+                                  {role.label}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
+                                <Store size={12} className="text-neutral-400 shrink-0" />
+                                <span>{worker.sucursal_nombre || 'Todas las Sucursales (Global)'}</span>
+                              </p>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Columna 4: Estado (Activo/Inactivo) */}
-                      <td className="py-3.5 px-4 sm:px-6 text-center">
+                      <td className="py-3.5 px-4 sm:px-6 text-center align-middle">
                         <Badge
-                          variant={worker.activo ? 'success' : 'neutral'}
+                          variant="minimal"
+                          color={worker.activo ? 'success' : 'neutral'}
                           icon={worker.activo ? CheckCircle2 : XCircle}
+                          className="font-medium"
                         >
                           {worker.activo ? 'Activo' : 'Inactivo'}
                         </Badge>
                       </td>
 
                       {/* Columna 5: Acciones (Protegidas por RBAC) */}
-                      <td className="py-3.5 px-4 sm:px-6 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="py-3 px-2.5 sm:px-3 text-center align-middle">
+                        <div className="flex items-center justify-center gap-1">
+                          {/* Botón Ver Detalles */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenViewModal(worker);
+                            }}
+                            title="Ver detalles del usuario"
+                            className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                          >
+                            <Eye size={16} />
+                          </button>
+
                           {canManageWorker(worker) ? (
                             <>
                               {/* Botón Editar */}
                               <button
-                                onClick={() => handleOpenEditModal(worker)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditModal(worker);
+                                }}
                                 title="Editar usuario"
-                                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                               >
-                                <Edit2 size={16} />
+                                <Edit2 size={15} />
                               </button>
 
                               {/* Botón Activar / Desactivar */}
                               <button
-                                onClick={() => handleRequestToggleStatus(worker)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRequestToggleStatus(worker);
+                                }}
                                 title={worker.activo ? 'Desactivar cuenta' : 'Activar cuenta'}
-                                className="p-2 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                               >
-                                <Power size={16} />
+                                <Power size={15} />
                               </button>
                             </>
                           ) : (
@@ -551,8 +738,33 @@ const WorkersPage = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Paginación */}
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={(newPage) => setPage(newPage)}
+            onItemsPerPageChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+            isLoading={isLoading || isRefreshing}
+          />
         </div>
       </div>
+
+      {/* Modal de Detalle / Ficha del Usuario */}
+      <UsuarioDetalleModal
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setSelectedWorkerForView(null);
+        }}
+        usuario={selectedWorkerForView}
+        onEdit={canManageWorker(selectedWorkerForView) ? (w) => handleOpenEditModal(w) : null}
+      />
 
       {/* Modal de Creación / Edición */}
       <WorkerModal
@@ -561,7 +773,7 @@ const WorkersPage = () => {
         worker={editingWorker}
         roles={roles}
         sucursales={sucursales}
-        onSuccess={fetchInitialData}
+        onSuccess={() => fetchWorkersData(true)}
       />
 
       {/* Modal de Confirmación de Estado */}

@@ -176,6 +176,7 @@ const getWorkers = async (req, res) => {
         t.usuario,
         t.nombre,
         t.apellido,
+        TRIM(CONCAT(t.nombre, ' ', t.apellido)) AS nombre_completo,
         t.cedula,
         t.telefono,
         t.correo,
@@ -193,25 +194,106 @@ const getWorkers = async (req, res) => {
       LEFT JOIN datos_sucursales s ON t.sucursal_id = s.id
     `;
 
-    // Aislamiento por sucursal: Admin_Sucursal solo ve trabajadores de su sede
+    const conditions = [];
+
+    // Aislamiento por sucursal: Admin_Sucursal ve trabajadores de su sede o técnicos globales (sucursal_id IS NULL)
     if (!req.isSuperAdmin && req.filterSucursalId) {
       queryParams.push(req.filterSucursalId);
-      query += ` WHERE t.sucursal_id = $${queryParams.length}`;
-    } else if (req.query.sucursal_id) {
+      conditions.push(`(t.sucursal_id = $${queryParams.length} OR t.sucursal_id IS NULL)`);
+    } else if (req.query.sucursal_id && req.query.sucursal_id !== 'all') {
       // Filtro opcional para SuperAdmin
-      queryParams.push(parseInt(req.query.sucursal_id, 10));
-      query += ` WHERE t.sucursal_id = $${queryParams.length}`;
+      if (req.query.sucursal_id === 'global') {
+        conditions.push(`t.sucursal_id IS NULL`);
+      } else {
+        queryParams.push(parseInt(req.query.sucursal_id, 10));
+        conditions.push(`t.sucursal_id = $${queryParams.length}`);
+      }
     }
 
-    query += ` ORDER BY t.id ASC`;
+    // Filtro por activo si se especifica
+    if (req.query.activo !== undefined && req.query.activo !== 'all') {
+      const isActivo = req.query.activo === 'true' || req.query.activo === true || req.query.activo === '1';
+      queryParams.push(isActivo);
+      conditions.push(`t.activo = $${queryParams.length}`);
+    }
 
-    const result = await pool.query(query, queryParams);
+    // Filtro por rol si se solicita (por id o por nombre)
+    if (req.query.rol_id) {
+      queryParams.push(parseInt(req.query.rol_id, 10));
+      conditions.push(`t.rol_id = $${queryParams.length}`);
+    } else if (req.query.rol) {
+      queryParams.push(req.query.rol.toLowerCase());
+      conditions.push(`LOWER(r.nombre_rol) = $${queryParams.length}`);
+    }
+
+    // Filtro específico para taller / colaboradores técnicos (excluye roles administrativos/recepción)
+    if (req.query.solo_tecnicos === 'true' || req.query.taller === 'true') {
+      conditions.push(`r.nombre_rol NOT ILIKE '%secretaria%' AND r.nombre_rol NOT ILIKE '%recepcio%' AND r.nombre_rol NOT ILIKE '%cajero%'`);
+    }
+
+    // Filtro por búsqueda textual (nombre, apellido, usuario, cedula, correo, telefono)
+    const searchTerm = req.query.q || req.query.search;
+    if (searchTerm && String(searchTerm).trim().length > 0) {
+      queryParams.push(`%${String(searchTerm).trim().toLowerCase()}%`);
+      const searchIdx = queryParams.length;
+      conditions.push(`(
+        LOWER(t.nombre) LIKE $${searchIdx} OR
+        LOWER(t.apellido) LIKE $${searchIdx} OR
+        LOWER(CONCAT(t.nombre, ' ', t.apellido)) LIKE $${searchIdx} OR
+        LOWER(t.usuario) LIKE $${searchIdx} OR
+        LOWER(t.cedula) LIKE $${searchIdx} OR
+        LOWER(COALESCE(t.correo, '')) LIKE $${searchIdx} OR
+        LOWER(COALESCE(t.telefono, '')) LIKE $${searchIdx}
+      )`);
+    }
+
+    const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : '';
+
+    // Consulta de conteo total filtrado
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM datos_trabajadores t
+      INNER JOIN roles_equipo r ON t.rol_id = r.id
+      LEFT JOIN datos_sucursales s ON t.sucursal_id = s.id
+      ${whereClause}
+    `;
+    const countResult = await pool.query(countQuery, queryParams);
+    const total = parseInt(countResult.rows[0]?.total || 0, 10);
+
+    const shouldPaginate = req.query.page !== undefined || req.query.limit !== undefined || req.query.paginate === 'true';
+
+    let dataQuery = query + whereClause + ` ORDER BY t.id ASC`;
+    let pageNum = 1;
+    let limitNum = total || 20;
+    let totalPages = 1;
+
+    const dataParams = [...queryParams];
+    if (shouldPaginate) {
+      pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+      limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+      const offset = (pageNum - 1) * limitNum;
+      totalPages = Math.ceil(total / limitNum) || 1;
+
+      dataQuery += ` LIMIT $${dataParams.length + 1} OFFSET $${dataParams.length + 2}`;
+      dataParams.push(limitNum, offset);
+    }
+
+    const result = await pool.query(dataQuery, dataParams);
 
     return res.status(200).json({
+      success: true,
       ok: true,
       message: 'Listado de trabajadores obtenido con éxito.',
       data: result.rows,
-      total: result.rows.length
+      workers: result.rows,
+      trabajadores: result.rows,
+      total,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages
+      }
     });
   } catch (error) {
     console.error('❌ Error en getWorkers:', error);
@@ -246,6 +328,7 @@ const getWorkerById = async (req, res) => {
         t.usuario,
         t.nombre,
         t.apellido,
+        TRIM(CONCAT(t.nombre, ' ', t.apellido)) AS nombre_completo,
         t.cedula,
         t.telefono,
         t.correo,

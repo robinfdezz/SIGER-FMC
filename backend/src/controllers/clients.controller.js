@@ -122,7 +122,7 @@ const getClients = async (req, res) => {
     const {
       page = 1,
       limit = 20,
-      search = '',
+      search = req.query.q || '',
       estado = 'all'
     } = req.query;
 
@@ -167,7 +167,7 @@ const getClients = async (req, res) => {
     `;
 
     const countResult = await pool.query(countQuery, queryParams);
-    const total = parseInt(countResult.rows[0].total, 10);
+    const total = parseInt(countResult.rows[0]?.total || 0, 10);
     const totalPages = Math.ceil(total / limitNum) || 1;
 
     // Consulta de registros paginados
@@ -176,6 +176,7 @@ const getClients = async (req, res) => {
         c.id,
         c.nombre,
         c.apellido,
+        TRIM(CONCAT(c.nombre, ' ', c.apellido)) AS nombre_completo,
         c.cedula_rnc,
         c.telefono,
         c.telefono_adicional,
@@ -195,7 +196,9 @@ const getClients = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+      ok: true,
       data: dataResult.rows,
+      clientes: dataResult.rows,
       pagination: {
         total,
         page: pageNum,
@@ -231,7 +234,8 @@ const getClientById = async (req, res) => {
     const pool = getPool();
     const result = await pool.query(
       `SELECT 
-        id, nombre, apellido, cedula_rnc, telefono, telefono_adicional,
+        id, nombre, apellido, TRIM(CONCAT(nombre, ' ', apellido)) AS nombre_completo,
+        cedula_rnc, telefono, telefono_adicional,
         correo, direccion, activo, created_at, updated_at
        FROM clientes 
        WHERE id = $1`,

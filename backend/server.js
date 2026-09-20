@@ -15,8 +15,23 @@ const startServer = async () => {
     console.log(`🔑 Auth Endpoint: http://localhost:${PORT}/api/auth/login`);
     console.log(`===================================================`);
 
-    // Validar conexión a SQL Server en segundo plano
-    testConnection();
+    // Validar conexión a PostgreSQL y ejecutar purga inicial de arranque
+    testConnection().then(async (connected) => {
+      if (connected) {
+        try {
+          const { purgarSesionesExpiradas } = require('./src/controllers/uploadSession.controller');
+          console.log('🧹 Ejecutando pasada inicial de purga de sesiones huérfanas en arranque...');
+          const resultado = await purgarSesionesExpiradas();
+          if (resultado && resultado.purgadas > 0) {
+            console.log(`✅ Purga inicial completada: ${resultado.purgadas} sesión(es) procesadas (${resultado.fotosEliminadas} fotos eliminadas).`);
+          } else {
+            console.log('✨ Purga inicial completada: Sin sesiones huérfanas pendientes.');
+          }
+        } catch (purgeErr) {
+          console.warn('⚠️ Advertencia en purga inicial de arranque:', purgeErr.message);
+        }
+      }
+    });
   });
 };
 

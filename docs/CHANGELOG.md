@@ -8,14 +8,330 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
-### Planned
-- Módulo de Recepción de Tickets (Fase 2: apertura y gestión de órdenes de servicio).
-- Módulo de Banco de Trabajo y Diagnóstico Técnico.
-- Portal público de seguimiento de tickets para clientes (`/tracking/:codigo_ticket`).
+## [0.10.0] - 2026-09-20
+
+### Added
+- **Módulo de Edición Controlada de Órdenes de Servicio (`PUT /api/servicios/:id` & `EditarOrdenModal.jsx`):**
+  - **Backend Transaccional y Matriz de Mutabilidad por Estado:** Endpoint transaccional seguro que evalúa el progreso técnico de la orden en el taller:
+    - **Estados Iniciales (`RECIBIDO_REVISION`, `PENDIENTE_REVISION`):** Habilita la corrección de datos descriptivos del equipo (`categoria_id`, `marca`, `modelo`, `numero_serie_imei`, `problema_reportado`, `costo_estimado`), así como credenciales de seguridad (`metodo_desbloqueo`, `pin_desbloqueo`, `patron_desbloqueo`), `fecha_estimada_entrega`, `prioridad`, `observaciones_recepcion` y `accesorios_recibidos`.
+    - **Estados Avanzados (`EN_DIAGNOSTICO`, `EN_REPARACION`, `ESPERANDO_REPUESTO`, `LISTO_ENTREGA`):** Congela en modo solo lectura los campos de dispositivo y falla para preservar la integridad del diagnóstico emitido en taller, permitiendo actualizar únicamente credenciales de seguridad/acceso, fecha estimada de entrega, prioridad, observaciones de recepción y accesorios.
+    - **Estados Terminales:** Bloqueo terminante si la orden se encuentra en estado `ENTREGADO` o `CANCELADO_DEVUELTO` con HTTP `400 Bad Request` (*"No es posible editar una orden finalizada o cancelada"*).
+  - **Protección de Roles (RBAC):** Restringido exclusivamente a `SuperAdmin`, `Admin_Sucursal`, `admin` y `administrador`. Bloqueo terminante para el rol `Tecnico` con HTTP `403 Forbidden`.
+  - **Exclusión Estricta de Asignación Técnica:** Se respeta la separación de responsabilidades: la asignación/desasignación de técnicos se gestiona de forma exclusiva en la Mesa de Trabajo / Tablero de Taller, sin exponerse en este modal.
+  - **Auditoría Exhaustiva de Cambios (`historial_estados`):** Cada edición genera un registro automático de trazabilidad con la lista exacta de campos modificados (`cambiosAudit`) y el identificador del usuario responsable.
+  - **Payload Enriquecido en Tiempo Real:** El endpoint retorna la entidad completa con todas sus relaciones (`tecnicos_asignados`, `historial_estados`, `incidencias`, `fotos`, `cliente`, `sucursal`, `recepcionista`), garantizando sincronización instantánea en la interfaz de usuario.
+  - **Componente Modal Homologado (`EditarOrdenModal.jsx`):**
+    - Cabecera visual estandarizada con `OrdenDetalleModal.jsx`: Título formal "Editar Orden", badges de estado y prioridad idénticos al visualizador, y fila de metadatos con iconos vectoriales (`# Código`, fecha de recepción, cliente, sucursal, recepcionista).
+    - Menú de pestañas segmentado (Tabs): "Dispositivo y Falla", "Seguridad y Acceso", "Prioridad y Observaciones".
+    - Banner de solo lectura minimalista y discreto (`flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 py-1.5`) para advertir de campos congelados sin saturar la UI.
+    - Selector interactivo de credenciales de desbloqueo (Ninguno, PIN / Contraseña, Patrón táctil).
+- **Restricción Estricta y Validación Temporal de Fecha Estimada de Entrega (`fecha_estimada_entrega`):**
+  - **Soporte de Fecha Mínima en Componente Reutilizable (`DatePicker.jsx`):** Incorporación de la prop `minDate` que desactiva clics e inhabilita visualmente (`opacity-25 cursor-not-allowed`) todos los días anteriores a la fecha mínima calendarizada (`isBefore(day, startOfDay(minDate))`).
+  - **Validación Preventiva en Formularios Frontend (`NuevaOrdenPage.jsx` & `EditarOrdenModal.jsx`):** Bloqueo en cliente con alerta contextual (`sileo.warning`) antes de enviar si la fecha seleccionada es anterior al inicio del día actual (`startOfDay(new Date())`).
+  - **Blindaje en Backend (`servicios.controller.js`):** Doble validación en `createServicio` y `updateServicio` a nivel de día calendario (`new Date().setHours(0,0,0,0)`), rechazando con HTTP `400 Bad Request` cualquier intento de programar fechas en el pasado.
+- **Auditoría y Preservación de Esquema Limpio en Base de Datos:**
+  - Garantía de conformidad con el diccionario relacional oficial en `servicios_recepcion`, prescindiendo de columnas no canónicas (`color_equipo`, `telefono_contacto_alterno`) y canalizando notas adicionales a través de `observaciones_recepcion`.
+- **Especificación Formal de Casos de Uso y Diagramas de Flujo (`DIAGRAMAS_CASOS_DE_USO_Y_FLUJO.md`):**
+  - Nuevo documento maestro de modelado UML y diagramas de flujo interactivos con sintaxis Mermaid cubriendo 18 casos de uso (CU-01 a CU-18), taxonomía RBAC, transiciones de estados de taller, pipeline multimedia Cloudinary y emisión de comprobantes.
+- **Pipeline Unificado de Evidencias Fotográficas y Prevención de Huérfanas (`DevicePhotoUploader.jsx`, `uploadSession.controller.js`, `servicios.controller.js`):**
+  - **Subida Unificada desde PC:** Las imágenes seleccionadas desde PC en `DevicePhotoUploader.jsx` se canalizan a través de `subirFotosSession` (`POST /api/upload-session/:sessionId/subir`), inicializando o reutilizando la sesión activa en `sesiones_carga_fotos` con vigencia temporal de 15 minutos.
+  - **Blindaje en Profundidad en Endpoint Directo (`POST /api/servicios/upload-foto`):** `uploadFotosServicio` genera o actualiza automáticamente una sesión en `sesiones_carga_fotos` con estado `COMPLETADO` y fecha de expiración, garantizando que ninguna foto quede sin registrar en base de datos.
+  - **Destrucción en Tiempo Real desde UI (`DELETE /api/upload-session/foto` & `POST /api/servicios/evidencia-temporal`):** Controlador `eliminarFotoTemporal` que recibe `{ publicId, sessionId }`, destruye el asset inmediatamente en Cloudinary vía `cloudinary.uploader.destroy(publicId)` y actualiza el arreglo JSONB en `sesiones_carga_fotos`.
+  - **Política de Retención Automática en Base de Datos (15 Días):** En `purgarSesionesExpiradas`, tras la destrucción de fotos en Cloudinary, se ejecuta una depuración histórica que elimina registros con más de 15 días de antigüedad (`DELETE FROM sesiones_carga_fotos WHERE estado IN ('PURGADA', 'UTILIZADA') AND created_at < NOW() - INTERVAL '15 days'`).
+  - **Script de Conciliación y Purga Administrativa (`backend/src/scripts/purgar_huerfanas_cloudinary.js`):** Herramienta CLI utilitaria que lista los recursos en la carpeta `siger-fmc/recepcion` de Cloudinary, los compara contra los `public_id` de `evidencias_fotograficas` y `sesiones_carga_fotos` activas en PostgreSQL, y purga de forma segura archivos huérfanos con más de 2 horas de antigüedad.
+  - **Desacoplamiento del Ciclo de Vida QR y Polling en Segundo Plano:** El ciclo de vida de la sesión QR (`activeSessionId`, `sessionExpiresAt`) y el sondeo continuo (polling cada ~2.5s) se elevaron a `DevicePhotoUploader.jsx`. El sondeo continúa activo aunque se cierre `QrUploadModal.jsx`, emitiendo una notificación toast (`sileo.success`) al recibir las fotos.
+  - **Propagación Dinámica de Cupo de Fotos (`maxFotosPermitidas`):** `DevicePhotoUploader.jsx` calcula los cupos disponibles (`MAX_PHOTOS - currentPhotos.length`) y los envía a `crearUploadSession`. Se persiste en la columna `max_fotos` de `sesiones_carga_fotos`, y el endpoint de subida (`subirFotosSesion`) valida estrictamente que la suma acumulada no exceda el límite permitido.
+  - **Blindaje y Formato Exacto en Carga Móvil (`UploadMobilePage.jsx`):** Validación en montaje inicial (`useEffect`) que deshabilita la interfaz si la sesión ya fue completada, utilizada o purgada. Pastilla de conteo adaptada a la relación exacta `${selectedFiles.length} de ${limiteEfectivo}`.
+- **Flujo Integral de Cancelación de Órdenes de Servicio (`POST /api/servicios/:id/cancelar` & `CancelarOrdenModal.jsx`):**
+  - **Control Estricto de Roles (RBAC):** Restricción de acceso en `servicios.routes.js` mediante `checkRole(['SuperAdmin', 'Admin_Sucursal'])`. Usuarios con rol `Tecnico` o `Secretaria` tienen terminantemente prohibida la anulación de órdenes (HTTP `403 Forbidden`).
+  - **Backend Transaccional:** Endpoint dedicado `POST /api/servicios/:id/cancelar` protegido por transacción atómica (`FOR UPDATE`), validación multi-sucursal defensiva y reglas estrictas de ciclo de vida (impide cancelar órdenes en estado `ENTREGADO` o previamente canceladas con HTTP `400 Bad Request`).
+  - **Auditoría e Inmutabilidad:** Exige `motivo_cancelacion` obligatorio (mínimo 5 caracteres), actualiza el estado al catálogo `CANCELADO_DEVUELTO` (`orden_flujo = 8`), persiste `motivo_cancelacion`, `fecha_cancelacion` y `usuario_cancela_id` en `servicios_recepcion` e inserta el evento de auditoría en `historial_estados`.
+  - **Modal Homologado (`CancelarOrdenModal.jsx`):** Interfaz modal amplia (`max-w-xl sm:max-w-2xl`) con cabecera limpia y metadatos destacados (código `# Ticket` resaltado en monoespaciado con icono `Hash` rojo, cliente con icono `User` y dispositivo con icono dinámico según categoría), aviso de advertencia tipográfico directo sobre el fondo sin contenedores invasivos, y botones estandarizados ("Volver" y "Confirmar Cancelación").
+- **Endpoint Dedicado para Emisión de Comprobantes (`GET /api/servicios/:id/ticket-impresion`):**
+  - Separación de responsabilidades entre consulta pública y emisión física: endpoint especializado `getTicketImpresionData` que valida y rechaza formalmente la generación de comprobantes térmicos o stickers para órdenes canceladas con HTTP `400 Bad Request` (*"No se permite emitir comprobantes o etiquetas para órdenes canceladas"*).
+- **Comprobante Térmico de Salida y Liquidación (`ReciboEntregaTermico.jsx`):**
+  - Nuevo comprobante térmico oficial para impresión de 58mm y 80mm con desglose exhaustivo de diagnósticos, mano de obra, repuestos/incidencias aprobadas, anticipos previos, descuentos, balance liquidado, condiciones de garantía y firmas de conformidad de cliente y receptor.
+- **Modales de Inspección 360° en Clientes y Personal (`ClienteDetalleModal.jsx`, `UsuarioDetalleModal.jsx`):**
+  - Modales de lectura y auditoría integral con diseño homologado, estadísticas de actividad, órdenes asociadas y badges minimalistas.
+- **Blindaje Defensivo de Integridad ante Órdenes Canceladas:**
+  - Bloqueo estricto con HTTP `400 Bad Request` en todas las operaciones de mutación técnica en taller para órdenes canceladas:
+    - `updateServicioEstado`: Impide transición o avance de estado en órdenes canceladas.
+    - `assignTecnicoServicio` y `removeTecnicoServicio`: Bloquea asignación y desasignación de colaboradores.
+    - `createIncidenciaServicio` y `updateAprobacionIncidencia`: Bloquea registro de repuestos e incidencias adicionales.
+    - `liquidarYEntregarServicio`: Bloquea liquidación financiera o entrega de equipos dados de baja.
+
+### Changed
+- **Liberación de Consulta Pública para Órdenes Canceladas (`getServicioByTicket` & `EstadoOrdenPage.jsx`):**
+  - Se eliminó el bloqueo `400` del endpoint de seguimiento online (`GET /api/servicios/ticket/:codigo`), garantizando que clientes y técnicos puedan consultar órdenes canceladas de forma transparente con sus metadatos (`motivo_cancelacion`, `fecha_cancelacion`).
+  - **Limpieza Visual en Consulta Pública (`EstadoOrdenPage.jsx`):**
+    - Retiro del banner superior redundante para priorizar una vista limpia y directa del buscador al stepper.
+    - Stepper de seguimiento actualizado con nodo terminal `Cancelado` completado con icono `<X />` en rojo institucional y trazo de conexión continuo.
+    - Reubicación contextual en tarjeta "Tiempos y Personal": el campo "Fecha Est. Entrega" conmuta a "Fecha de Cancelación" y se proyecta el bloque tipográfico de "Motivo de Cancelación" si está presente.
+- **Refactorización de Tabla de Servicios (`ServiciosPage.jsx`):**
+  - Fila completamente interactiva (`cursor-pointer` y `onClick`) para abrir los detalles de la orden, retirando el botón redundante de visualización con icono de ojo (`<Eye />`).
+  - Ocultamiento contextual en la columna de acciones: los botones de impresión (`<Printer />`) y de cancelación (`<Ban />`) se ocultan automáticamente en filas de órdenes canceladas o inactivas.
+- **Pie de Modal Contextual en `OrdenDetalleModal.jsx`:**
+  - Retiro del botón de cancelación del pie del modal (centralizándolo exclusivamente en las acciones de la tabla general).
+  - El botón "Abrir en Banco de Trabajo" se oculta automáticamente si la orden está entregada o cancelada, dejando el pie del modal oculto sin líneas divisorias vacías.
+  - Normalización defensiva de nombres de dispositivos (`formatDeviceName`), corrigiendo casos de duplicidad de marca y modelo (ej. "Google Pixel Google Pixel 7 Pro" -> "Google Pixel · 7 Pro").
+- **Homologación de Insignias de Checklist a Variante Minimalista:**
+  - Actualización de `<DeviceChecklistPicker />` con `badgeVariant="minimal"` en `OrdenDetalleModal.jsx` y en la Ficha Técnica del Banco de Trabajo (`FichaTecnicaModal.jsx`).
+  - Soporte bidireccional en `DeviceChecklistPicker.jsx` para variantes `'minimal'` y `'minimalist'`.
+- **Automatización del Entorno de Desarrollo (`.vscode/tasks.json`):**
+  - Tarea `Dev: Frontend` migrada a `type: "shell"` ejecutando `npm run dev -- --host` en el directorio `${workspaceFolder}/frontend` para habilitar acceso por red local.
+  - Corrección de esquema de la tarea compuesta `🚀 Iniciar Entorno Completo`: reubicación de `isDefault` dentro de `group: { kind: "build", isDefault: true }` y adición de `"problemMatcher": []`, resolviendo el aviso `Missing property "customize"`.
 
 ---
 
-## [0.5.0] - 2026-09-02
+## [0.9.0] - 2026-09-17
+
+### Added
+- **Sincronización Móvil de Evidencias Fotográficas vía QR (`/api/upload-session`):**
+  - Tabla `sesiones_carga_fotos` con almacenamiento JSONB estructurado (`url`, `secure_url`, `public_id`, `bytes`, `size`, `fecha_subida`), UUID v4 y vigencia de 15 minutos.
+  - Endpoints `POST /api/upload-session`, `GET /api/upload-session/:sessionId`, `POST /api/upload-session/:sessionId/subir` y `POST /api/upload-session/purgar`.
+  - Interfaz web móvil responsiva (`UploadMobilePage.jsx`) para captura directa con cámara o galería desde smartphones sin autenticación.
+  - Modal interactivo de sincronización en PC (`QrUploadModal.jsx`) con polling automático y carga fluida de evidencias.
+- **Ciclo de Vida y Garbage Collector Autónomo de Cloudinary:**
+  - **Confirmación Automática:** Al guardar la orden (`POST /api/servicios`), las sesiones de carga móvil asociadas transicionan de forma atómica a `estado = 'UTILIZADA'`, protegiendo sus imágenes de cualquier purga.
+  - **Recolección Periódica en Background:** Rutina `purgarSesionesExpiradas()` que consulta sesiones huérfanas (`estado NOT IN ('UTILIZADA', 'CONFIRMADA', 'PURGADA')` y expiración mayor a 30 minutos atrás), destruye sus fotos en Cloudinary vía `cloudinary.uploader.destroy(public_id)` y marca la sesión como `'PURGADA'`.
+  - Activadores resilientes en background con intervalo `.unref()`, al crear/expirar sesiones y vía endpoint manual.
+  - Índice de base de datos compuesto `idx_sesiones_carga_estado_expira` sobre `(estado, expira_en)`.
+- **Regla de Asignación Obligatoria de Técnico en Taller:**
+  - Validación en backend (`servicios.controller.js`): Impide avanzar de estado desde `RECIBIDO` hacia cualquier estado operativo (`EN_DIAGNOSTICO`, `EN_REPARACION`, etc.) si no existe al menos un técnico asignado en `tecnicos_asignados` (HTTP `400 Bad Request`).
+  - Bloqueo de desasignación: Impide retirar al único técnico asignado si la orden ya no se encuentra en estado inicial `RECIBIDO`.
+- **Blindaje Estricto Multi-Sucursal en Mesa de Trabajo:**
+  - Forzado estricto de `req.user.sucursal_id` en todas las consultas y mutaciones de taller.
+  - Rechazo inmediato con HTTP `404 Not Found` en intentos de mutación cruzada entre sucursales.
+  - Validación de coincidencia de sede al asignar técnicos a una orden.
+- **Restricción de Roles Operativos en Taller:**
+  - Exclusión estricta de personal con rol `Secretaria`/Recepción en asignaciones técnicas de taller (`POST /api/servicios/:id/tecnicos`), selectores de colaboradores y visibilidad de la acción "Unirme a la orden" (restringido a `Tecnico`, `Admin_Sucursal` y `SuperAdmin`).
+
+### Changed
+- **Homologación Visual en Carga Móvil y Modal QR:**
+  - `UploadMobilePage.jsx`: Cabecera y branding homologados con `EstadoOrdenPage.jsx` (logo, selector de tema oscuro/claro y tipografía institucional).
+  - `QrUploadModal.jsx`: Reducción de textos redundantes, integración de componente `Badge` minimalista, espaciado inferior ergonómico y adopción del sistema de diseño unificado (`Button`, `SimpleButton`).
+  - `DevicePhotoUploader.jsx`: Tarjetas de evidencia con indicador de peso en bytes/KB y posicionamiento superior derecho del botón de eliminación.
+
+---
+
+## [0.8.1] - 2026-09-16
+
+### Added
+- **Microcomponente Reutilizable de Confirmación Inline (`InlineConfirmButton.jsx`):**
+  - Componente interactivo de confirmación en dos pasos (`[Unirme] -> "¿Unirte?" [✓] [✕]`) con microanimaciones, auto-cierre tras 5s por inactividad (`autoCancelTimeout`), detección de clics externos y variantes visuales (`card`, `primary`, `custom`).
+  - Integración en `TallerCard.jsx` para autoasignación rápida de técnicos en el banco de trabajo sin necesidad de abrir la ficha técnica.
+  - Integración en `FichaTecnicaModal.jsx` para el botón de autoasignación técnica directa.
+- **Exposición y Filtrado de Incidencias en Consulta Pública (`getServicioByTicket` & `EstadoOrdenPage.jsx`):**
+  - Subconsulta SQL optimizada en `servicios.controller.js` (`getServicioByTicket`) que proyecta incidencias activas en formato JSON con ID, descripción, tipo, repuesto, costo, fecha y fotos vinculadas de `evidencias_fotograficas` (`WHERE incidencia_id = inc.id`).
+  - Inyección de eventos con `tipo_evento: 'INCIDENCIA'` en `historialPublico` ordenados cronológicamente de forma descendente junto a las transiciones de estado.
+- **Componente Modularizado de Línea de Tiempo (`ServiceTimeline.jsx`):**
+  - Componente compartido de visualización cronológica reutilizado tanto en Ficha Técnica (`FichaTecnicaModal.jsx`) como en el portal público de seguimiento (`EstadoOrdenPage.jsx`).
+  - Soporte de modo público (`isPublic={true}`) con regla de exposición controlada: solo muestra incidencias de tipo `"Aviso al Cliente"` o incidencias con resolución formal (aprobadas o rechazadas), filtrando hallazgos técnicos o notas operativas internas.
+  - Renderizado de miniaturas multimedia asociadas a cada hito y apertura a pantalla completa vía modal Lightbox.
+- **Copiado Rápido de Ticket en Ficha Técnica (`FichaTecnicaModal.jsx`):**
+  - Encabezado interactivo que permite copiar el código de ticket al portapapeles con un clic (`navigator.clipboard.writeText`) con feedback visual instantáneo (icono `Check` esmeralda durante 1.5s).
+
+### Changed
+- **Limpieza Visual en Ficha Técnica y Portal de Consulta Pública:**
+  - `FichaTecnicaModal.jsx`: Eliminación de galerías de fotos de recepción duplicadas fuera del timeline histórico, consolidando toda la evidencia fotográfica dentro de los nodos correspondientes.
+  - `EstadoOrdenPage.jsx`: Retiro del subtítulo redundante "Portal de Consulta y Seguimiento", unificación de espacios y enriquecimiento del detalle de hardware y avance.
+
+### Fixed
+- **Normalización de Evidencias en Nodos de Estado:**
+  - Vinculación inequívoca de fotos de recepción inicial (`tipo_evidencia = 'RECEPCION'`) al evento de ingreso en taller (`orden_flujo = 1`) y fotos de salida (`tipo_evidencia = 'ENTREGA'`) al evento de despacho (`orden_flujo = 7`), evitando fotos flotantes descontextualizadas.
+
+---
+
+## [0.8.0] - 2026-09-15
+
+### Added
+- **Modal de Liquidación y Entrega de Equipos (`EntregaServicioModal.jsx`):**
+  - **Desglose Financiero Integral:** Cálculo automático de balance con costo base de mano de obra, suma de incidencias aprobadas con costo adicional, deducción de anticipos pagados y descuentos comerciales.
+  - **Multi-Método de Pago:** Soporte formal para cobro en `'Efectivo'`, `'Tarjeta'` y `'Transferencia'`.
+  - **Cálculo Reactivo de Cambio:** Cálculo en tiempo real de devuelta/cambio para cobros en efectivo con validación de suficiencia del importe entregado por el cliente.
+  - **Captura de Evidencias Fotográficas de Salida:** Integración de `DevicePhotoUploader.jsx` dentro del modal para registrar fotografías de entrega física del equipo reparado y encendido, persistidas atómicamente con `tipo_evidencia = 'ENTREGA'`.
+  - **Observaciones de Despacho:** Campo textual para asentar notas de conformidad del cliente al momento de retirar el dispositivo.
+- **Comprobante Térmico de Salida y Liquidación (`ReciboEntregaTermico.jsx`):**
+  - **Componente Modularizado:** Comprobante térmico POS nativo (80mm / 58mm) completamente desacoplado de `TicketTermico.jsx`.
+  - **Desglose Contable de Salida:** Cabecera fiscal de la sucursal emisora, datos del cliente y dispositivo, detalle de falla resuelta, detalle de mano de obra y de cada repuesto/incidencia aprobada, anticipo, total liquidado, importe recibido y cambio devuelto.
+  - **Póliza de Garantía y QR:** Bloque formal de días de vigencia, fecha exacta de expiración, términos de cobertura y código QR vectorial dinámico (`TicketQR.jsx`).
+  - **Integración con Configuración de Tickets:** Respeta las directivas y flags de `config_tickets` (`mostrar_cliente`, `mostrar_equipo`, `mostrar_falla`, `mostrar_observaciones`, `mostrar_costo_y_anticipo`, `imprimir_garantia`, `mostrar_mensaje_cortesia`, ancho de papel y regla de 2 copias con salto `@media print`).
+- **Modal Post-Entrega Homologado (`PostEntregaModal.jsx`):**
+  - Diálogo modal de confirmación post-despacho homologado visualmente respecto a `PostCreacionModal.jsx` con contenedor circular simétrico (`w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 mx-auto mb-4`), monto total cobrado y botón rojo primario a ancho completo para imprimir el recibo térmico con un clic.
+- **Persistencia Atómica en Base de Datos (`servicios_recepcion`):**
+  - Nuevas columnas DDL y lógica transaccional: `fecha_entrega_real`, `usuario_entrega_id` (FK `datos_trabajadores(id)`), `metodo_pago_entrega`, `monto_liquidado`, `monto_recibido_entrega`, `cambio_devuelto_entrega` y `observaciones_entrega`.
+  - Transición atómica al estado `ENTREGADO` (Orden 7) con asiento inmutable en `historial_estados` y almacenamiento en `evidencias_fotograficas`.
+- **Suite Automatizada de Pruebas de Aislamiento y Roles (`test_branch_isolation.js`):**
+  - 12/12 pruebas unitarias e integrales exitosas validando el aislamiento multi-sucursal y el cumplimiento estricto de las reglas de negocio por rol.
+
+### Changed
+- **Refinamiento Visual de la Bitácora Técnica ("HISTÓRICO EN TALLER" en `FichaTecnicaModal.jsx`):**
+  - Sustitución de la línea conectora vertical sólida por un trazo continuo punteado/discontinuo elegante (`border-l-2 border-dashed border-neutral-300 dark:border-neutral-700`).
+  - Reemplazo de los puntos sólidos por anillos huecos (*hollow rings*, `w-3.5 h-3.5 rounded-full border-2 bg-white dark:bg-[#18181b]`) con color dinámico en el borde perimetral sincronizado con el estado operativo o la naturaleza del evento técnico.
+- **Detección Normalizada de Órdenes Entregadas en Reimpresión (`ServiciosPage.jsx`, `PostCreacionModal.jsx`):**
+  - Normalización robusta e insensible a mayúsculas/minúsculas para evaluar si una orden ya fue despachada (`estadoNormalizado.includes('ENTREG') || orden_flujo === 7 || estado_id === 7 || fecha_entrega_real`).
+  - Al abrir el diálogo de reimpresión desde la tabla de tickets para una orden entregada, destaca prioritariamente el botón rojo "Recibo de Entrega y Liquidación" (montando `ReciboEntregaTermico`), manteniendo accesibles de forma secundaria el ticket de recepción y el sticker.
+- **Enriquecimiento de la Consulta `getServicioById`:**
+  - Inclusión explícita de `codigo_estado` y `orden_flujo` en el payload de detalle de servicio, garantizando la consistencia del estado en modales de impresión y vistas técnicas sin disparar consultas redundantes.
+
+### Fixed
+- **Homologación Visual y Corrección de Icono en `PostEntregaModal.jsx`:**
+  - Corrección del aplastamiento o deformación horizontal del contenedor del icono de check esmeralda superior.
+  - Eliminación de botones superfluos o redundantes ("WhatsApp" y "Finalizar") para proporcionar un flujo de caja enfocado y sin distracciones.
+- **Tratamiento Contable de Incidencias Rechazadas:**
+  - Garantía matemática y visual de exclusión del costo adicional de incidencias rechazadas en el total a liquidar, mostrándose tachadas (`line-through`) y con badge descriptivo.
+
+### Security
+- **Control Estricto de Roles en Taller (`checkTecnicoRol`):**
+  - **Validación Backend (HTTP 400):** Bloqueo estricto que rechaza cualquier intento de autoasignación o asignación técnica hacia colaboradores con roles administrativos (`SuperAdmin`, `Admin_Sucursal`) o de secretaría (`Secretaria`).
+  - **Filtro de Catálogo (`?solo_tecnicos=true`):** Filtrado específico en `/api/trabajadores` para que los desplegables de asignación en taller únicamente listen técnicos operativos activos.
+  - **Ocultamiento Condicional en UI:** En `TallerCard.jsx` y `FichaTecnicaModal.jsx`, los botones interactivos de autoasignación ("Asignarme") y selectores se ocultan condicionalmente si el usuario autenticado no posee el rol de Técnico.
+
+## [0.7.0] - 2026-09-14
+
+### Added
+- **Módulo de Taller Técnico y Banco de Trabajo (`BancoTrabajoPage.jsx`, `TallerCard.jsx`, `AnimatedTabs.jsx`):**
+  - **Mesa de Trabajo Dinámica:** Vista de gestión técnica organizada por fases de taller con selector animado de pestañas (`AnimatedTabs`) que muestra contadores en tiempo real por estado operativo (`Recibido`, `En Diagnóstico`, `En Reparación`, `Esperando Repuesto`, `Listo para Entrega`).
+  - **Tarjetas de Taller (`TallerCard.jsx`):** Visualización de equipos en banco con código de ticket, cliente, dispositivo, técnico asignado, nivel de prioridad y acceso directo con un clic a la Ficha Técnica.
+- **Ficha Técnica Integral del Equipo (`FichaTecnicaModal.jsx`):**
+  - **Auditoría de Datos Iniciales:** Resumen del equipo, cliente, fecha de ingreso, fallas reportadas y checklist de recepción.
+  - **Transición de Estados con Validación:** Formulario para actualizar el estado técnico (`POST /api/servicios/:id/estados`) con notas de avance técnico y asignación del técnico responsable.
+  - **Gestión Multi-Técnico:** Asignación y desasignación reactiva de múltiples técnicos de taller (`POST /api/servicios/:id/tecnicos` y `DELETE /api/servicios/:id/tecnicos/:tecnicoId`).
+  - **Bitácora Unificada ("HISTÓRICO EN TALLER"):** Línea de tiempo que entrelaza cronológicamente las transiciones de estado con los hallazgos técnicos en orden descendente (del más reciente al más antiguo) con contenedor scroleable independiente (`max-h-[480px]`).
+- **Módulo de Incidencias y Hallazgos Técnicos (Backend & Frontend):**
+  - **Endpoints Relacionales (`servicios.controller.js`, `servicios.routes.js`):**
+    * `POST /api/servicios/:id/incidencias`: Registro transaccional en `incidencias_servicio` (tipo, descripción, repuesto, costo adicional) y vinculación a `evidencias_fotograficas` (`tipo_evidencia = 'INCIDENCIA'`).
+    * `GET /api/servicios/:id/incidencias`: Consulta de incidencias activas con datos del autor técnico y galería multimedia.
+    * `GET /api/servicios/:id`: Enriquecido con subconsultas JSON agregadas para incidencias, técnicos asignados y fotos.
+  - **Aislamiento Estricto de Fotos:** Separación inequívoca entre fotos de recepción inicial (`tipo_evidencia = 'RECEPCION'`) y fotos vinculadas a incidencias técnicas específicas (`tipo_evidencia = 'INCIDENCIA'`).
+  - **Visor Lightbox Multimedia:** Visualizador de imágenes ampliado a pantalla completa con portal React (`createPortal`) integrado tanto en incidencias como en el histórico.
+- **Ciclo de Vida de Aprobación y Rechazo de Costo Extra por Incidencias:**
+  - **Endpoint de Resolución (`PATCH /api/servicios/:id/incidencias/:incidenciaId/aprobacion`):** Admite resolución de aprobación (`aprobado: true`) o rechazo formal (`estado_aprobacion: 'RECHAZADO'`, `aprobado_por_cliente = FALSE`, `fecha_aprobacion = NOW()`), con registro del canal de contacto (*WhatsApp*, *Llamada*, *Presencial*).
+  - **Tratamiento del Rechazo:** Presentación del costo adicional tachado (`line-through`) con indicación explícita de descarte del total a cobrar, y botón para reconsiderar en caso de que el cliente cambie de opinión.
+  - **Diseño Inline Sobrio:** Retiro de píldoras pesadas en favor de metadatos limpios, selectores segmentados compactos y botones institucionales `Button.jsx` (botón de confirmación en rojo institucional).
+- **Homologación Visual y Vectorial del Patrón de Desbloqueo (`PatternLock.jsx` & `LabelPreview.jsx`):**
+  - **Ficha Técnica (Modo Pantalla):** Rediseño de `PatternLockSvg` homologado 1:1 con el diseñador de recepción (`DeviceSecurityPicker`): cuadrícula 3x3 con números de paso del trazo (1, 2, 3...) en blanco dentro de círculos rojos (`fill="#ef4444"`), halo suave y trazos rojos continuos.
+  - **Etiquetas Térmicas (Modo Compacto):** Cuadrícula 3x3 numerada en paleta estrictamente monocromática de alto contraste (negro `#111827` sobre blanco) para etiquetas adhesivas, asegurando legibilidad sin tramas de escala de grises en impresoras de 58mm y 80mm.
+  - **Corrección de Desbordamiento y Envoltura (`wrap`):** Eliminación de truncamiento (`truncate`) en ambas variantes, aplicando `break-all whitespace-normal flex-wrap text-center` para que las secuencias largas quiebren suavemente de renglón y se mantengan perfectamente centradas sin generar puntos suspensivos (`...`).
+  - **Eliminación de Rótulos Redundantes:** Retiro de los textos `"Patrón: X puntos"` y `"PATRÓN"` para una estética limpia.
+  - **Prevención de Solapamiento en `LabelPreview.jsx`:** Contenedor derecho acotado a `w-20 sm:w-24 max-w-[96px]` y columna izquierda con `flex-1 min-w-0 pr-2` para garantizar holgura total a los datos del cliente y evitar cortes en el borde inferior.
+
+---
+
+## [0.6.2] - 2026-09-13
+
+### Added
+- **Ordenamiento Interactivo Multi-Columna en Tablas Maestras (`ServiciosPage.jsx`, `ClientsPage.jsx`, `WorkersPage.jsx`):**
+  - **Estado y Alternancia:** Implementación de `sortConfig` (`key`, `direction`) con función `handleSort` reactiva que conmuta entre orden ascendente y descendente en clics sucesivos.
+  - **Servicios (`ServiciosPage.jsx`):** Ordenamiento por Ticket (alfabético), Cliente (A-Z / Z-A), Equipo (marca y modelo), Estado, Prioridad (ponderación por severidad `Urgente: 3 > Alta: 2 > Media: 1 > Baja: 0`) y Fecha de ingreso (cronológica precisa por timestamp).
+  - **Clientes (`ClientsPage.jsx`):** Ordenamiento por Cliente (nombre completo A-Z / Z-A), Contacto (cédula/RNC, teléfono, correo), Dirección, Fecha de Registro y Estado (activo/inactivo).
+  - **Usuarios / Trabajadores (`WorkersPage.jsx`):** Ordenamiento por Usuario/Nombre (A-Z / Z-A), Cédula/Contacto, Rol (jerarquía de permisos `Super Admin > Admin Sucursal > Secretaria > Técnico`) y Estado (activo/inactivo).
+  - **UI/UX Minimalista:** Encabezados interactivos (`cursor-pointer select-none`) limpios y sin iconos cuando la columna está inactiva, y con indicadores de flecha minimalistas estilizados (`ChevronUp` / `ChevronDown` en color rojo de acento) al activarse.
+- **Acción Rápida de Selección Masiva en Checklist de Recepción (`ChecklistRecepcion.jsx`):**
+  - Botón complementario "Marcar todos" junto al botón de limpiar, manteniendo coherencia estética y permitiendo completar rápidamente las comprobaciones de entrada de dispositivos.
+- **Píldora Deslizante Animada en Selector de Pestañas (`ConfigurationPage.jsx`):**
+  - Navegación animada entre pestañas mediante indicador deslizante reactivo utilizando React nativo (`useRef`, `useState`, `useEffect`) y Tailwind CSS, calculando dinámicamente `offsetLeft` y `offsetWidth`.
+- **Sombreado Visual de Rango en Selector de Fechas (`DatePicker.jsx` / `Calendar.jsx`):**
+  - Efecto continuo de recorrido entre la fecha inicial y la fecha de destino seleccionada (`isInRange`), con resaltado visual estilizado y bordes redondeados.
+
+### Changed
+- **Estandarización de Ancho de Contenedor en Dashboard:**
+  - Ajuste del área de trabajo del Dashboard a `max-w-7xl mx-auto w-full` para armonizar el ancho de mesa de trabajo con las demás vistas del sistema (`Servicios`, `Clientes`, `Usuarios`).
+- **Limpieza de Modales de Impresión:**
+  - Remoción del botón redundante "Cerrar" en el modal de tickets y etiquetas térmicas, delegando el cierre a la interacción estándar (`Esc` / clic exterior / botón de aspa superior).
+
+---
+
+## [0.6.1] - 2026-09-11
+
+### Added
+- **Auditoría y Persistencia de `public_id` de Cloudinary en Evidencias Fotográficas (`servicios.controller.js`, `DevicePhotoUploader.jsx`):**
+  - **Endpoint de Subida (`POST /api/servicios/upload-foto`):** Respuesta estructurada retornando `url`, `public_id`, `fotos: [{ url, public_id }]` y `urls`, asegurando acceso directo tanto a nivel raíz como anidado.
+  - **Componente de Carga (`DevicePhotoUploader.jsx`):** Almacenamiento en el estado local de objetos estructurados `{ url, public_id }` con soporte de renderizado resiliente y preservación de identificadores de Cloudinary.
+  - **Envío en Formulario (`NuevaOrdenPage.jsx`):** Mapeo de `fotos_recepcion` y `evidencias_fotograficas` enviando arreglos de objetos estructurados `{ url, public_id }`.
+  - **Persistencia en Base de Datos (`createServicio`):** Inserción relacional en `evidencias_fotograficas (servicio_id, url_foto, public_id, tipo_evidencia, usuario_id)` almacenando fielmente el `public_id` de Cloudinary para futura gestión y depuración física de assets.
+- **Sanitización y Bloqueo Centralizado de Emojis (Backend & Frontend):**
+  - **Backend (`stripEmojis.middleware.js` / `app.js`):** Middleware global registrado inmediatamente tras `express.json()`. Aplica remoción recursiva en `req.body` y `req.query` mediante regex Unicode que abarca pictografías extendidas, bloques de emojis y símbolos suplementarios (`[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE0E}-\u{FE0F}\u{200D}]/gu`), normalizando espacios redundantes sin afectar contraseñas o instancias no planas (`Date`, `Buffer`).
+  - **Frontend (`stripEmojis.js` / `api.js` / `Input.jsx`):** Interceptor de solicitudes Axios que sanitiza `config.data` y `config.params` de forma transparente antes de disparar cualquier petición HTTP hacia el backend (incluyendo `FormData`). Se provee además el componente base `Input.jsx` con sanitización en tiempo real en eventos `onChange` y `onPaste`.
+- **Generación Vectorial de Código QR Dinámico (`qrcode.react` / `TicketQR.jsx`):**
+  - Integración de la dependencia `qrcode.react` (`QRCodeSVG`) en el frontend.
+  - Creación del componente `TicketQR.jsx` (`frontend/src/components/common/TicketQR.jsx`) para renderizado vectorial SVG de alta definición, eliminando dependencias externas de APIs web y garantizando legibilidad en impresión térmica.
+  - Enlace de rastreo resuelto dinámicamente según la sucursal y la empresa: `${dominio_sistema}/estado/${codigo_ticket}` (ej. `https://franyermobilecenter.com/estado/FMC-2026-0089`), embebido en comprobantes térmicos (`TicketTermico.jsx`) y stickers adhesivos (`StickerTermico.jsx`, `LabelPreview.jsx`).
+- **Portal Público de Seguimiento de Órdenes para Clientes (`EstadoOrdenPage.jsx`):**
+  - Nuevas rutas públicas en el frontend (`App.jsx`): `/estado` y `/estado/:codigo`, accesibles libremente sin requerir inicio de sesión.
+  - Interfaz de rastreo en tiempo real estilo courier con buscador manual de ticket, stepper de las 8 fases operativas, detalles del dispositivo, desglose de costos y bitácora pública de avances.
+- **Parametrización en Base de Datos de Dominio Web y Prefijos (`init.sql`, `DATABASE.md`):**
+  - `datos_companhia`: Adición de la columna `dominio_sistema VARCHAR(150) NOT NULL DEFAULT 'https://franyermobilecenter.com'` para centralizar el dominio corporativo base para códigos QR y notificaciones.
+  - `datos_sucursales`: Adición de la columna `prefijo_ticket VARCHAR(15) NOT NULL DEFAULT 'FMC-'` para la nomenclatura y formato personalizado de tickets por sede física.
+- **Estandarización de Tablas de Gestión (`ServiciosPage.jsx`, `ClientsPage.jsx`, `WorkersPage.jsx`):**
+  - Contenedor con altura fija homogénea de `h-[560px]` con scroll vertical y horizontal independiente (`overflow-y-auto overflow-x-auto relative`).
+  - Cabecera fija (`thead sticky top-0`) con sombras sutiles y soporte coherente para modo claro y oscuro.
+  - Barra inferior de conteo y resumen homologada en todas las vistas maestras (`"Mostrando X órdenes / clientes / usuarios"`).
+  - Unificación de scrollbars globales (`frontend/src/index.css`) a `8px` tanto en el eje vertical como horizontal con `scrollbar-gutter: stable`.
+  - Habilitación de salto de línea natural (`whitespace-normal break-words leading-snug`) en nombres de clientes y descripciones de equipos, eliminando truncados prematuros con puntos suspensivos.
+  - Optimización de anchos de columnas: columna Cliente ajustada a `w-[19%] min-w-[150px]` y columna Fecha de Registro ampliada a `w-[145px] min-w-[135px] whitespace-nowrap`.
+
+### Changed
+- **Adopción de Iconos de Prioridad y Categorías en Tablas y Formularios (`ServiciosPage.jsx`, `NuevaOrdenPage.jsx`):**
+  - **Clientes (`ClientsPage.jsx`):** Columna de estado activo/inactivo migrada a `<Badge variant="minimal" ... />` con iconos `CheckCircle2` y `XCircle`.
+  - **Órdenes de Servicio (`ServiciosPage.jsx`):** Columna de prioridad migrada a `<Badge variant="minimal" ... />` con iconos específicos para cada uno de los 4 niveles, selector de filtro de prioridad actualizado con los mismos iconos, y columna "Equipo" dinamizada con iconos semánticos según la categoría técnica del dispositivo (`Smartphone`, `Laptop`, `Tablet`, `Gamepad2`, `Watch`, `Package`).
+  - **Formulario de Ingreso de Órdenes (`NuevaOrdenPage.jsx`):**
+    * **Nivel de Prioridad:** Enriquecido con los 4 iconos (`ChevronsDown`, `Equal`, `ChevronsUp`, `Flame` relleno) en cada opción y en el disparador.
+    * **Categoría de Dispositivos:** Enriquecido con iconos específicos por categoría técnica tanto para opciones dinámicas de API como de respaldo (`Smartphone`, `Laptop`, `Tablet / iPad`, `Consola de Videojuegos`, `Smartwatch`, `Otros`).
+- **Extensión del Componente `Badge` (`Badge.jsx`) y Refactorización en `WorkersPage.jsx`:**
+  - Soporte para dos variantes visuales mediante la prop `variant`:
+    * `'pill'` (predeterminado): estilo clásico tipo cápsula con fondo suave, borde y padding (`rounded-lg border px-2.5 py-1`).
+    * `'minimal'`: estilo limpio en línea sin fondo ni borde (`bg-transparent border-0 p-0 rounded-none`), con icono y texto a color semántico.
+  - Soporte de prop `color` para asignar colores semánticos (`danger`, `warning`, `purple`, `info`, `success`, `neutral`) con retrocompatibilidad absoluta para llamadas existentes.
+  - Refactorización de la columna de roles en `WorkersPage.jsx` para utilizar la interfaz oficial: `<Badge variant="minimal" color={role.color} icon={RoleIcon}>{role.label}</Badge>`.
+  - Asignación de iconos semánticos de Lucide y colores atenuados por rol:
+    * `SuperAdmin`: Icono `ShieldCheck` con color `danger` (`text-red-600/80 dark:text-red-400/80`).
+    * `Admin_Sucursal`: Icono `Shield` con color `warning` (`text-amber-600/85 dark:text-amber-400/80`).
+    * `Secretaria`: Icono `ClipboardList` con color `purple` (`text-purple-600/80 dark:text-purple-400/80`).
+    * `Tecnico`: Icono `Wrench` con color `info` (`text-blue-600/80 dark:text-blue-400/80`).
+    * Default / Otros: Icono `User` con color `neutral` (`text-neutral-600/80 dark:text-neutral-400/80`).
+  - Columna de estado activo/inactivo en `WorkersPage.jsx` migrada a `<Badge variant="minimal" color={worker.activo ? 'success' : 'neutral'} icon={worker.activo ? CheckCircle2 : XCircle}>` para completa coherencia visual con la tabla de clientes.
+  - Mantenimiento del subtexto atenuado de sucursal con icono `Store` (`text-neutral-500 text-xs`).
+- **Controles Inferiores del Sidebar (`Sidebar.jsx`):**
+  - Corrección de alineación a la izquierda (`items-start`) en el contenedor inferior cuando el sidebar se encuentra expandido o fijado, alineándose a la misma vertical que el menú principal.
+  - Botones de alternancia de tema (Modo Claro/Oscuro) y modo de visualización del sidebar definidos como cuadrados compactos (`w-10 h-10 aspect-square rounded-lg flex items-center justify-center`).
+  - Efecto hover delimitado estrictamente al recuadro cuadrado (`hover:bg-neutral-100 dark:hover:bg-neutral-800`), eliminando la deformación rectangular a lo ancho.
+
+### Fixed
+- **Validación y Bloqueo de Reingresos por Garantía (`servicios.controller.js`, `NuevaOrdenPage.jsx`):**
+  - Backend: Bloqueo estricto que impide procesar un reingreso por garantía si la orden de servicio previa no cuenta con estado `ENTREGADO` o fecha formal de entrega (`fecha_entrega`), retornando código de error `NO_ENTREGADO`.
+  - Frontend: Bloqueo interactivo en el Paso 1 de apertura de órdenes al ingresar tickets de equipos aún en taller, alertando al usuario y deshabilitando el avance a pasos posteriores.
+- **Formulario de Recepción de Servicios (`NuevaOrdenPage.jsx`):**
+  - Unificación y aseguramiento del color rojo institucional (`text-red-500`) en los asteriscos (`*`) de todos los campos obligatorios del formulario (Nombre del Cliente, Teléfono, Marca, Modelo, Falla Reportada, Categoría de Dispositivo, Código de Ticket Original y Costo Estimado).
+
+---
+
+## [0.6.0] - 2026-09-09
+
+### Added
+- **Módulo de Recepción y Apertura de Órdenes de Servicio (`NuevaOrdenPage.jsx`, `ServiciosPage.jsx`):**
+  - Generación de código único de ticket en formato estándar corporativo `FMC-YYYY-XXXX`.
+  - Captura y persistencia JSONB de `checklist_entrada`, `observaciones_recepcion` y especificaciones completas del dispositivo.
+  - Selector de método de seguridad del equipo (`DeviceSecurityPicker.jsx`): Soporte para patrón Android 3x3 normalizado en coordenadas base 0 (`[0..8]`) con secuencia numérica proyectada 1..9 (ej. `"7-4-1-5-3-6-9"`), código PIN, contraseña y sin bloqueo (`datos_acceso_equipo`).
+  - Desglose presupuestario y financiero: `costo_previsto`, `monto_anticipo`, `monto_descuento` y balance pendiente calculado en tiempo real.
+  - Asignación técnica inicial en `tecnicos_asignados` y registro automático de apertura en `historial_estados` con estado `RECIBIDO`.
+- **Arquitectura de Impresión Térmica y Stickers de Taller (`#print-mount-point`):**
+  - Punto de montaje On-Demand aislado del DOM interactivo para evitar distorsiones por modo oscuro, scrolls o estilos globales.
+  - Resolución asíncrona de datos frescos (`getServicioById`) al reimprimir desde listas (`ServiciosPage.jsx`), garantizando la proyección de todas las columnas DDL de `init.sql`.
+  - Presets físicos soportados:
+    * Comprobantes térmicos POS de rollo continuo: **80 mm** y **58 mm** con logotipo monocromático de alto contraste, desglose financiero, checklist y código QR de seguimiento.
+    * Stickers adhesivos de taller: **50x30 mm** y **60x40 mm** con trazado vectorial SVG de patrón Android o valor alfanumérico destacado para PIN/Contraseña.
+- **Control de Acceso por Roles (RBAC) y Blindaje Multi-Sucursal:**
+  - `Tecnico`: Configurado en modo **SOLO LECTURA** en órdenes de servicio. Bloqueo estricto con `403 Forbidden` en `POST /api/servicios`. Confinado a su sucursal (`requireBranchAccess`) y acceso de lectura habilitado en `GET /api/trabajadores` para filtros operativos de la sucursal.
+  - `Admin_Sucursal` y `Secretaria`: Control total de apertura en mostrador confinado a su sucursal fija (`req.user.sucursal_id`), forzando `usuario_recepcion_id` en backend sin admitir sobreescritura manual. Habilitado acceso de lectura en `/configuracion/sucursales`, `/configuracion/companhia` y `/trabajadores`.
+  - `SuperAdmin`: Visión omnicanal global y selección opcional de cualquier sucursal.
+
+### Fixed
+- Corrección de discrepancia de datos al reimprimir tickets térmicos desde `ServiciosPage.jsx` mediante la proyección unificada con `COALESCE` de clientes y subconsultas de técnicos.
+- Corrección en renderizado de stickers adhesivos (`LabelPreview.jsx`) para mostrar el valor legible en PIN/Contraseña en lugar de `"[]"`.
+- Normalización del dibujo vectorial del patrón de desbloqueo Android y texto inferior legible ordenado.
+- Corrección en subtítulo contextual de `NuevaOrdenPage.jsx` para mostrar el nombre de la sucursal asignada a la Secretaria en lugar del fallback estático.
+- Corrección de formato de fecha en cabeceras a minúsculas ("del" en lugar de "de").
 
 ### Added
 - **Módulo de Gestión de Clientes y Control RBAC Granular:**

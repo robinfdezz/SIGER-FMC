@@ -41,8 +41,9 @@ const getRoleConfig = (rolNombre) => {
 const MENU_ITEMS = [
   { id: 'dashboard', name: 'Inicio / Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { id: 'tickets', name: 'Órdenes de Servicio', path: '/tickets', icon: Ticket },
-  { id: 'clientes', name: 'Clientes', path: '/clientes', icon: Contact },
   { id: 'taller', name: 'Banco de Trabajo', path: '/taller', icon: Wrench },
+  { id: 'divider-ops', isDivider: true },
+  { id: 'clientes', name: 'Clientes', path: '/clientes', icon: Contact },
   { id: 'trabajadores', name: 'Usuarios', path: '/trabajadores', icon: Users, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
   { id: 'config', name: 'Configuración', path: '/configuracion', icon: Settings, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
 ];
@@ -55,6 +56,7 @@ const DashboardLayout = ({ children }) => {
 
   const filteredMenuItems = useMemo(() => {
     return MENU_ITEMS.filter((item) => {
+      if (item.isDivider) return true;
       if (!item.allowedRoles) return true;
       return item.allowedRoles.includes(user?.rol_nombre);
     });
@@ -116,6 +118,15 @@ const DashboardLayout = ({ children }) => {
           {/* Lista de Navegación Móvil */}
           <nav className="space-y-1.5">
             {filteredMenuItems.map((item) => {
+              if (item.isDivider) {
+                return (
+                  <div
+                    key={item.id}
+                    className="my-2 border-t border-zinc-200 dark:border-dark-border"
+                  />
+                );
+              }
+
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
 

@@ -40,7 +40,26 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 - `401 Unauthorized`: Token ausente, expirado o credenciales inválidas.
 - `403 Forbidden`: Acceso denegado por rol o por aislamiento de sucursal.
 - `404 Not Found`: Recurso no encontrado.
+- `409 Conflict`: Conflicto de unicidad (cédula, usuario, correo duplicado).
 - `500 Internal Server Error`: Error no controlado en el servidor.
+
+---
+
+### 1.1 Matriz de Roles y Control de Acceso (RBAC)
+
+La arquitectura de seguridad de SIGER-FMC implementa control de acceso basado en roles (RBAC) combinado con aislamiento de datos por sucursal (`requireBranchAccess`):
+
+| Rol | Alcance de Datos (Sucursal) | Órdenes de Servicio (`/servicios`) | Personal (`/trabajadores`) | Configuración (`/configuracion`) | Clientes (`/clientes`) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **`SuperAdmin`** | **Omnicanal Global** (ve todas las sedes) | Control total (Crear, Listar, Detalle, Modificar) | CRUD Total y gestión de avatares | Edición global de Empresa y Sucursales | CRUD Total |
+| **`Admin_Sucursal`** | **Sede Asignada Fija** (`sucursal_id`) | Control total en su sucursal (Crear, Listar, Detalle) | CRUD de Técnicos/Secretarias de su sede | Edición exclusiva de su sucursal asignada | CRUD Total |
+| **`Secretaria`** | **Sede Asignada Fija** (`sucursal_id`) | Control operativo (Crear órdenes, Listar, Detalle, Imprimir) | **Lectura** (`GET /`, `GET /:id`) de personal de su sede | **Lectura** (`GET`) de Empresa y Sucursales | CRUD de Clientes |
+| **`Tecnico`** | **Sede Asignada Fija** (`sucursal_id`) | **SOLO LECTURA** (`GET /`, `GET /:id`). **Bloqueo 403** en creación | **Lectura** (`GET /`, `GET /:id`) de personal de su sede | Sin acceso (`403 Forbidden`) | Lectura (`GET`) |
+
+#### Políticas Estrictas de Seguridad:
+1. **`SuperAdmin`:** Acceso omnicanal y selección global de sucursales en filtros y creaciones.
+2. **`Admin_Sucursal` y `Secretaria`:** Control total de recepción confinado a su `sucursal_id` fija. Permisos de lectura habilitados en `/configuracion/sucursales`, `/configuracion/companhia` y `/trabajadores` para alimentar selectores y plantillas de comprobantes de su sede.
+3. **`Tecnico`:** Modo **SOLO LECTURA** en recepción de órdenes. Cualquier intento de `POST /api/servicios` es rechazado con `403 Forbidden` (*"Los técnicos no tienen permisos para crear órdenes de servicio"*). Confinado a su sucursal y lectura autorizada en `GET /api/trabajadores` para filtros operativos de asignación en taller.
 
 ---
 
@@ -48,12 +67,14 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ### 2.1 Iniciar Sesión (Login)
 - **Ruta:** `POST /api/auth/login`
-- **Acceso:** Público
+- **Acceso:** Público (Protegido condicionalmente por `verifyTurnstile` según `ENABLE_TURNSTILE`)
+- **Headers:** `Content-Type: application/json`, `cf-turnstile-response: <token_turnstile>` (opcional si viene en body/query)
 - **Body (JSON):**
   ```json
   {
     "usuario": "superadmin",
-    "password": "admin123"
+    "password": "admin123",
+    "turnstileToken": "0.XXXXX..."
   }
   ```
 - **Respuesta Exitosa (`200 OK`):**
@@ -134,11 +155,21 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ### 3.1 Listar Trabajadores
 - **Ruta:** `GET /api/trabajadores`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
-- **Query Params (Opcionales):** `sucursal_id` (solo SuperAdmin)
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Aislamiento:** Filtrado automático por `requireBranchAccess` según `sucursal_id` del token (excepto `SuperAdmin` que tiene visión global).
+- **Query Params (Opcionales):**
+  - `page` (número, default 1): Número de página.
+  - `limit` (número, default 20, máx 100): Registros por página.
+  - `paginate` (`true`/`false`): Forzar modo paginado.
+  - `sucursal_id` (solo `SuperAdmin`): Filtrar por ID de sucursal (`'all'`, `'global'` o ID numérico).
+  - `activo` (`true`/`false`): Filtrar trabajadores activos.
+  - `rol` / `rol_id`: Filtrar por nombre de rol o ID.
+  - `solo_tecnicos` / `taller` (`true`): Excluye personal con rol de Secretaria/Recepción para selectores operativos de taller.
+  - `q` / `search`: Búsqueda textual por nombre, apellido, usuario, cédula, correo o teléfono.
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
+    "success": true,
     "ok": true,
     "message": "Listado de trabajadores obtenido con éxito.",
     "data": [
@@ -160,7 +191,15 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
         "sucursal_codigo": "MATRIZ"
       }
     ],
-    "total": 1
+    "workers": [ ... ],
+    "trabajadores": [ ... ],
+    "total": 1,
+    "pagination": {
+      "total": 1,
+      "page": 1,
+      "limit": 20,
+      "totalPages": 1
+    }
   }
   ```
 
@@ -168,7 +207,7 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ### 3.2 Obtener Detalle de un Trabajador
 - **Ruta:** `GET /api/trabajadores/:id`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
@@ -528,42 +567,75 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ## 5. Módulo de Servicios y Tickets (`/api/servicios`)
 
-### 3.1 Listar Órdenes de Servicio
+Control integral de recepción de equipos, apertura de órdenes de trabajo, seguimiento técnico, comprobantes térmicos y stickers adhesivos de taller.
+
+### 5.1 Listar Órdenes de Servicio
 - **Ruta:** `GET /api/servicios`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Aislamiento por Sede:**
+  - Si el usuario no es `SuperAdmin`, la consulta fuerza automáticamente:
+    `WHERE sr.sucursal_id = req.user.sucursal_id`
+  - Si es `SuperAdmin`, puede consultar globalmente o filtrar por una sede específica (`?sucursal_id=X`).
 - **Query Params (Opcionales):**
-  - `sucursal_id`: Filtrar por sede (ignorado si no es SuperAdmin).
-  - `estado_id` o `codigo_estado`: Filtrar por estado actual.
-  - `search`: Búsqueda por código de ticket, nombre de cliente o modelo.
-  - `tecnico_id`: Filtrar servicios asignados a un técnico.
-  - `page` (default: 1), `limit` (default: 20).
+  - `page` (INT, default: 1): Número de página.
+  - `limit` (INT, default: 20): Registros por página.
+  - `sucursal_id` (INT | 'all'): Filtro por sucursal (solo `SuperAdmin`).
+  - `estado_id` (INT | 'all'): Filtro por estado del flujo.
+  - `prioridad` (STRING | 'all'): `'baja'`, `'media'`, `'alta'`, `'urgente'`.
+  - `tecnico_id` (INT | 'all'): Filtra servicios donde el técnico participe en `tecnicos_asignados`.
+  - `q` o `busqueda` (STRING): Búsqueda por `codigo_ticket`, nombre de cliente, modelo, marca, IMEI o teléfono.
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
-    "success": true,
+    "ok": true,
     "data": [
       {
         "id": 1,
-        "codigo_ticket": "TKT-2026-0001",
-        "sucursal_id": 1,
-        "sucursal_nombre": "Franyer Mobile Center - SFM",
-        "nombre_cliente": "Juan Pérez",
-        "telefono_cliente": "809-555-1234",
-        "marca_equipo": "Apple",
-        "modelo_equipo": "iPhone 13",
-        "falla_reportada": "Pantalla rota sin táctil",
-        "codigo_estado": "EN_REPARACION",
-        "nombre_estado": "En Proceso de Reparación",
-        "color_badge": "#8B5CF6",
-        "costo_previsto": "4500.00",
-        "costo_final_confirmado": "4500.00",
-        "fecha_entrega_estimada": "2026-08-28",
-        "created_at": "2026-08-25T14:30:00.000Z"
+        "codigo_ticket": "FMC-2026-0001",
+        "prioridad": "media",
+        "marca_equipo": "Samsung",
+        "modelo_equipo": "Galaxy S23 Ultra",
+        "num_serie_imei": "358921000123456",
+        "datos_acceso_equipo": {
+          "tipo": "patron",
+          "metodo": "patron",
+          "patron": [6, 3, 0, 4, 2, 5, 8],
+          "valor": "7-4-1-5-3-6-9"
+        },
+        "falla_reportada": "Pantalla estrellada y no responde al tacto",
+        "observaciones_recepcion": "Bordes con desgaste cosmético leve",
+        "observaciones": "Bordes con desgaste cosmético leve",
+        "checklist_entrada": { "enciende": true, "pantalla_tactil": false, "camaras": true },
+        "checklist_recepcion": { "enciende": true, "pantalla_tactil": false, "camaras": true },
+        "costo_previsto": "5500.00",
+        "monto_anticipo": "2000.00",
+        "monto_descuento": "0.00",
+        "costo_final_confirmado": "0.00",
+        "es_garantia": false,
+        "nombre_cliente": "Carlos Mendoza",
+        "cliente_nombre": "Carlos Mendoza",
+        "telefono_cliente": "829-555-0149",
+        "cliente_telefono": "829-555-0149",
+        "fecha_entrega_estimada": "2026-09-12",
+        "tiempo_garantia": 30,
+        "condiciones_garantia": "Garantía cubre exclusivamente defectos en la pantalla instalada.",
+        "created_at": "2026-09-09T16:00:00.000Z",
+        "updated_at": "2026-09-09T16:00:00.000Z",
+        "estado": "Recibido en Taller",
+        "estado_color": "#6B7280",
+        "categoria": "Smartphone",
+        "sucursal": "Franyer Mobile Center - Castillo",
+        "recepcionista": "secre secre",
+        "tecnico_nombre": "ronall franco",
+        "tecnicos": [
+          { "id": 5, "nombre_completo": "ronall franco" }
+        ]
       }
     ],
     "pagination": {
       "total": 1,
       "page": 1,
+      "limit": 20,
       "totalPages": 1
     }
   }
@@ -571,208 +643,677 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 ---
 
-### 3.2 Obtener Detalle Completo de una Orden
+### 5.2 Obtener Detalle Completo de una Orden por ID
 - **Ruta:** `GET /api/servicios/:id`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Aislamiento:** Un usuario de sucursal solo puede consultar órdenes de su misma sede (`AND sr.sucursal_id = req.user.sucursal_id`).
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
-    "success": true,
+    "ok": true,
     "data": {
       "id": 1,
-      "codigo_ticket": "TKT-2026-0001",
-      "sucursal_id": 1,
+      "codigo_ticket": "FMC-2026-0001",
+      "sucursal_id": 2,
       "categoria_id": 1,
-      "nombre_categoria": "Smartphone",
-      "usuario_recepcion_id": 3,
-      "recepcionista_nombre": "Laura Secretaria",
-      "estado_actual_id": 4,
-      "codigo_estado": "EN_REPARACION",
-      "nombre_estado": "En Proceso de Reparación",
-      "color_badge": "#8B5CF6",
-      "nombre_cliente": "Juan Pérez",
-      "telefono_cliente": "809-555-1234",
-      "cedula_cliente": "056-1111111-2",
-      "correo_cliente": "juan.perez@email.com",
-      "marca_equipo": "Apple",
-      "modelo_equipo": "iPhone 13",
-      "num_serie_imei": "356789012345678",
-      "datos_acceso_equipo": "PIN: 1234",
-      "falla_reportada": "Pantalla rota sin táctil",
-      "observaciones_recepcion": "Bordes con golpes leves, sin cámara rota",
-      "checklist_entrada": "{\"enciende\":true,\"camaras\":true,\"wifi\":true,\"carga\":true}",
-      "costo_previsto": "4500.00",
+      "cliente_id": 3,
+      "servicio_origen_id": null,
+      "es_garantia": false,
+      "nombre_cliente": "Carlos Mendoza",
+      "cliente_nombre": "Carlos Mendoza",
+      "telefono_cliente": "829-555-0149",
+      "cliente_telefono": "829-555-0149",
+      "cedula_cliente": "056-0012345-6",
+      "correo_cliente": "carlos.mendoza@email.com",
+      "usuario_recepcion_id": 6,
+      "estado_actual_id": 1,
+      "prioridad": "media",
+      "marca_equipo": "Samsung",
+      "modelo_equipo": "Galaxy S23 Ultra",
+      "num_serie_imei": "358921000123456",
+      "datos_acceso_equipo": {
+        "tipo": "patron",
+        "metodo": "patron",
+        "patron": [6, 3, 0, 4, 2, 5, 8],
+        "valor": "7-4-1-5-3-6-9"
+      },
+      "falla_reportada": "Pantalla estrellada y no responde al tacto",
+      "observaciones_recepcion": "Bordes con desgaste cosmético leve",
+      "observaciones": "Bordes con desgaste cosmético leve",
+      "checklist_entrada": { "enciende": true, "pantalla_tactil": false },
+      "checklist_recepcion": { "enciende": true, "pantalla_tactil": false },
+      "costo_previsto": "5500.00",
+      "monto_anticipo": "2000.00",
       "monto_descuento": "0.00",
-      "costo_final_confirmado": "4500.00",
-      "tiempo_garantia": "30 días",
-      "fecha_entrega_estimada": "2026-08-28",
-      "tecnicos_asignados": [
-        { "id": 1, "tecnico_id": 4, "nombre": "Manuel Tecnico", "es_principal": true }
-      ],
-      "historial_estados": [
-        { "id": 1, "codigo_estado": "RECIBIDO", "nota_cambio": "Recepción en mostrador", "fecha_registro": "2026-08-25T14:30:00.000Z", "usuario_nombre": "Laura Secretaria" },
-        { "id": 2, "codigo_estado": "EN_DIAGNOSTICO", "nota_cambio": "Iniciando pruebas de pantalla", "fecha_registro": "2026-08-25T15:00:00.000Z", "usuario_nombre": "Manuel Tecnico" }
-      ],
-      "incidencias": [],
-      "evidencias": []
+      "costo_final_confirmado": "0.00",
+      "tiempo_garantia": 30,
+      "condiciones_garantia": "Garantía estándar de 30 días.",
+      "fecha_entrega_estimada": "2026-09-12",
+      "fecha_entrega_real": null,
+      "created_at": "2026-09-09T16:00:00.000Z",
+      "updated_at": "2026-09-09T16:00:00.000Z",
+      "activo": true,
+      "estado": "Recibido en Taller",
+      "estado_color": "#6B7280",
+      "categoria": "Smartphone",
+      "sucursal": "Franyer Mobile Center - Castillo",
+      "recepcionista": "secre secre",
+      "nombre_cliente_reg": "Carlos Mendoza",
+      "telefono_cliente_reg": "829-555-0149",
+      "tecnico_nombre": "ronall franco",
+      "tecnicos": [
+        { "id": 5, "nombre_completo": "ronall franco" }
+      ]
     }
   }
   ```
+- **Errores:**
+  - `400 Bad Request`: ID inválido.
+  - `404 Not Found`: Orden no encontrada o no pertenece a la sucursal del usuario.
 
 ---
 
-### 3.3 Crear Nueva Orden de Servicio (Ticket)
+### 5.3 Crear Nueva Orden de Servicio (Apertura de Ticket)
 - **Ruta:** `POST /api/servicios`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`)
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`). **Bloqueado para `Tecnico` con `403 Forbidden`**.
+- **Reglas RBAC y Blindaje de Sucursal:**
+  - Si el usuario logueado tiene rol `Tecnico`, se rechaza inmediatamente:
+    `{ "ok": false, "message": "Los técnicos no tienen permisos para crear órdenes de servicio." }`
+  - Si el usuario no es `SuperAdmin`, se fuerza estrictamente:
+    `sucursal_id = req.user.sucursal_id`
+    `usuario_recepcion_id = req.user.id` (sin admitir sobreescritura desde el body).
+  - El código de ticket generado es único e inmutable en formato estándar `FMC-YYYY-XXXX`.
 - **Body (JSON):**
   ```json
   {
-    "sucursal_id": 1,
+    "cliente_id": 3,
+    "nombre_cliente": "Carlos Mendoza",
+    "telefono_cliente": "829-555-0149",
+    "cedula_cliente": "056-0012345-6",
+    "correo_cliente": "carlos.mendoza@email.com",
     "categoria_id": 1,
-    "nombre_cliente": "Juan Pérez",
-    "telefono_cliente": "809-555-1234",
-    "cedula_cliente": "056-1111111-2",
-    "correo_cliente": "juan.perez@email.com",
-    "marca_equipo": "Apple",
-    "modelo_equipo": "iPhone 13",
-    "num_serie_imei": "356789012345678",
-    "datos_acceso_equipo": "PIN: 1234",
-    "falla_reportada": "Pantalla rota sin táctil",
-    "observaciones_recepcion": "Bordes con golpes leves",
-    "checklist_entrada": "{\"enciende\":true,\"camaras\":true,\"wifi\":true,\"carga\":true}",
-    "costo_previsto": 4500.00,
+    "prioridad": "media",
+    "marca_equipo": "Samsung",
+    "modelo_equipo": "Galaxy S23 Ultra",
+    "num_serie_imei": "358921000123456",
+    "datos_acceso_equipo": {
+      "tipo": "patron",
+      "metodo": "patron",
+      "patron": [6, 3, 0, 4, 2, 5, 8],
+      "valor": "7-4-1-5-3-6-9"
+    },
+    "falla_reportada": "Pantalla estrellada y no responde al tacto",
+    "observaciones_recepcion": "Bordes con desgaste cosmético leve",
+    "checklist_entrada": {
+      "enciende": true,
+      "pantalla_tactil": false,
+      "camara_trasera": true,
+      "camara_frontal": true,
+      "puerto_carga": true,
+      "wifi_bluetooth": true
+    },
+    "costo_previsto": 5500.00,
+    "monto_anticipo": 2000.00,
     "monto_descuento": 0.00,
-    "tiempo_garantia": "30 días",
-    "condiciones_garantia": "No cubre daños por humedad ni golpes posteriores.",
-    "fecha_entrega_estimada": "2026-08-28"
+    "tiempo_garantia": 30,
+    "condiciones_garantia": "Garantía estándar de 30 días.",
+    "fecha_entrega_estimada": "2026-09-12",
+    "es_garantia": false,
+    "servicio_origen_id": null,
+    "fotos_recepcion": [],
+    "tecnicos_ids": [5]
   }
   ```
 - **Respuesta Exitosa (`201 Created`):**
   ```json
   {
-    "success": true,
+    "ok": true,
     "message": "Orden de servicio creada exitosamente.",
     "data": {
       "id": 1,
-      "codigo_ticket": "TKT-2026-0001",
-      "estado_actual": "RECIBIDO"
+      "codigo_ticket": "FMC-2026-0001",
+      "sucursal_id": 2,
+      "categoria_id": 1,
+      "cliente_id": 3,
+      "nombre_cliente": "Carlos Mendoza",
+      "telefono_cliente": "829-555-0149",
+      "marca_equipo": "Samsung",
+      "modelo_equipo": "Galaxy S23 Ultra",
+      "falla_reportada": "Pantalla estrellada y no responde al tacto",
+      "costo_previsto": "5500.00",
+      "monto_anticipo": "2000.00",
+      "costo_final_confirmado": "0.00",
+      "estado_actual_id": 1,
+      "created_at": "2026-09-09T16:00:00.000Z"
+    }
+  }
+  ```
+- **Errores:**
+  - `400 Bad Request`: Falta de campos obligatorios (`categoria_id`, `falla_reportada`, `marca_equipo`, etc.) o fecha estimada de entrega anterior a la fecha actual.
+  - `403 Forbidden`: Usuario con rol `Tecnico` o usuario sin sucursal asignada.
+
+---
+
+### 5.4 Actualización / Edición Controlada de Orden de Servicio
+- **Ruta:** `PUT /api/servicios/:id`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `admin`, `administrador`). **Bloqueado para `Tecnico` con `403 Forbidden`**.
+- **Reglas RBAC, Ciclo de Vida y Matriz de Mutabilidad:**
+  - **Bloqueo de Técnicos:** Los técnicos no tienen autorización para editar órdenes de servicio (`403 Forbidden`).
+  - **Aislamiento Multi-Sucursal:** Usuarios con rol `Admin_Sucursal` únicamente pueden editar órdenes pertenecientes a su `sucursal_id` asignada. Intentos en órdenes de otras sucursales son rechazados con `403 Forbidden`.
+  - **Validación de Estados Terminales:** Si la orden se encuentra en estado `ENTREGADO` o `CANCELADO_DEVUELTO`, la petición es rechazada con `400 Bad Request` (*"No es posible editar una orden finalizada o cancelada"*).
+  - **Campos Editables según Estado de la Orden:**
+    - **Estados Iniciales (`RECIBIDO_REVISION`, `PENDIENTE_REVISION`):** Permite actualizar datos descriptivos del hardware (`categoria_id`, `marca`, `modelo`, `numero_serie_imei`, `problema_reportado`, `costo_estimado`), credenciales de seguridad (`metodo_desbloqueo`, `pin_desbloqueo`, `patron_desbloqueo`), `fecha_estimada_entrega`, `prioridad`, `observaciones_recepcion` y `accesorios_recibidos`.
+    - **Estados Avanzados (`EN_DIAGNOSTICO`, `EN_REPARACION`, `ESPERANDO_REPUESTO`, `LISTO_ENTREGA`):** Los campos descriptivos de equipo y falla reportada quedan congelados en modo solo lectura para proteger el diagnóstico de taller. Solo se permite actualizar credenciales de acceso/seguridad, `fecha_estimada_entrega`, `prioridad`, `observaciones_recepcion` y `accesorios_recibidos`.
+  - **Validación de Fecha Estimada de Entrega:** Si se proporciona `fecha_estimada_entrega`, esta no puede ser anterior a la fecha actual a nivel de día calendario (`new Date().setHours(0,0,0,0)`). Si se envía una fecha pasada, responde `400 Bad Request` (*"La fecha estimada de entrega no puede ser anterior a la fecha actual."*).
+  - **Exclusión de Técnicos:** La asignación de técnicos NO se gestiona en este endpoint (se administra de forma exclusiva en la Mesa de Trabajo mediante `/api/servicios/:id/asignar-tecnico`).
+  - **Auditoría:** Cada modificación registra una entrada en `historial_estados` indicando el usuario ejecutor y la lista exacta de campos actualizados.
+- **Body (JSON Ejemplo):**
+  ```json
+  {
+    "categoria_id": 1,
+    "marca": "Samsung",
+    "modelo": "Galaxy S23 Ultra",
+    "numero_serie_imei": "358921000123456",
+    "problema_reportado": "Pantalla no responde y batería se descarga rápidamente",
+    "costo_estimado": 6200.00,
+    "fecha_estimada_entrega": "2026-09-25",
+    "prioridad": "alta",
+    "observaciones_recepcion": "Bordes con desgaste cosmético leve. Cliente dejó cable tipo C.",
+    "accesorios_recibidos": "Cable original USB-C",
+    "metodo_desbloqueo": "pin",
+    "pin_desbloqueo": "1234",
+    "patron_desbloqueo": null
+  }
+  ```
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Orden de servicio actualizada exitosamente.",
+    "cambios": ["problema_reportado", "costo_estimado", "prioridad", "observaciones_recepcion"],
+    "data": {
+      "id": 1,
+      "codigo_ticket": "FMC-2026-0001",
+      "marca": "Samsung",
+      "modelo": "Galaxy S23 Ultra",
+      "estado": "Recibido",
+      "codigo_estado": "RECIBIDO_REVISION",
+      "prioridad": "alta",
+      "costo_previsto": 6200.00,
+      "observaciones": "Bordes con desgaste cosmético leve. Cliente dejó cable tipo C.",
+      "tecnicos_asignados": [],
+      "historial_estados": [],
+      "incidencias": [],
+      "fotos": []
+    }
+  }
+  ```
+- **Errores:**
+  - `400 Bad Request`: ID inválido, orden finalizada/cancelada, o fecha estimada anterior a hoy.
+  - `401 Unauthorized`: Token ausente o inválido.
+  - `403 Forbidden`: Rol `Tecnico` o intento de modificar una orden de otra sucursal.
+  - `404 Not Found`: Orden no encontrada o inactiva.
+  - `500 Internal Server Error`: Error al persistir cambios o en la transacción.
+
+---
+
+### 5.5 Consultar por Código de Ticket (Público / Seguimiento Online)
+- **Ruta:** `GET /api/servicios/ticket/:codigo`
+- **Acceso:** Público (Protegido condicionalmente por `verifyTurnstile` si `ENABLE_TURNSTILE === 'true'`)
+- **Headers:** `cf-turnstile-response: <token_turnstile>` (opcional si se pasa por query param `turnstileToken`)
+- **Parámetros URL:** `codigo` (ej. `FMC-2026-0001` o `SFM-VFC9-6NND`).
+- **Respuesta Exitosa (`200 OK`):** Devuelve la orden con sus datos descriptivos de hardware, tiempos, técnicos asignados, checklist de entrada, historial de estados e incidencias públicas con fotos.
+  - *Nota sobre órdenes canceladas:* Este endpoint responde siempre `200 OK` incluso si la orden se encuentra en estado `CANCELADO_DEVUELTO`, exponiendo de forma transparente `motivo_cancelacion`, `fecha_cancelacion` y el nodo final de cancelación para que el cliente consulte el estatus de su dispositivo sin bloqueos.
+
+---
+
+### 5.6 Validar Vigencia de Garantía
+- **Ruta:** `GET /api/servicios/validar-garantia/:codigoTicket`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Descripción:** Comprueba si un ticket previo existe, si fue entregado y calcula si la fecha actual está dentro del periodo cubierto por `tiempo_garantia`.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "data": {
+      "servicio_id": 1,
+      "codigo_ticket": "FMC-2026-0001",
+      "en_garantia": true,
+      "dias_restantes": 18,
+      "fecha_entrega": "2026-08-28T18:00:00.000Z",
+      "tiempo_garantia_dias": 30
     }
   }
   ```
 
 ---
 
-### 3.4 Cambiar Estado de Servicio (Transición de Flujo)
-- **Ruta:** `PATCH /api/servicios/:id/estado`
+### 5.7 Subir Fotografías de Recepción (Endpoint Directo)
+- **Ruta:** `POST /api/servicios/upload-foto`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Headers:** `multipart/form-data` con campo `fotos` (hasta 5 imágenes).
+- **Procesamiento y Prevención de Huérfanas:** Transmite los buffers a Cloudinary en carpeta `siger-fmc/recepcion` en formato optimizado WebP. Como salvaguarda defensiva, **registra o actualiza de forma automática una sesión temporal en `sesiones_carga_fotos`** (`estado = 'COMPLETADO'`, `expira_en = NOW() + 15 min`), vinculando los `public_id` para que el Garbage Collector automático los destruya si el usuario cancela o abandona el formulario.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "sessionId": "e4f8c12a-3b56-4c78-9f12-0abc3456def7",
+    "url": "https://res.cloudinary.com/.../siger-fmc/recepcion/foto1.webp",
+    "public_id": "siger-fmc/recepcion/foto1",
+    "fotos": [
+      {
+        "url": "https://res.cloudinary.com/.../siger-fmc/recepcion/foto1.webp",
+        "public_id": "siger-fmc/recepcion/foto1",
+        "bytes": 245000,
+        "size": "0.23"
+      }
+    ],
+    "urls": [
+      "https://res.cloudinary.com/.../siger-fmc/recepcion/foto1.webp"
+    ]
+  }
+  ```
+
+### 5.8 Listar Órdenes para Tablero de Taller
+- **Ruta:** `GET /api/servicios/taller`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`, `Secretaria`)
+- **Descripción:** Obtiene las órdenes activas en taller agrupadas y filtradas para la mesa de trabajo (`BancoTrabajoPage.jsx`), ordenadas por prioridad y fecha de ingreso.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "servicios": [
+      {
+        "id": 1,
+        "codigo_ticket": "FMC-2026-0001",
+        "marca_equipo": "Samsung",
+        "modelo_equipo": "Galaxy S23 Ultra",
+        "falla_reportada": "Pantalla dañada",
+        "prioridad": "alta",
+        "estado_id": 2,
+        "estado_nombre": "En Diagnóstico",
+        "tecnicos_asignados": [ { "id": 4, "nombre": "Carlos Técnico" } ]
+      }
+    ]
+  }
+  ```
+
+---
+
+### 5.9 Actualizar Estado Técnico en Taller
+- **Ruta:** `PATCH /api/servicios/:id/estado`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`)
+- **Aislamiento Multi-Sucursal Estricto:**
+  - Si el usuario no es `SuperAdmin`, la consulta valida `WHERE id = :id AND sucursal_id = req.user.sucursal_id`.
+  - Intentar modificar órdenes de otra sede retorna `404 Not Found` (*"Orden de servicio no encontrada en esta sucursal"*).
+- **Regla de Asignación Obligatoria:**
+  - No es posible avanzar el estado desde `RECIBIDO` hacia estados operativos superiores (`EN_DIAGNOSTICO`, `ESPERA_REPUESTO`, `EN_REPARACION`, etc.) si la orden no tiene al menos un técnico asignado en `tecnicos_asignados`.
+  - Si no hay técnicos asignados, la petición retorna `400 Bad Request`:
+    `"Debe asignar al menos un técnico responsable antes de iniciar el trabajo o cambiar el estado del equipo."`
 - **Body (JSON):**
   ```json
   {
-    "nuevo_estado_id": 2,
-    "nota_cambio": "Equipo diagnosticado. Se confirma cambio de módulo de pantalla."
+    "estado_id": 3,
+    "nota": "Se procedió al desensamble. Diagnóstico confirmado: cambio de pantalla.",
+    "tecnico_id": 4
   }
   ```
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
-    "success": true,
-    "message": "Estado del servicio actualizado correctamente.",
-    "data": {
+    "ok": true,
+    "message": "Estado del servicio actualizado correctamente",
+    "servicio": { ... }
+  }
+  ```
+
+---
+
+### 5.10 Gestión de Técnicos en Taller
+- **Aislamiento Multi-Sucursal y Restricción de Roles:**
+  - Solo se pueden asignar usuarios que pertenezcan a la misma sucursal física de la orden de servicio (excepto `SuperAdmin`).
+  - **Exclusión Estricta de Secretaría:** Solo se admiten usuarios con rol `Tecnico`, `Admin_Sucursal` o `SuperAdmin`. Si se intenta asignar a un usuario con rol `Secretaria`, la petición es rechazada con `400 Bad Request` (*"El usuario seleccionado tiene rol de Secretaría/Recepción y no puede ser asignado como técnico operativo de taller"*).
+- **Asignar Técnico:** `POST /api/servicios/:id/tecnicos`
+  - **Body (JSON):** `{ "tecnico_id": 4 }`
+  - **Respuesta Exitosa (`200 OK`):** `{ "ok": true, "message": "Técnico asignado exitosamente" }`
+- **Remover Técnico:** `DELETE /api/servicios/:id/tecnicos/:tecnicoId`
+  - **Bloqueo de Desasignación del Único Técnico:** Si el servicio ya avanzó de `RECIBIDO` (se encuentra en diagnóstico, reparación, control de calidad, etc.) y solo cuenta con un técnico asignado, la petición se rechaza con `400 Bad Request`:
+    `"No se puede desasignar el único técnico mientras el servicio está en proceso. Asigne a otro técnico antes de removerlo o reasigne la orden."`
+  - **Respuesta Exitosa (`200 OK`):** `{ "ok": true, "message": "Técnico desasignado exitosamente" }`
+
+---
+
+### 5.11 Registrar Incidencia o Hallazgo Técnico
+- **Ruta:** `POST /api/servicios/:id/incidencias`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`)
+- **Body (JSON):**
+  ```json
+  {
+    "tipo_incidencia": "Pieza Extra",
+    "descripcion": "Flex de carga sulfatado no detecta cargador rápido.",
+    "repuesto_requerido": "Flex Pin de Carga iPhone 13 Original",
+    "costo_adicional_repuesto": 1200.00,
+    "aprobado_por_cliente": true,
+    "metodo_aprobacion": "WhatsApp",
+    "fotos": [
+      {
+        "url": "https://res.cloudinary.com/.../evidencia1.webp",
+        "public_id": "siger-fmc/evidencias-tickets/evidencia1"
+      }
+    ]
+  }
+  ```
+- **Aislamiento Fotográfico:** Las fotos enviadas en `fotos` se asocian en `evidencias_fotograficas` con `tipo_evidencia = 'INCIDENCIA'` e `incidencia_id` asignado, manteniéndolas estrictamente separadas de las fotos de recepción.
+- **Respuesta Exitosa (`201 Created`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Incidencia registrada correctamente",
+    "incidencia": {
+      "id": 5,
       "servicio_id": 1,
-      "codigo_estado": "EN_DIAGNOSTICO",
-      "nombre_estado": "En Diagnóstico"
+      "tipo_incidencia": "Pieza Extra",
+      "descripcion": "Flex de carga sulfatado...",
+      "repuesto_requerido": "Flex Pin de Carga iPhone 13 Original",
+      "costo_adicional_repuesto": 1200.00,
+      "aprobado_por_cliente": true,
+      "fecha_aprobacion": "2026-09-14T18:30:00.000Z",
+      "metodo_aprobacion": "WhatsApp",
+      "usuario_nombre": "Carlos Técnico",
+      "fotos": [ ... ]
     }
   }
   ```
 
 ---
 
-### 3.5 Consulta Pública de Ticket (Tracking de Clientes)
-- **Ruta:** `GET /api/servicios/publico/:codigo_ticket`
-- **Acceso:** Público (Sin token)
-- **Parámetros:** `codigo_ticket` (ej. `TKT-2026-0001`)
+### 5.12 Listar Incidencias de una Orden
+- **Ruta:** `GET /api/servicios/:id/incidencias`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`, `Secretaria`)
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
-    "success": true,
+    "ok": true,
+    "incidencias": [
+      {
+        "id": 5,
+        "servicio_id": 1,
+        "tipo_incidencia": "Pieza Extra",
+        "descripcion": "Flex de carga sulfatado...",
+        "repuesto_requerido": "Flex Pin de Carga iPhone 13 Original",
+        "costo_adicional_repuesto": 1200.00,
+        "aprobado_por_cliente": true,
+        "estado_aprobacion": "APROBADO",
+        "rechazado_por_cliente": false,
+        "fecha_aprobacion": "2026-09-14T18:30:00.000Z",
+        "metodo_aprobacion": "WhatsApp",
+        "usuario_nombre": "Carlos Técnico",
+        "fotos": [ ... ]
+      }
+    ]
+  }
+  ```
+
+---
+
+### 5.13 Actualizar Ciclo de Aprobación/Rechazo de Incidencia
+- **Ruta:** `PATCH /api/servicios/:id/incidencias/:incidenciaId/aprobacion`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Acción de Aprobación (JSON):**
+  ```json
+  {
+    "aprobado": true,
+    "metodo_aprobacion": "WhatsApp"
+  }
+  ```
+- **Acción de Rechazo (JSON):**
+  ```json
+  {
+    "aprobado": false,
+    "estado_aprobacion": "RECHAZADO",
+    "metodo_aprobacion": "Llamada"
+  }
+  ```
+- **Acción de Reinicio a Pendiente (JSON):**
+  ```json
+  {
+    "accion": "reset"
+  }
+  ```
+- **Comportamiento en la Base de Datos:**
+  - Al aprobar: `aprobado_por_cliente = TRUE`, `fecha_aprobacion = NOW()`, `metodo_aprobacion = :metodo`.
+  - Al rechazar: `aprobado_por_cliente = FALSE`, `fecha_aprobacion = NOW()`, `metodo_aprobacion = :metodo`.
+  - En la respuesta se computan automáticamente `estado_aprobacion` (`'APROBADO' | 'RECHAZADO' | 'PENDIENTE'`) y `rechazado_por_cliente` (booleano).
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Aprobación de la incidencia actualizada exitosamente",
+    "incidencia": {
+      "id": 5,
+      "aprobado_por_cliente": false,
+      "estado_aprobacion": "RECHAZADO",
+      "rechazado_por_cliente": true,
+      "fecha_aprobacion": "2026-09-14T19:00:00.000Z",
+      "metodo_aprobacion": "Llamada",
+      "fotos": [ ... ]
+    }
+  }
+  ```
+
+### 5.14 Módulo de Sesiones de Carga Móvil y Recolector de Huérfanos (`/api/upload-session`)
+
+Permite a clientes o recepcionistas escanear un código QR desde cualquier dispositivo móvil para tomar fotografías de evidencias físicas y sincronizarlas en tiempo real con el formulario de recepción en PC, sin requerir inicio de sesión en el móvil.
+
+#### 5.14.1 Crear Sesión de Carga QR o PC
+- **Ruta:** `POST /api/upload-session/crear`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Vigencia:** 15 minutos desde el momento de emisión.
+- **Body (JSON opcional):**
+  ```json
+  {
+    "maxFotosPermitidas": 4
+  }
+  ```
+- **Respuesta Exitosa (`201 Created`):**
+  ```json
+  {
+    "ok": true,
+    "sessionId": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
     "data": {
-      "codigo_ticket": "TKT-2026-0001",
-      "marca_equipo": "Apple",
-      "modelo_equipo": "iPhone 13",
-      "codigo_estado": "EN_REPARACION",
-      "nombre_estado": "En Proceso de Reparación",
-      "color_badge": "#8B5CF6",
-      "orden_flujo": 4,
-      "fecha_entrega_estimada": "2026-08-28",
-      "historial": [
-        { "nombre_estado": "Recibido en Taller", "fecha_registro": "2026-08-25T14:30:00.000Z" },
-        { "nombre_estado": "En Diagnóstico", "fecha_registro": "2026-08-25T15:00:00.000Z" },
-        { "nombre_estado": "En Proceso de Reparación", "fecha_registro": "2026-08-25T16:20:00.000Z" }
+      "session_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      "url_subida": "http://192.168.1.50:5173/subir-fotos/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      "expira_en": "2026-09-20T14:15:00.000Z",
+      "minutos_vigencia": 15,
+      "max_fotos": 4
+    }
+  }
+  ```
+
+#### 5.14.2 Consultar Estado de la Sesión
+- **Ruta:** `GET /api/upload-session/:sessionId`
+- **Acceso:** Público (utilizado por el móvil y por el polling en segundo plano en PC)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "data": {
+      "session_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      "estado": "COMPLETADO",
+      "expirado": false,
+      "expira_en": "2026-09-20T14:15:00.000Z",
+      "total_fotos": 2,
+      "max_fotos": 4,
+      "limiteEfectivo": 4,
+      "fotosExistentes": 2,
+      "fotos": [
+        {
+          "url": "https://res.cloudinary.com/demo/image/upload/v1/siger-fmc/recepcion/foto1.webp",
+          "secure_url": "https://res.cloudinary.com/demo/image/upload/v1/siger-fmc/recepcion/foto1.webp",
+          "public_id": "siger-fmc/recepcion/foto1",
+          "bytes": 245000,
+          "size": 245000,
+          "fecha_subida": "2026-09-20T14:02:00.000Z"
+        }
       ]
     }
   }
   ```
 
----
+#### 5.14.3 Subir Evidencias desde Dispositivo Móvil o PC
+- **Ruta:** `POST /api/upload-session/:sessionId/subir`
+- **Acceso:** Público (validado por `:sessionId` activo y no expirado)
+- **Formato:** `multipart/form-data` con campo `fotos` (hasta el límite de cupos disponibles).
+- **Validaciones:**
+  - Si la sesión está en estado `'COMPLETADO'`, `'UTILIZADA'` o `'PURGADA'`, rechaza la petición con HTTP `400 Bad Request` (*"Esta sesión de carga ya ha sido finalizada o utilizada."*).
+  - Si `fotosActuales.length + nuevosArchivos.length > limiteEfectivo`, rechaza la subida con HTTP `400 Bad Request` indicando que se excede el cupo disponible.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Se subieron 2 fotografía(s) exitosamente.",
+    "data": {
+      "session_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      "nuevas_fotos": [ ... ],
+      "total_fotos": 2
+    },
+    "fotos": [ ... ],
+    "nuevasFotos": [ ... ]
+  }
+  ```
 
-## 4. Módulo de Incidencias y Evidencias (`/api/incidencias`, `/api/evidencias`)
-
-### 4.1 Registrar Incidencia / Repuesto Adicional
-- **Ruta:** `POST /api/incidencias`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`)
+#### 5.14.4 Destruir Evidencia Temporal en Tiempo Real (Cloudinary)
+- **Rutas:** `POST /api/upload-session/eliminar-foto` o `DELETE /api/servicios/evidencia-temporal`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Descripción:** Destruye inmediatamente el recurso físico en Cloudinary vía `cloudinary.uploader.destroy(publicId)` al presionar el icono de basura en la interfaz, y si se suministra `sessionId`, lo remueve del array JSONB en `sesiones_carga_fotos`.
 - **Body (JSON):**
   ```json
   {
-    "servicio_id": 1,
-    "tipo_incidencia": "Pieza Extra",
-    "descripcion": "Flex de carga sulfatado no detecta cargador rápido.",
-    "repuesto_requerido": "Flex Pin de Carga iPhone 13 Original",
-    "costo_adicional_repuesto": 1200.00
+    "publicId": "siger-fmc/recepcion/foto1",
+    "sessionId": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
   }
   ```
-- **Respuesta Exitosa (`201 Created`):**
+- **Respuesta Exitosa (`200 OK`):**
   ```json
   {
-    "success": true,
-    "message": "Incidencia registrada exitosamente.",
+    "ok": true,
+    "message": "Fotografía eliminada exitosamente de Cloudinary y sesión temporal."
+  }
+  ```
+
+#### 5.14.5 Purgar Sesiones Huérfanas (Garbage Collector Manual)
+- **Ruta:** `POST /api/upload-session/purgar`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Descripción:** Ejecuta inmediatamente la rutina de recolección de huérfanos. Purga los archivos de Cloudinary de sesiones expiradas mayores a 30 minutos y elimina registros históricos de `sesiones_carga_fotos` con más de 15 días de antigüedad.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Purga de sesiones huérfanas completada.",
     "data": {
-      "id": 1,
-      "aprobado_por_cliente": false
+      "purgadas": 3,
+      "fotosEliminadas": 6,
+      "registrosHistoricosEliminados": 12
     }
   }
   ```
 
+#### Ciclo de Vida y Prevención de Huérfanos:
+1. **`PENDIENTE` / `COMPLETADO`**: La sesión recibe fotos desde el móvil o la PC y las preserva temporalmente mientras el operador redacta la orden de servicio.
+2. **`UTILIZADA`**: Al presionar "Guardar Orden de Servicio" (`POST /api/servicios`), la orden vincula las fotos en `evidencias_fotograficas` y actualiza la sesión a `'UTILIZADA'`. Las fotos de sesiones `'UTILIZADA'` **nunca** son borradas por el purgador.
+3. **`PURGADA`**: Si la orden se cancela, la ventana se cierra o expira y pasan más de 30 minutos sin ser confirmada, el Garbage Collector automático (que corre cada 30 minutos en background) elimina las imágenes de Cloudinary (`cloudinary.uploader.destroy`) y marca la sesión como `'PURGADA'`.
+4. **Depuración de Base de Datos (15 Días):** Cada ejecución del Garbage Collector elimina filas en `sesiones_carga_fotos` en estado `'PURGADA'` o `'UTILIZADA'` con más de 15 días.
+
 ---
 
-### 4.2 Aprobar o Rechazar Incidencia
-- **Ruta:** `PATCH /api/incidencias/:id/aprobacion`
+### 5.15 Liquidar y Entregar Orden de Servicio
+- **Ruta:** `POST /api/servicios/:id/entregar`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`)
+- **Descripción:** Concluye el ciclo técnico y financiero de la orden de servicio en mostrador. Verifica que la orden pertenezca a la sucursal del usuario (aislamiento de sede), que no haya sido entregada previamente ni cancelada, que no existan incidencias pendientes de aprobación del cliente, liquida el saldo neto, actualiza el estado a `ENTREGADO` (`orden_flujo = 7`), registra la fecha y usuario de entrega e inserta el evento de auditoría en `historial_estados`.
 - **Body (JSON):**
   ```json
   {
-    "aprobado_por_cliente": true
+    "metodo_pago_entrega": "Efectivo",
+    "monto_recibido_entrega": 2500.00,
+    "observaciones_entrega": "Equipo probado y entregado con conformidad del cliente."
   }
   ```
-
----
-
-### 4.3 Subir Evidencia Fotográfica
-- **Ruta:** `POST /api/evidencias`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`)
-- **Body (JSON / Multipart):**
+- **Respuesta Exitosa (`200 OK`):**
   ```json
   {
-    "servicio_id": 1,
-    "incidencia_id": null,
-    "url_foto": "https://res.cloudinary.com/fmc/image/upload/v1234/evidencia_1.jpg",
-    "tipo_evidencia": "Estado Inicial",
-    "descripcion": "Golpe en esquina inferior derecha al recibir."
+    "ok": true,
+    "success": true,
+    "message": "Servicio liquidado y entregado exitosamente.",
+    "data": {
+      "id": 1,
+      "codigo_ticket": "FMC-2026-0001",
+      "estado": "Entregado al Cliente",
+      "codigo_estado": "ENTREGADO",
+      "orden_flujo": 7,
+      "monto_liquidado": 2200.00,
+      "cambio_devuelto_entrega": 300.00,
+      "fecha_entrega_real": "2026-09-20T12:00:00.000Z"
+    }
   }
   ```
+- **Errores Posibles:**
+  - `400 Bad Request`: "No se puede liquidar o entregar una orden cancelada.", "Esta orden ya fue entregada previamente.", o "Existen repuestos pendientes de aprobación o rechazo."
+  - `403 Forbidden`: Acceso denegado a órdenes de otra sucursal o roles sin permiso.
 
 ---
 
-## 5. Módulo de Catálogos del Sistema (`/api/catalogos`)
+### 5.16 Cancelar Orden de Servicio
+- **Ruta:** `POST /api/servicios/:id/cancelar`
+- **Acceso:** Privado Estricto (`SuperAdmin`, `Admin_Sucursal` únicamente)
+- **Restricción de Rol:** Protegido por `checkRole(['SuperAdmin', 'Admin_Sucursal'])`. Usuarios con rol `Secretaria` o `Tecnico` son rechazados con HTTP `403 Forbidden` (*"No tienes permisos para desactivar órdenes de servicio"*).
+- **Descripción:** Da de baja formalmente una orden técnica que no continuará en reparación (ej. cliente rechaza presupuesto, equipo irreparable o desistimiento). Ejecuta una transacción atómica bloqueando el registro con `FOR UPDATE`, valida aislamiento multi-sucursal, impide cancelar órdenes previamente entregadas o ya canceladas, exige un motivo descriptivo obligatorio (mínimo 5 caracteres), actualiza el estado al catálogo `CANCELADO_DEVUELTO` (`orden_flujo = 8`), persiste `motivo_cancelacion`, `fecha_cancelacion` y `usuario_cancela_id` en `servicios_recepcion` e inserta el registro inmutable en `historial_estados`.
+- **Body (JSON):**
+  ```json
+  {
+    "motivo_cancelacion": "Cliente no aprobó el presupuesto para cambio de módulo de pantalla."
+  }
+  ```
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "message": "Orden de servicio cancelada correctamente.",
+    "data": {
+      "id": 6,
+      "codigo_ticket": "SFM-VFC9-6NND",
+      "estado_actual_id": 8,
+      "estado": "Cancelado / No Reparado",
+      "codigo_estado": "CANCELADO_DEVUELTO",
+      "estado_color": "#EF4444",
+      "orden_flujo": 8,
+      "motivo_cancelacion": "Cliente no aprobó el presupuesto para cambio de módulo de pantalla.",
+      "fecha_cancelacion": "2026-09-20T12:30:00.000Z"
+    }
+  }
+  ```
+- **Errores Posibles:**
+  - `400 Bad Request`: "El motivo de cancelación es obligatorio y debe contener al menos 5 caracteres.", "No es posible cancelar una orden que ya fue entregada al cliente.", o "Esta orden ya se encuentra cancelada."
+  - `403 Forbidden`: "No tienes permisos para desactivar órdenes de servicio" o acceso a órdenes de otra sucursal.
+  - `404 Not Found`: "Orden de servicio no encontrada."
+
+---
+
+### 5.17 Validar y Consultar Datos para Emisión de Comprobante / Etiqueta
+- **Ruta:** `GET /api/servicios/:id/ticket-impresion`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Descripción:** Endpoint especializado para validar la precondición de impresión antes de generar el comprobante térmico o la etiqueta de taller. Verifica que la orden exista y **bloquea la emisión para órdenes canceladas**, asegurando la integridad física y documental del taller.
+- **Parámetros URL:** `:id` (ID numérico o código de ticket).
+- **Respuesta Exitosa (`200 OK`):** Retorna los datos requeridos para la plantilla de impresión de comprobante o sticker.
+- **Errores Posibles:**
+  - `400 Bad Request`: *"No se permite emitir comprobantes o etiquetas para órdenes canceladas"* (cuando `orden_flujo === 8` o `codigo_estado` incluye `CANCEL`).
+  - `404 Not Found`: "Orden de servicio no encontrada."
+
+---
+
+---
+
+## 6. Módulo de Catálogos del Sistema (`/api/catalogos`)
 
 ### Endpoints Disponibles
 
@@ -811,9 +1352,12 @@ Gestión integral de los usuarios y empleados del sistema con control de acceso 
 
 ### 6.2 Obtener Listado de Trabajadores
 - **Ruta:** `GET /api/trabajadores`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Aislamiento:** Restringido por `requireBranchAccess` a la sucursal del usuario logueado (los técnicos y secretarias reciben los trabajadores de su propia sede para los filtros operativos).
 - **Query Params:**
   - `sucursal_id` (opcional, solo `SuperAdmin`): Filtrar por ID de sucursal.
+  - `activo` (opcional, boolean): Filtrar por estado activo.
+  - `rol` (opcional, string): Filtrar por nombre de rol.
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
@@ -849,7 +1393,7 @@ Gestión integral de los usuarios y empleados del sistema con control de acceso 
 
 ### 6.3 Obtener Detalle de un Trabajador
 - **Ruta:** `GET /api/trabajadores/:id`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
@@ -1082,20 +1626,21 @@ Módulo administrativo para la parametrización de la empresa matriz y la gesti�
         "direccion": "San Francisco de Macoris",
         "config_tickets": {
           "ancho_papel_mm": 80,
-          "mostrar_logo": true,
-          "mostrar_datos_empresa": true,
-          "mostrar_datos_sucursal": true,
+          "copias_impresion": 1,
+          "imprimir_logo": true,
+          "mostrar_rnc": true,
+          "mostrar_contacto_sucursal": true,
           "mostrar_cliente": true,
           "mostrar_equipo": true,
           "mostrar_falla": true,
           "mostrar_observaciones": true,
-          "mostrar_desglose_costos": true,
-          "mostrar_garantia": true,
-          "mostrar_qr_consulta": true,
+          "mostrar_costo_y_anticipo": true,
+          "mostrar_checklist_recepcion": true,
+          "incluir_qr_tracking": true,
+          "imprimir_garantia": true,
+          "clausula_garantia_defecto": "Garantía válida únicamente presentando este comprobante...",
           "mostrar_mensaje_cortesia": true,
-          "terminos_garantia": "Garantía válida únicamente presentando este comprobante...",
-          "mensaje_cortesia": "¡Gracias por su preferencia!...",
-          "tamano_fuente": "md"
+          "mensaje_cortesia": "¡Gracias por su preferencia!..."
         },
         "config_etiquetas": {
           "preset": "50x30",
@@ -1134,20 +1679,21 @@ Módulo administrativo para la parametrización de la empresa matriz y la gesti�
     "direccion": "Av. Presidente Antonio Guzmán Fernández #12, SFM",
     "config_tickets": {
       "ancho_papel_mm": 80,
-      "mostrar_logo": true,
-      "mostrar_datos_empresa": true,
-      "mostrar_datos_sucursal": true,
+      "copias_impresion": 1,
+      "imprimir_logo": true,
+      "mostrar_rnc": true,
+      "mostrar_contacto_sucursal": true,
       "mostrar_cliente": true,
       "mostrar_equipo": true,
       "mostrar_falla": true,
       "mostrar_observaciones": true,
-      "mostrar_desglose_costos": true,
-      "mostrar_garantia": true,
-      "mostrar_qr_consulta": true,
+      "mostrar_costo_y_anticipo": true,
+      "mostrar_checklist_recepcion": true,
+      "incluir_qr_tracking": true,
+      "imprimir_garantia": true,
+      "clausula_garantia_defecto": "Garantía válida únicamente presentando este comprobante...",
       "mostrar_mensaje_cortesia": true,
-      "terminos_garantia": "Garantía válida únicamente presentando este comprobante...",
-      "mensaje_cortesia": "¡Gracias por su preferencia!...",
-      "tamano_fuente": "md"
+      "mensaje_cortesia": "¡Gracias por su preferencia!..."
     },
     "config_etiquetas": {
       "preset": "50x30",

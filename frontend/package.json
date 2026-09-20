@@ -1,7 +1,7 @@
 {
   "name": "siger-fmc-frontend",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.10.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,8 +13,10 @@
     "lucide": "^1.32.0",
     "lucide-react": "^0.475.0",
     "morphicons": "^1.7.0",
+    "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-loading-skeleton": "^3.5.0",
     "react-router-dom": "^6.28.2",
     "sileo": "^0.1.5"
   },

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
+import AnimatedTabs from '../components/common/AnimatedTabs';
 import CompanyProfileTab from '../components/configuration/CompanyProfileTab';
 import BranchesTab from '../components/configuration/BranchesTab';
 import PrintingTab from '../components/configuration/PrintingTab';
@@ -14,6 +15,12 @@ import {
   RefreshCw,
   AlertTriangle
 } from 'lucide-react';
+
+const TABS = [
+  { id: 'perfil', label: 'Perfil de la Empresa', icon: Building2 },
+  { id: 'sucursales', label: 'Sucursales Físicas', icon: Store },
+  { id: 'impresion', label: 'Impresión y Comprobantes', icon: Printer },
+];
 
 export const ConfigurationPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -65,7 +72,7 @@ export const ConfigurationPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
         {/* Cabecera Principal */}
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight">
@@ -78,47 +85,13 @@ export const ConfigurationPage = () => {
 
         {/* Fila de Pestañas (Tabs) y Acción de Recarga */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Selector de Pestañas (Tabs) */}
-          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 w-full sm:w-fit flex-wrap">
-            <button
-              type="button"
-              onClick={() => handleTabChange('perfil')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
-                activeTab === 'perfil' || activeTab === 'companhia'
-                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-              }`}
-            >
-              <Building2 size={16} />
-              <span>Perfil de la Empresa</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleTabChange('sucursales')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
-                activeTab === 'sucursales'
-                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-              }`}
-            >
-              <Store size={16} />
-              <span>Sucursales Físicas</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleTabChange('impresion')}
-              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
-                activeTab === 'impresion'
-                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 shadow-xs'
-                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'
-              }`}
-            >
-              <Printer size={16} />
-              <span>Impresión y Comprobantes</span>
-            </button>
-          </div>
+          {/* Selector de Pestañas (Tabs) con Pastilla Deslizante */}
+          <AnimatedTabs
+            items={TABS}
+            value={activeTab}
+            onChange={handleTabChange}
+            className="w-full sm:w-fit"
+          />
 
           {/* Botón de Recarga a la Derecha */}
           <button

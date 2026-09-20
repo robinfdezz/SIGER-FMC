@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS datos_companhia (
     telefono_principal VARCHAR(20) NOT NULL,
     correo_contacto VARCHAR(100) NOT NULL,
     direccion_fiscal TEXT NOT NULL,
+    dominio_sistema VARCHAR(150) NOT NULL DEFAULT 'https://franyermobilecenter.com',
+    tasa_impuesto_defecto NUMERIC(5,2) NOT NULL DEFAULT 18.00,
     logo_url TEXT NULL,
     logo_public_id VARCHAR(150) NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -24,6 +26,7 @@ CREATE TABLE IF NOT EXISTS datos_sucursales (
     companhia_id INT NOT NULL,
     codigo_sucursal VARCHAR(10) NOT NULL UNIQUE,
     nombre_sucursal VARCHAR(100) NOT NULL,
+    prefijo_ticket VARCHAR(15) NOT NULL DEFAULT 'FMC-',
     telefono VARCHAR(20) NOT NULL,
     direccion character varying(200) NOT NULL,
     config_tickets jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -103,10 +106,12 @@ CREATE TABLE IF NOT EXISTS clientes (
 -- 8. Tabla de Servicios de Recepción (Tickets / Órdenes de Trabajo)
 CREATE TABLE IF NOT EXISTS servicios_recepcion (
     id SERIAL PRIMARY KEY,
-    codigo_ticket VARCHAR(20) NOT NULL UNIQUE,
+    codigo_ticket VARCHAR(35) NOT NULL UNIQUE,
     sucursal_id INT NOT NULL,
     categoria_id INT NOT NULL,
     cliente_id INT NULL,
+    servicio_origen_id INT NULL,
+    es_garantia BOOLEAN NOT NULL DEFAULT FALSE,
     nombre_cliente VARCHAR(100) NULL,
     telefono_cliente VARCHAR(20) NULL,
     cedula_cliente VARCHAR(20) NULL,
@@ -120,27 +125,45 @@ CREATE TABLE IF NOT EXISTS servicios_recepcion (
     datos_acceso_equipo jsonb NULL,
     falla_reportada TEXT NOT NULL,
     observaciones_recepcion TEXT NULL,
+    accesorios_recibidos TEXT NULL,
     checklist_entrada jsonb NULL,
     costo_previsto NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     monto_anticipo NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     monto_descuento NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    tasa_impuesto NUMERIC(5,2) NOT NULL DEFAULT 18.00,
+    monto_impuesto NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     costo_final_confirmado NUMERIC(10,2) NOT NULL DEFAULT 0.00,
-    tiempo_garantia VARCHAR(50) NULL DEFAULT '30 días',
+    tiempo_garantia integer DEFAULT 30,
     condiciones_garantia TEXT NULL,
     fecha_entrega_estimada DATE NULL,
     fecha_entrega_real TIMESTAMPTZ NULL,
+    usuario_entrega_id INT DEFAULT NULL,
+    metodo_pago_entrega VARCHAR(50) DEFAULT NULL,
+    monto_liquidado NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    monto_recibido_entrega NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    cambio_devuelto_entrega NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    observaciones_entrega TEXT NULL,
+    motivo_cancelacion TEXT NULL,
+    fecha_cancelacion TIMESTAMPTZ NULL,
+    usuario_cancela_id INT DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT chk_identificacion_cliente CHECK ((cliente_id IS NOT NULL) OR (nombre_cliente IS NOT NULL)),
     CONSTRAINT chk_prioridad CHECK (prioridad IN ('baja', 'media', 'alta', 'urgente')),
+    CONSTRAINT chk_metodo_pago_entrega CHECK (metodo_pago_entrega IS NULL OR metodo_pago_entrega IN ('Efectivo', 'Tarjeta', 'Transferencia')),
+    CONSTRAINT chk_servicio_no_autoreferencia CHECK (id != servicio_origen_id),
     CONSTRAINT fk_servicio_sucursal FOREIGN KEY (sucursal_id) 
         REFERENCES datos_sucursales(id) ON DELETE RESTRICT,
     CONSTRAINT fk_servicio_categoria FOREIGN KEY (categoria_id) 
         REFERENCES categorias_dispositivos(id) ON DELETE RESTRICT,
     CONSTRAINT fk_servicio_cliente FOREIGN KEY (cliente_id) 
         REFERENCES clientes(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT fk_servicio_garantia_origen FOREIGN KEY (servicio_origen_id) 
+        REFERENCES servicios_recepcion(id) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT fk_servicio_recepcionista FOREIGN KEY (usuario_recepcion_id) 
+        REFERENCES datos_trabajadores(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_servicio_usuario_entrega FOREIGN KEY (usuario_entrega_id) 
         REFERENCES datos_trabajadores(id) ON DELETE RESTRICT,
     CONSTRAINT fk_servicio_estado FOREIGN KEY (estado_actual_id) 
         REFERENCES estados_servicio(id) ON DELETE RESTRICT
@@ -217,19 +240,35 @@ CREATE TABLE IF NOT EXISTS evidencias_fotograficas (
         REFERENCES datos_trabajadores(id) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
+-- 13. Tabla de Sesiones de Carga Remota de Fotos (Vía QR)
+CREATE TABLE IF NOT EXISTS sesiones_carga_fotos (
+    id SERIAL PRIMARY KEY,
+    session_id VARCHAR(64) NOT NULL UNIQUE,
+    fotos JSONB NOT NULL DEFAULT '[]'::jsonb,
+    estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE', -- 'PENDIENTE', 'COMPLETADO', 'EXPIRADO', 'UTILIZADA', 'PURGADA'
+    expira_en TIMESTAMPTZ NOT NULL,
+    max_fotos INTEGER DEFAULT 5,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ============================================================================
 -- ÍNDICES SECUNDARIOS PARA RENDIMIENTO
 -- ============================================================================
 CREATE INDEX IF NOT EXISTS idx_servicios_sucursal ON servicios_recepcion(sucursal_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_cliente ON servicios_recepcion(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_servicios_garantia_origen ON servicios_recepcion(servicio_origen_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_estado ON servicios_recepcion(estado_actual_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_prioridad ON servicios_recepcion(prioridad);
+CREATE INDEX IF NOT EXISTS idx_servicios_usuario_entrega ON servicios_recepcion(usuario_entrega_id);
 CREATE INDEX IF NOT EXISTS idx_tecnicos_servicio ON tecnicos_asignados(servicio_id);
 CREATE INDEX IF NOT EXISTS idx_historial_servicio ON historial_estados(servicio_id);
 CREATE INDEX IF NOT EXISTS idx_incidencias_servicio ON incidencias_servicio(servicio_id);
 CREATE INDEX IF NOT EXISTS idx_incidencias_usuario ON incidencias_servicio(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_evidencias_servicio ON evidencias_fotograficas(servicio_id);
 CREATE INDEX IF NOT EXISTS idx_evidencias_usuario ON evidencias_fotograficas(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_sesiones_carga_session_id ON sesiones_carga_fotos(session_id);
+CREATE INDEX IF NOT EXISTS idx_sesiones_carga_estado_expira ON sesiones_carga_fotos(estado, expira_en);
 
 -- ============================================================================
 -- DATOS SEMILLA BASE (CATÁLOGOS OBLIGATORIOS)

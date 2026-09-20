@@ -3,6 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import { uploadCompanyLogo, updateCompanyProfile } from '../../services/configuracion.service';
 import SingleImageDropzone from '../common/SingleImageDropzone';
 import Button from '../common/Button';
+import InlineConfirmButton from '../common/InlineConfirmButton';
+import Badge from '../common/Badge';
 import { sileo } from 'sileo';
 import {
   Building2,
@@ -11,6 +13,7 @@ import {
   Phone,
   Mail,
   MapPin,
+  Globe,
   Loader2,
   Lock,
   Save,
@@ -30,6 +33,7 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
     telefono_principal: '',
     correo_contacto: '',
     direccion_fiscal: '',
+    dominio_sistema: '',
     logo_url: null,
     logo_public_id: null
   });
@@ -48,6 +52,7 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
         telefono_principal: companyData.telefono_principal ? String(companyData.telefono_principal).replace(/\D/g, '') : '',
         correo_contacto: companyData.correo_contacto || '',
         direccion_fiscal: companyData.direccion_fiscal || '',
+        dominio_sistema: companyData.dominio_sistema || 'https://franyermobilecenter.com',
         logo_url: companyData.logo_url || null,
         logo_public_id: companyData.logo_public_id || null
       });
@@ -66,7 +71,8 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
     formData.rnc.trim() !== (companyData?.rnc || '').trim() ||
     formData.telefono_principal.replace(/\D/g, '') !== String(companyData?.telefono_principal || '').replace(/\D/g, '') ||
     formData.correo_contacto.trim().toLowerCase() !== (companyData?.correo_contacto || '').trim().toLowerCase() ||
-    formData.direccion_fiscal.trim() !== (companyData?.direccion_fiscal || '').trim()
+    formData.direccion_fiscal.trim() !== (companyData?.direccion_fiscal || '').trim() ||
+    formData.dominio_sistema.trim() !== (companyData?.dominio_sistema || '').trim()
   );
 
   const handleChange = (field, value) => {
@@ -148,6 +154,15 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
       newErrors.direccion_fiscal = 'Debe contener al menos 3 caracteres.';
     }
 
+    const cleanDominio = formData.dominio_sistema.trim();
+    if (!cleanDominio) {
+      newErrors.dominio_sistema = 'El dominio web del sistema es obligatorio.';
+    } else if (cleanDominio.length > 150) {
+      newErrors.dominio_sistema = 'No puede exceder los 150 caracteres.';
+    } else if (!/^https?:\/\/.+/i.test(cleanDominio)) {
+      newErrors.dominio_sistema = 'El dominio web debe ser una URL válida (debe iniciar con http:// o https://).';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -181,6 +196,7 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
         telefono_principal: formData.telefono_principal.trim(),
         correo_contacto: formData.correo_contacto.trim().toLowerCase(),
         direccion_fiscal: formData.direccion_fiscal.trim(),
+        dominio_sistema: formData.dominio_sistema.trim(),
         logo_url: finalLogoUrl,
         logo_public_id: finalLogoPublicId
       };
@@ -213,15 +229,18 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
 
   return (
     <div className="space-y-6">
-      {/* Banner de Modo Solo Lectura para Admin Sucursal */}
+      {/* Aviso Sutil de Modo Solo Lectura para Admin Sucursal */}
       {!isSuperAdmin && (
-        <div className="flex items-center gap-3 p-3.5 sm:p-4 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-800 dark:text-red-300 text-xs sm:text-sm">
-          <div className="p-1.5 rounded-lg bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 shrink-0">
-            <ShieldAlert size={18} />
-          </div>
-          <p className="font-medium font-inter">
+        <div className="flex items-center justify-start -mt-2">
+          <Badge
+            variant="minimalist"
+            color="danger"
+            size="sm"
+            icon={Lock}
+            className="text-xs text-red-600 dark:text-red-400 font-inter gap-1.5"
+          >
             La edición está reservada para el Super Administrador.
-          </p>
+          </Badge>
         </div>
       )}
 
@@ -394,6 +413,33 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
                     <p className="text-xs text-red-500 mt-1">{errors.correo_contacto}</p>
                   )}
                 </div>
+
+                {/* Dominio Web del Sistema */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
+                    Dominio Web del Sistema <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400">
+                      <Globe size={16} />
+                    </div>
+                    <input
+                      type="url"
+                      value={formData.dominio_sistema}
+                      onChange={(e) => handleChange('dominio_sistema', e.target.value)}
+                      placeholder="https://franyermobilecenter.com"
+                      maxLength={150}
+                      disabled={!isSuperAdmin || isSubmitting}
+                      className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all disabled:bg-neutral-100 dark:disabled:bg-neutral-800/60 disabled:cursor-not-allowed ${errors.dominio_sistema
+                          ? 'border-red-500 focus:ring-red-500/20'
+                          : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10'
+                        }`}
+                    />
+                  </div>
+                  {errors.dominio_sistema && (
+                    <p className="text-xs text-red-500 mt-1">{errors.dominio_sistema}</p>
+                  )}
+                </div>
               </div>
 
               {/* Dirección Fiscal */}
@@ -425,16 +471,18 @@ export const CompanyProfileTab = ({ companyData, onRefresh }) => {
               {/* Botón de Guardado (Solo SuperAdmin) */}
               {isSuperAdmin && (
                 <div className="pt-4 flex items-center justify-end">
-                  <Button
-                    type="submit"
+                  <InlineConfirmButton
+                    type="button"
                     variant="primary"
                     size="md"
+                    icon={Save}
+                    text="Guardar Cambios"
+                    confirmText="¿Guardar?"
+                    onBeforeConfirm={validate}
+                    onConfirm={handleSubmit}
                     disabled={isSubmitting || !hasChanges}
                     isLoading={isSubmitting}
-                    icon={Save}
-                  >
-                    Guardar Cambios
-                  </Button>
+                  />
                 </div>
               )}
             </div>

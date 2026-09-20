@@ -4,11 +4,12 @@ import Button from '../common/Button';
 import { useAuth } from '../../context/AuthContext';
 import { updateBranch } from '../../services/configuracion.service';
 import { sileo } from 'sileo';
-import { Building2, Phone, MapPin, Hash } from 'lucide-react';
+import { Building2, Phone, MapPin, Hash, Ticket } from 'lucide-react';
 
 const INITIAL_FORM_STATE = {
   codigo_sucursal: '',
   nombre_sucursal: '',
+  prefijo_ticket: '',
   telefono: '',
   direccion: ''
 };
@@ -31,6 +32,7 @@ export const BranchModal = ({
       setFormData({
         codigo_sucursal: branch.codigo_sucursal || '',
         nombre_sucursal: branch.nombre_sucursal || '',
+        prefijo_ticket: branch.prefijo_ticket || 'FMC-',
         telefono: branch.telefono ? String(branch.telefono).replace(/\D/g, '') : '',
         direccion: branch.direccion || ''
       });
@@ -44,6 +46,7 @@ export const BranchModal = ({
   const hasChanges = Boolean(
     formData.codigo_sucursal.trim().toUpperCase() !== (branch?.codigo_sucursal || '').trim().toUpperCase() ||
     formData.nombre_sucursal.trim() !== (branch?.nombre_sucursal || '').trim() ||
+    formData.prefijo_ticket.trim().toUpperCase() !== (branch?.prefijo_ticket || 'FMC-').trim().toUpperCase() ||
     formData.telefono.replace(/\D/g, '') !== String(branch?.telefono || '').replace(/\D/g, '') ||
     formData.direccion.trim() !== (branch?.direccion || '').trim()
   );
@@ -52,6 +55,8 @@ export const BranchModal = ({
     let processedValue = value;
     if (field === 'codigo_sucursal') {
       processedValue = value.toUpperCase().slice(0, 10);
+    } else if (field === 'prefijo_ticket') {
+      processedValue = value.toUpperCase().slice(0, 15);
     } else if (field === 'telefono') {
       processedValue = value.replace(/\D/g, '').slice(0, 20);
     }
@@ -72,6 +77,13 @@ export const BranchModal = ({
         newErrors.codigo_sucursal = 'El código de la sucursal es obligatorio.';
       } else if (cleanCode.length > 10) {
         newErrors.codigo_sucursal = 'El código no puede superar los 10 caracteres.';
+      }
+
+      const cleanPrefix = formData.prefijo_ticket.trim().toUpperCase();
+      if (!cleanPrefix) {
+        newErrors.prefijo_ticket = 'El prefijo de ticket es obligatorio.';
+      } else if (cleanPrefix.length > 15) {
+        newErrors.prefijo_ticket = 'El prefijo de ticket no puede superar los 15 caracteres.';
       }
 
       const cleanNombre = formData.nombre_sucursal.trim();
@@ -117,6 +129,7 @@ export const BranchModal = ({
       const payload = {
         codigo_sucursal: isSuperAdmin ? formData.codigo_sucursal.trim().toUpperCase() : branch.codigo_sucursal,
         nombre_sucursal: isSuperAdmin ? formData.nombre_sucursal.trim() : branch.nombre_sucursal,
+        prefijo_ticket: isSuperAdmin ? formData.prefijo_ticket.trim().toUpperCase() : (branch.prefijo_ticket || 'FMC-'),
         telefono: formData.telefono.trim(),
         direccion: formData.direccion.trim()
       };
@@ -196,33 +209,63 @@ export const BranchModal = ({
               )}
             </div>
 
-            {/* Teléfono */}
+            {/* Prefijo de Ticket */}
             <div>
               <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
-                Teléfono de Contacto <span className="text-red-500">*</span>
+                Prefijo de Ticket <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400">
-                  <Phone size={16} />
+                  <Ticket size={16} />
                 </div>
                 <input
-                  type="tel"
-                  value={formData.telefono}
-                  onChange={(e) => handleChange('telefono', e.target.value)}
-                  placeholder="8095550100"
-                  maxLength={20}
-                  disabled={isSubmitting}
-                  className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all ${
-                    errors.telefono
-                      ? 'border-red-500 focus:ring-red-500/20'
-                      : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10'
+                  type="text"
+                  value={formData.prefijo_ticket}
+                  onChange={(e) => handleChange('prefijo_ticket', e.target.value)}
+                  placeholder="FMC-"
+                  maxLength={15}
+                  disabled={isSubmitting || !isSuperAdmin}
+                  className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border font-mono uppercase transition-all ${
+                    !isSuperAdmin
+                      ? 'opacity-60 bg-zinc-100 dark:bg-zinc-800 text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 cursor-not-allowed select-none'
+                      : errors.prefijo_ticket
+                      ? 'border-red-500 focus:ring-red-500/20 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2'
+                      : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2'
                   }`}
                 />
               </div>
-              {errors.telefono && (
-                <p className="text-xs text-red-500 mt-1">{errors.telefono}</p>
+              {errors.prefijo_ticket && (
+                <p className="text-xs text-red-500 mt-1">{errors.prefijo_ticket}</p>
               )}
             </div>
+          </div>
+
+          {/* Teléfono */}
+          <div>
+            <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
+              Teléfono de Contacto <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400">
+                <Phone size={16} />
+              </div>
+              <input
+                type="tel"
+                value={formData.telefono}
+                onChange={(e) => handleChange('telefono', e.target.value)}
+                placeholder="8095550100"
+                maxLength={20}
+                disabled={isSubmitting}
+                className={`w-full pl-9 pr-3 py-2 text-sm rounded-xl border bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-hidden focus:ring-2 transition-all ${
+                  errors.telefono
+                    ? 'border-red-500 focus:ring-red-500/20'
+                    : 'border-neutral-200 dark:border-neutral-800 focus:border-neutral-900 dark:focus:border-neutral-100 focus:ring-neutral-900/10'
+                }`}
+              />
+            </div>
+            {errors.telefono && (
+              <p className="text-xs text-red-500 mt-1">{errors.telefono}</p>
+            )}
           </div>
 
           {/* Nombre de la Sucursal */}

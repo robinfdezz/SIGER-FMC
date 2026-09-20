@@ -8,13 +8,18 @@ import DashboardPage from './pages/Dashboard/DashboardPage';
 import WorkersPage from './pages/WorkersPage';
 import ClientsPage from './pages/ClientsPage';
 import ConfigurationPage from './pages/ConfigurationPage';
+import ServiciosPage from './pages/ServiciosPage';
+import NuevaOrdenPage from './pages/NuevaOrdenPage';
+import EstadoOrdenPage from './pages/EstadoOrdenPage';
+import BancoTrabajoPage from './pages/BancoTrabajoPage';
+import UploadMobilePage from './pages/UploadMobilePage';
 import { useTheme } from './context/ThemeContext';
 import { Toaster } from 'sileo';
 import 'sileo/styles.css';
 
 const ThemedToaster = () => {
   const { isDark } = useTheme();
-  return <Toaster position="top-center" theme={isDark ? 'dark' : 'light'} />;
+  return <Toaster position="bottom-right" theme={isDark ? 'dark' : 'light'} />;
 };
 
 function App() {
@@ -24,8 +29,11 @@ function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            {/* Ruta Pública: Login */}
+            {/* Rutas Públicas: Login, Seguimiento QR y Carga Remota Móvil */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/estado" element={<EstadoOrdenPage />} />
+            <Route path="/estado/:codigo" element={<EstadoOrdenPage />} />
+            <Route path="/subir-fotos/:sessionId" element={<UploadMobilePage />} />
 
             {/* Rutas Privadas Protegidas */}
             <Route
@@ -33,6 +41,60 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/tickets"
+              element={
+                <ProtectedRoute>
+                  <ServiciosPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/tickets/nueva"
+              element={
+                <ProtectedRoute>
+                  <NuevaOrdenPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/servicios"
+              element={
+                <ProtectedRoute>
+                  <ServiciosPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/servicios/nueva"
+              element={
+                <ProtectedRoute>
+                  <NuevaOrdenPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/taller"
+              element={
+                <ProtectedRoute>
+                  <BancoTrabajoPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/banco-trabajo"
+              element={
+                <ProtectedRoute>
+                  <BancoTrabajoPage />
                 </ProtectedRoute>
               }
             />

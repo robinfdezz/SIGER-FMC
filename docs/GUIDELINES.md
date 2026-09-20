@@ -85,29 +85,54 @@ frontend/
 * **Feedback Visual:** Spinners en peticiones asíncronas, toasts de notificación para acciones exitosas/fallidas.
 * **Fotos de Perfil:** Si el usuario no tiene `foto_perfil_url`, mostrar un avatar con sus iniciales.
 * **Atenuación en Modo Solo Lectura:** Bloques y formularios no editables por restricciones de rol (RBAC) aplican la directriz uniforme `opacity-50 select-none pointer-events-none` junto a un banner explicativo conciso.
-* **Seguimiento Público:** Vista minimalista y limpia para clientes sin requerir inicio de sesión.
+* **Tablas de Gestión con Paginación Universal:**
+  - Contenedor con altura fija estándar (`h-[560px] overflow-y-auto overflow-x-auto relative`).
+  - Cabecera fija (`thead sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs`).
+  - Barra inferior con el componente unificado `<Pagination />`: selector de elementos por página (`[10, 20, 50, 100]`), leyenda "Mostrando {start} a {end} de {total} registros" en tono gris neutro tenue, botones `<` y `>` y navegación numerada responsiva sin fondos estridentes.
+  - Scrollbars estandarizados a `8px` tanto en el eje vertical como horizontal (`scrollbar-gutter: stable`).
+* **Microcomponente de Confirmación Inline (`InlineConfirmButton`):**
+  - Para acciones críticas o de confirmación (guardar configuraciones de sucursal/empresa, despachar y cobrar órdenes, autoasignarse órdenes de taller), preferir la doble confirmación interactiva en el mismo botón (`¿Guardar? [✓] [✕]` / `¿Confirmar entrega? [✓] [✕]`).
+  - Soporta tamaño `size="md"` para formularios y modales principales, e integra validaciones previas (`onBeforeConfirm`) antes de alternar el estado.
+* **Estados de Carga con Esqueletos Preciso (Shimmer Skeletons):**
+  - En vistas de consulta pública o paneles con estructura geométrica fija, utilizar `react-loading-skeleton` con `<SkeletonTheme>` adaptado a tema claro (`#e5e7eb` / `#f3f4f6`) y oscuro (`#262626` / `#404040`).
+  - El esqueleto debe calcar la geometría, dimensiones de tarjetas, nodos de stepper y tablas 1:1 respecto a la vista final, eliminando saltos bruscos de diseño (*CLS*).
+* **Envoltorio Natural de Texto en Tablas:** En columnas de nombres de clientes y modelos de dispositivos, evitar el uso de `truncate` estricto; utilizar `whitespace-normal break-words leading-snug` con ancho delimitado para permitir el flujo multilínea sin cortes bruscos.
+* **Presentación de Roles en Tablas:** Utilizar el componente oficial `<Badge variant="minimal" color={...} icon={RoleIcon}>{nombreRol}</Badge>` para proyectar un formato en línea limpio con icono y texto a color semántico sin recuadros ni fondos pesados.
+* **Indicadores de Campos Obligatorios:** En formularios, todo asterisco indicador de obligatoriedad debe proyectar explícitamente `<span className="text-red-500">*</span>` en color rojo institucional.
+* **Controles Inferiores del Sidebar:** En estado expandido, los botones de tema y modo se alinean a la izquierda en la misma vertical del menú (`items-start`), con formato cuadrado estricto (`w-10 h-10 aspect-square rounded-lg flex items-center justify-center`) y hover contenido sin expansión a lo ancho.
+* **Seguimiento Público:** Vista minimalista y limpia para clientes sin requerir inicio de sesión, protegida condicionalmente con Cloudflare Turnstile anti-bot.
 
 ---
 
 ## 5. Reglas de Negocio y Flujo de Trabajo
 
 1. **Creación de Tickets:** Al registrar un servicio, se genera un código correlativo único (ej. `TKT-2026-0001`) y se crea automáticamente el primer registro en `Historial_Estados` con estado `RECIBIDO`.
-2. **Subida y Procesamiento de Imágenes (Cloudinary):**
+2. **Subida y Ciclo de Vida de Evidencias Fotográficas (Cloudinary & Sesión Unificada):**
    * **Pipeline de Backend:** Multer en memoria (`memoryStorage`, límite de 5MB) transmite por streaming en RAM (`Readable.from(buffer)`) al SDK de Cloudinary.
    * **Optimización Automática:** Formato WebP inteligente (`format: 'webp'`), compresión adaptativa (`quality: 'auto'`) y dimensiones restringidas (`500x500`, `crop: 'limit'`).
-   * **Estructura de Carpetas:**
+   * **Estructura Canónica de Carpetas:**
      * `siger-fmc/personal-fmc`: Avatares de trabajadores y administradores.
-     * `siger-fmc/evidencias-tickets`: Fotos de equipos recibidos, diagnóstico y entrega.
-   * **Limpieza de Recursos Huérfanos:** Al actualizar o remover fotos, se invoca `deleteImageByUrl(url)` para destruir el asset previo en Cloudinary.
-   * **Experiencia de Usuario (Dropzone):** Modales con selector dropzone completo (`onDragOver`, `onDrop`, `onClick`), preview instantáneo (`URL.createObjectURL`), feedback animado y timeout de petición extendido a 120 segundos.
+     * `siger-fmc/recepcion`: Evidencias temporales de recepción (sesiones móviles QR y subidas directas desde PC).
+     * `siger-fmc/evidencias-tickets`: Fotos confirmadas de equipos recibidos, incidencias técnicas y entregas.
+   * **Pauta contra Archivos Huérfanos (Sesión Unificada):**
+     * Queda estrictamente prohibida la subida anónima o desvinculada de fotos sin registrar en la base de datos.
+     * Toda foto seleccionada antes de guardar una orden (sea desde PC o desde teléfono móvil vía QR) debe canalizarse o asociarse a una sesión activa en `sesiones_carga_fotos`.
+     * Las sesiones no confirmadas expiran en 15 minutos y son purgadas de Cloudinary tras 30 minutos por el Garbage Collector en background.
+   * **Destrucción Inmediata al Descartar en UI:**
+     * Al presionar el botón de eliminar o la papelera en miniaturas temporales, el frontend debe invocar de inmediato `eliminarFotoTemporal` (`POST /api/upload-session/eliminar-foto` o `DELETE /api/servicios/evidencia-temporal`) para destruir el asset en Cloudinary (`cloudinary.uploader.destroy`) y mantener saneado el almacenamiento.
+   * **Control Dinámico de Cupos:**
+     * Al inicializar una sesión de carga, el componente uploader debe calcular el cupo disponible (`MAX_PHOTOS - currentPhotos.length`) y enviarlo al backend (`maxFotosPermitidas`). Las vistas móviles deben respetar este límite y el backend debe rechazar peticiones que lo desborden.
+   * **Desacoplamiento de Polling:**
+     * El sondeo asíncrono para recibir fotos no debe residir dentro de modales temporales. Debe gestionarse en el componente padre (`DevicePhotoUploader.jsx`) para que continúe en segundo plano si el operador cierra el diálogo QR, informando al usuario mediante toasts (`sileo.success`).
 3. **Manejo de Incidencias:**
    * Si una incidencia incluye costo de repuesto, inicia con `aprobado_por_cliente = 0`.
    * El `costo_final_confirmado` del ticket no suma este valor hasta que se confirme la aprobación.
-4. **Seguridad y Roles:**
-   * `SuperAdmin`: Acceso a todas las sucursales y usuarios.
-   * `Admin_Sucursal`: Filtrado automático de consultas por su `sucursal_id`.
-   * `Tecnico`: Solo gestiona tickets asignados o de su sede.
-   * `Secretaria`: Apertura de órdenes, asignación básica y cobro/entrega.
+4. **Seguridad y Roles (RBAC):**
+   * `SuperAdmin`: Acceso omnicanal a todas las sucursales, finanzas, configuración y control total.
+   * `Admin_Sucursal`: Filtrado automático de consultas por su `sucursal_id` y control operativo local.
+   * `Tecnico`: Solo gestiona tickets asignados o de su sede en el banco de trabajo. No puede crear órdenes de servicio (`403 Forbidden`).
+   * `Secretaria`: Apertura de órdenes en mostrador, emisión de comprobantes y cobro/entrega.
+   * **Restricción Estricta de Cancelación de Órdenes:** Solo `SuperAdmin` y `Admin_Sucursal` están autorizados para cancelar o dar de baja órdenes de servicio (`POST /api/servicios/:id/cancelar`). Usuarios con rol `Tecnico` o `Secretaria` tienen terminantemente denegada esta acción (`403 Forbidden`).
 
 ## 6. Identidad Visual, UI/UX y Sistema de Temas
 
@@ -173,6 +198,11 @@ frontend/
 * **Cabecera y Filtros Integrados:** El título de la vista, la descripción, el botón de refrescar y el botón de acción principal (`+ Nuevo ...`) deben residir dentro de la misma tarjeta superior que contiene los buscadores y filtros.
 * **Filas Inactivas:** Las filas con registros deshabilitados o inactivos (`activo = false`) deben mostrarse con opacidad atenuada (`opacity-50`) para comunicar visualmente su estado sin alterar la alineación.
 * **Botones de Acción en Tablas:** Los botones de acción por fila (Editar, Activar/Desactivar) comparten dimensiones idénticas (`p-2 rounded-lg`), color base neutro (`text-neutral-500`) y estados hover sutiles.
+* **Ordenamiento Interactivo en Tablas (Sort Multi-columna):**
+  * **Comportamiento:** Cada encabezado ordenable incluye `cursor-pointer select-none group` y conmuta entre ascendente (`asc`) y descendente (`desc`) al hacer clic.
+  * **Indicador Visual:** Para mantener un diseño limpio y despejado, las columnas inactivas **no muestran icono**. Al activarse una columna, se muestra un chevron minimalista (`ChevronUp` o `ChevronDown` con color de acento corporativo) indicando con precisión la dirección.
+  * **Columna de Acciones:** La columna de acciones permanece fija al extremo derecho sin interactividad de ordenamiento.
+  * **Contenedor Homogéneo:** Las tablas maestras utilizan un contenedor de altura fija (`h-[560px] relative overflow-x-auto overflow-y-auto`) con cabecera fija (`thead sticky top-0 bg-neutral-50 dark:bg-[#141416]`) y barra de conteo inferior unificada (`Mostrando X de Y registros`).
 
 ---
 
@@ -263,11 +293,33 @@ frontend/
    * **Estética:** Bordes redondeados `rounded-xl`, sombra suave, transiciones y variantes consistentes con el diseño de la aplicación.
 
 7. **`Badge.jsx` (Insignia / Chip de Estado):**
-   * **Props:** `children`, `variant` (`'success' | 'danger' | 'warning' | 'info' | 'neutral'`), `size` (`'sm' | 'md'`), `showDot` (`boolean`, por defecto: `true`), `icon` (componente funcional de `lucide-react`, ej. `CheckCircle2`, `XCircle`, `Sparkles`), `className`.
+   * **Props:** `children`, `variant` (`'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'minimal'`), `size` (`'sm' | 'md'`), `showDot` (`boolean`, por defecto: `true`), `icon` (componente funcional de `lucide-react`, ej. `CheckCircle2`, `XCircle`, `Sparkles`), `className`.
    * **Comportamiento y Renderizado:**
      * Si se pasa la prop `icon`, se renderiza con dimensionamiento adaptativo proporcional (`w-3 h-3` para `size="sm"` y `w-3.5 h-3.5` para `size="md"`) heredando el color semántico de la variante.
      * Si no se pasa `icon` y `showDot` es `true`, renderiza el punto indicador circular (`w-1.5 h-1.5 rounded-full`).
+     * **Variante Minimalista (`variant="minimal"` / `badgeVariant="minimal"`):** Renderiza una presentación limpia y en línea con texto e icono al color semántico, sin fondos opacos pesados ni bordes gruesos. Estandarizado para roles en tablas maestras y elementos de checklist técnico en modales (`DeviceChecklistPicker`, `OrdenDetalleModal`, `FichaTecnicaModal`).
    * **Estética:** Bordes suaves `rounded-lg`, padding equilibrado y tipografía `font-medium text-xs`.
+
+### 8.4 Homologación de Modales de Alta Densidad y Flujos Críticos (`OrdenDetalleModal.jsx`, `CancelarOrdenModal.jsx`)
+
+1. **Dimensiones y Espaciado:**
+   * Modales de confirmación o acción destructiva (ej. `CancelarOrdenModal`): Ancho equilibrado `max-w-xl` o `max-w-2xl` para evitar interfaces comprimidas o textos forzados.
+   * Modales de inspección y visor 360° (ej. `OrdenDetalleModal`): Ancho extendido `max-w-4xl` a `max-w-5xl` con scroll interno en el cuerpo y pie de acciones limpio sin botones redundantes.
+
+2. **Cabecera Jerarquizada (Header):**
+   * Eliminar recuadros o contenedores circulares estridentes con iconos gigantes (ej. círculos rojos de bloqueo).
+   * Título principal limpio en tipografía institucional Sora/Inter (`text-xl font-bold`).
+   * Subtítulo con metadatos contextuales en una sola línea sutil:
+     * Código de ticket con badge destacado monoespaciado (`font-mono font-semibold`).
+     * Nombre del cliente acompañado de su icono (`<User className="w-3.5 h-3.5" />`).
+     * Equipo acompañado del icono representativo (`<Smartphone className="w-3.5 h-3.5" />`).
+
+3. **Desduplicación de Marcas y Modelos (`formatDeviceName`):**
+   * En cualquier componente que proyecte la información del equipo, aplicar la utilidad `formatDeviceName(marca, modelo)`.
+   * Si el modelo ya inicia con el nombre de la marca (ej. marca: *"Samsung"*, modelo: *"Samsung Galaxy S22"*), la utilidad remueve la duplicidad para mostrar limpiamente *"Samsung Galaxy S22"*.
+
+4. **Navegación Profunda (Deep Linking) a Taller:**
+   * En modales informativos de órdenes (`OrdenDetalleModal`), incluir acceso directo a la mesa técnica mediante el botón *"Ir al Banco de Trabajo"* con parámetro de consulta (`/taller?buscar={codigo_ticket}`) para agilizar la transición operativa.
 
 ---
 

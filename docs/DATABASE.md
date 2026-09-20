@@ -18,6 +18,8 @@
 | `telefono_principal`| VARCHAR(20) | NO | Teléfono de contacto oficial |
 | `correo_contacto` | VARCHAR(100) | NO | Correo oficial de contacto |
 | `direccion_fiscal` | TEXT | NO | Dirección fiscal de la matriz |
+| `dominio_sistema` | VARCHAR(150) | NO | URL base/origen del sistema web para la construcción de enlaces de seguimiento QR (Default: 'https://franyermobilecenter.com') |
+| `tasa_impuesto_defecto` | NUMERIC(5,2) | NO | Porcentaje base de impuesto (ITBIS) configurado para la empresa (Default: 18.00) |
 | `logo_url` | TEXT | SÍ | URL del logotipo de la empresa |
 | `logo_public_id` | VARCHAR(150) | SÍ | ID único del archivo en Cloudinary para gestión y borrado del logotipo |
 | `created_at` | TIMESTAMPTZ | SÍ | Fecha de creación (CURRENT_TIMESTAMP) |
@@ -30,6 +32,7 @@
 | `companhia_id` | INT | NO | FK -> `datos_companhia(id)` ON UPDATE CASCADE ON DELETE RESTRICT |
 | `codigo_sucursal`| VARCHAR(10) | NO | Código único identificador (ej. 'SUC-01', 'SUC-02') |
 | `nombre_sucursal`| VARCHAR(100) | NO | Nombre descriptivo de la sucursal |
+| `prefijo_ticket` | VARCHAR(15) | NO | Prefijo institucional por sucursal para la nomenclatura de órdenes de servicio (Default: 'FMC-') |
 | `telefono` | VARCHAR(20) | NO | Teléfono directo de la sucursal |
 | `direccion` | VARCHAR(200) | NO | Ubicación física |
 | `config_tickets` | JSONB | NO | Configuración de formato e impresión de comprobantes térmicos POS |
@@ -43,20 +46,21 @@ Configuración parametrizable de impresión de comprobantes en papel térmico de
 ```json
 {
   "ancho_papel_mm": 80,
-  "mostrar_logo": true,
-  "mostrar_datos_empresa": true,
-  "mostrar_datos_sucursal": true,
+  "copias_impresion": 1,
+  "imprimir_logo": true,
+  "mostrar_rnc": true,
+  "mostrar_contacto_sucursal": true,
   "mostrar_cliente": true,
   "mostrar_equipo": true,
   "mostrar_falla": true,
   "mostrar_observaciones": true,
-  "mostrar_desglose_costos": true,
-  "mostrar_garantia": true,
-  "mostrar_qr_consulta": true,
+  "mostrar_costo_y_anticipo": true,
+  "mostrar_checklist_recepcion": true,
+  "incluir_qr_tracking": true,
+  "imprimir_garantia": true,
+  "clausula_garantia_defecto": "Garantía válida únicamente presentando este comprobante. No cubre caídas, humedad, sellos rotos ni manipulación por terceros.",
   "mostrar_mensaje_cortesia": true,
-  "terminos_garantia": "Garantía válida únicamente presentando este comprobante. No cubre caídas, humedad, sellos rotos ni manipulación por terceros.",
-  "mensaje_cortesia": "¡Gracias por su preferencia! Su equipo está en manos de profesionales certificados.",
-  "tamano_fuente": "md"
+  "mensaje_cortesia": "¡Gracias por su preferencia! Su equipo está en manos de profesionales certificados."
 }
 ```
 
@@ -152,6 +156,8 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | `sucursal_id` | INT | NO | FK -> `datos_sucursales(id)` ON DELETE RESTRICT |
 | `categoria_id` | INT | NO | FK -> `categorias_dispositivos(id)` ON DELETE RESTRICT |
 | `cliente_id` | INT | SÍ | FK -> `clientes(id)` ON UPDATE CASCADE ON DELETE SET NULL |
+| `servicio_origen_id` | INT | SÍ | FK -> `servicios_recepcion(id)` ON UPDATE CASCADE ON DELETE RESTRICT (ID de la orden previa original si es un reingreso por garantía) |
+| `es_garantia` | BOOLEAN | NO | Flag lógico que identifica si la orden es un reingreso por garantía (Default: FALSE) |
 | `nombre_cliente` | VARCHAR(100) | SÍ | Nombre de cliente (Obligatorio si `cliente_id` es NULL) |
 | `telefono_cliente`| VARCHAR(20) | SÍ | Teléfono de contacto directo |
 | `cedula_cliente` | VARCHAR(20) | SÍ | Documento del cliente |
@@ -165,22 +171,153 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | `datos_acceso_equipo`| JSONB | SÍ | PIN, patrón o datos de acceso en formato JSON |
 | `falla_reportada`| TEXT | NO | Problema descrito al ingresar el equipo |
 | `observaciones_recepcion`| TEXT | SÍ | Detalles estéticos y condición inicial |
+| `accesorios_recibidos`| TEXT | SÍ | Accesorios dejados por el cliente al ingresar el equipo (cables, cargador, funda, caja, etc.) |
 | `checklist_entrada`| JSONB | SÍ | Inspección inicial en formato JSON |
 | `costo_previsto` | NUMERIC(10,2)| NO | Presupuesto inicial (Default: 0.00) |
 | `monto_anticipo` | NUMERIC(10,2)| NO | Abono o pago inicial dejado por el cliente (Default: 0.00) |
 | `monto_descuento`| NUMERIC(10,2)| NO | Descuento aplicado (Default: 0.00) |
+| `tasa_impuesto` | NUMERIC(5,2) | NO | Porcentaje de impuesto aplicado al ticket al momento de su creación (Default: 18.00) |
+| `monto_impuesto` | NUMERIC(10,2) | NO | Monto monetario retenido por concepto de impuesto en el ticket (Default: 0.00) |
 | `costo_final_confirmado`| NUMERIC(10,2)| NO | Monto final a facturar (Default: 0.00) |
-| `tiempo_garantia`| VARCHAR(50) | SÍ | Periodo de garantía (Default: '30 días') |
+| `tiempo_garantia`| INTEGER | NO | Periodo de garantía en cantidad de días de cobertura (Default: 30) |
 | `condiciones_garantia`| TEXT | SÍ | Términos y exclusiones de garantía |
 | `fecha_entrega_estimada`| DATE | SÍ | Fecha estimada de entrega |
 | `fecha_entrega_real`| TIMESTAMPTZ | SÍ | Fecha y hora en que se entregó el equipo |
+| `usuario_entrega_id`| INT | SÍ | FK -> `datos_trabajadores(id)` ON DELETE RESTRICT (Usuario que despacha/entrega) |
+| `metodo_pago_entrega`| VARCHAR(50) | SÍ | Método de pago para liquidar la orden ('Efectivo', 'Tarjeta', 'Transferencia') |
+| `monto_liquidado` | NUMERIC(10,2)| NO | Saldo neto cobrado al retirar (Default: 0.00) |
+| `monto_recibido_entrega`| NUMERIC(10,2)| NO | Monto monetario entregado por el cliente al retirar (Default: 0.00) |
+| `cambio_devuelto_entrega`| NUMERIC(10,2)| NO | Devuelta o cambio entregado al cliente (Default: 0.00) |
+| `observaciones_entrega`| TEXT | SÍ | Notas finales y pruebas de conformidad al momento del despacho |
+| `motivo_cancelacion` | TEXT | SÍ | Motivo justificado de cancelación de la orden técnica |
+| `fecha_cancelacion`  | TIMESTAMPTZ | SÍ | Fecha y hora en que se canceló formalmente la orden |
+| `usuario_cancela_id` | INT | SÍ | FK -> `usuarios(id)` ON DELETE RESTRICT (Usuario que dio de baja la orden) |
 | `created_at` | TIMESTAMPTZ | SÍ | Timestamp de creación |
 | `updated_at` | TIMESTAMPTZ | SÍ | Timestamp de actualización |
 | `activo` | BOOLEAN | NO | Estado lógico (Default: TRUE) |
 
-> **Restricciones Check (`servicios_recepcion`):**
+> **Restricciones Check y Llaves Foráneas (`servicios_recepcion`):**
 > - `chk_identificacion_cliente`: `(cliente_id IS NOT NULL) OR (nombre_cliente IS NOT NULL)`
 > - `chk_prioridad`: `prioridad IN ('baja', 'media', 'alta', 'urgente')`
+> - `chk_metodo_pago_entrega`: `metodo_pago_entrega IS NULL OR metodo_pago_entrega IN ('Efectivo', 'Tarjeta', 'Transferencia')`
+> - `chk_servicio_no_autoreferencia`: `CHECK (id != servicio_origen_id)`
+> - `fk_servicio_garantia_origen`: `FOREIGN KEY (servicio_origen_id) REFERENCES servicios_recepcion(id) ON UPDATE CASCADE ON DELETE RESTRICT`
+> - `fk_servicio_usuario_entrega`: `FOREIGN KEY (usuario_entrega_id) REFERENCES datos_trabajadores(id) ON DELETE RESTRICT`
+> - `fk_servicio_usuario_cancela`: `FOREIGN KEY (usuario_cancela_id) REFERENCES usuarios(id) ON DELETE RESTRICT`
+
+#### Columnas de Liquidación y Entrega de Equipos (`servicios_recepcion`)
+Para formalizar el cierre contable, la entrega física y la emisión de comprobantes de salida, la tabla gestiona los siguientes campos:
+1. `fecha_entrega_real` (`TIMESTAMPTZ`): Timestamp del momento exacto en que se concluye la liquidación en mostrador y se entrega el dispositivo al cliente.
+2. `usuario_entrega_id` (`INT`, FK -> `datos_trabajadores(id)`): Identificador del colaborador (personal administrativo o secretaría) que gestionó el cobro, entrega y comprobante de salida.
+3. `metodo_pago_entrega` (`VARCHAR(50)`): Medio de pago formal registrado para saldar el balance pendiente (`'Efectivo'`, `'Tarjeta'`, `'Transferencia'`).
+4. `monto_liquidado` (`NUMERIC(10,2)`): Balance neto cobrado al retirar el equipo ($\text{Mano de Obra} + \sum\text{Incidencias Aprobadas} - \text{Anticipos} - \text{Descuentos}$).
+5. `monto_recibido_entrega` (`NUMERIC(10,2)`): Monto monetario entregado por el cliente en caja (usado para transacciones en efectivo).
+6. `cambio_devuelto_entrega` (`NUMERIC(10,2)`): Importe monetario devuelto como cambio o devuelta ($\text{monto\_recibido\_entrega} - \text{monto\_liquidado}$).
+7. `observaciones_entrega` (`TEXT`): Notas finales de conformidad estética y técnica asentadas en el acto de entrega.
+
+#### Columnas de Cancelación de Órdenes (`servicios_recepcion`)
+Para dar soporte al flujo formal de cancelación de servicios técnicos que salen del taller sin solución o sin aprobación del cliente:
+1. `motivo_cancelacion` (`TEXT`): Justificación obligatoria de al menos 5 caracteres (ej. "Cliente no aprueba presupuesto de repuesto", "Equipo irreparable por sulfatación en placa").
+2. `fecha_cancelacion` (`TIMESTAMPTZ`): Timestamp exacto de la baja técnica.
+3. `usuario_cancela_id` (`INT`, FK -> `usuarios(id)`): Identificador del operador o técnico que procesó la cancelación.
+
+#### Esquema JSONB: `datos_acceso_equipo` (Credenciales y Seguridad del Equipo)
+Estructura persistida para resguardar el método de desbloqueo configurado en `DeviceSecurityPicker.jsx` y renderizado en comprobantes / stickers:
+
+1. **Método Patrón (`'patron'`):**
+   ```json
+   {
+     "tipo": "patron",
+     "metodo": "patron",
+     "patron": [6, 3, 0, 4, 2, 5, 8],
+     "valor": "7-4-1-5-3-6-9"
+   }
+   ```
+   * **Array numérico `patron`:** Representación en coordenadas base 0 (`0..8`) correspondientes a una cuadrícula matricial 3x3:
+     ```
+     0 (x=0, y=0) | 1 (x=1, y=0) | 2 (x=2, y=0)
+     3 (x=0, y=1) | 4 (x=1, y=1) | 5 (x=2, y=1)
+     6 (x=0, y=2) | 7 (x=1, y=2) | 8 (x=2, y=2)
+     ```
+     Utilizado para el trazado vectorial SVG de líneas y nodos en `LabelPreview.jsx` y `PatternLock.jsx`.
+   * **String `valor`:** Secuencia legible proyectada al estándar Android del 1 al 9 separada por guiones (ej. `"7-4-1-5-3-6-9"`), facilitando la lectura humana en tickets térmicos y stickers adhesivos.
+
+2. **Método PIN / Contraseña (`'pin'`, `'contrasena'`, `'password'`):**
+   ```json
+   {
+     "tipo": "pin",
+     "metodo": "pin",
+     "valor": "7645",
+     "patron": []
+   }
+   ```
+   * El código alfanumérico o numérico se almacena directamente en la propiedad `valor`.
+   * Se inicializa `patron: []` para evitar errores de renderizado. En la impresión de stickers (`UnlockMethodView`), el sistema prioriza la clave en texto legible en lugar de intentar dibujar trazos vacíos.
+
+3. **Sin Bloqueo (`'ninguno'`):**
+   ```json
+   {
+     "tipo": "ninguno",
+     "metodo": "ninguno",
+     "valor": "",
+     "patron": []
+   }
+   ```
+
+#### Esquema JSONB: `checklist_entrada` (Inspección Inicial de Recepción)
+Inspección ocular y funcional realizada durante la apertura de la orden:
+```json
+{
+  "enciende": true,
+  "pantalla_tactil": true,
+  "camara_trasera": true,
+  "camara_frontal": true,
+  "puerto_carga": true,
+  "altavoz": true,
+  "auricular": true,
+  "microfono": true,
+  "wifi_bluetooth": true,
+  "botones_fisicos": true,
+  "face_touch_id": false,
+  "sensores": true,
+  "bandeja_sim": true,
+  "golpes_rayones": true
+}
+```
+
+#### Resolución de Clientes y Técnicos en Consultas SQL
+
+1. **Resolución Unificada de Cliente (`COALESCE`):**
+   Para garantizar compatibilidad dual entre clientes frecuentes (registrados en la tabla `clientes`) y clientes rápidos de mostrador (datos embebidos en `servicios_recepcion`), las consultas del backend implementan:
+   ```sql
+   COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS nombre_cliente,
+   COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS cliente_nombre,
+   COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,
+   COALESCE(sr.telefono_cliente, c.telefono) AS cliente_telefono
+   ```
+   Esto asegura que tanto el comprobante térmico como el sticker y las vistas de tabla reciban siempre valores válidos sin depender exclusivamente de una relación de clave foránea.
+
+2. **Resolución de Técnicos Asignados:**
+   - **Técnico Principal:** Obtenido mediante subconsulta con orden por ID de asignación:
+     ```sql
+     COALESCE((
+       SELECT TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido))
+       FROM tecnicos_asignados ta
+       JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+       WHERE ta.servicio_id = sr.id
+       ORDER BY ta.id ASC
+       LIMIT 1
+     ), 'Sin asignar') AS tecnico_nombre
+     ```
+   - **Colección Completa de Técnicos:** Agregada como array JSON para soporte multi-técnico:
+     ```sql
+     COALESCE((
+       SELECT json_agg(json_build_object('id', dt_tec.id, 'nombre_completo', TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido))))
+       FROM tecnicos_asignados ta
+       JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id
+       WHERE ta.servicio_id = sr.id
+     ), '[]'::json) AS tecnicos
+     ```
 
 ### `tecnicos_asignados` (Asignación Técnica)
 | Campo | Tipo | Nulo | Descripción |
@@ -210,15 +347,26 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | `descripcion` | TEXT | NO | Detalle del problema o novedad |
 | `repuesto_requerido`| VARCHAR(150)| SÍ | Repuesto o componente necesario |
 | `costo_adicional_repuesto`| NUMERIC(10,2)| NO | Costo extra del repuesto (Default: 0.00) |
-| `aprobado_por_cliente`| BOOLEAN | NO | Aprobación del cliente (Default: FALSE) |
-| `fecha_aprobacion`| TIMESTAMPTZ | SÍ | Timestamp en que el cliente aprueba el costo extra |
-| `metodo_aprobacion`| VARCHAR(30) | SÍ | Medio de confirmación ('Presencial', 'Llamada', 'WhatsApp', 'Correo', 'Otro') |
+| `aprobado_por_cliente`| BOOLEAN | NO | Aprobación del cliente: TRUE (aprobado), FALSE (pendiente o rechazado) (Default: FALSE) |
+| `fecha_aprobacion`| TIMESTAMPTZ | SÍ | Timestamp en que el cliente resuelve (aprueba o rechaza expresamente) el costo extra |
+| `metodo_aprobacion`| VARCHAR(30) | SÍ | Medio de confirmación/notificación ('Presencial', 'Llamada', 'WhatsApp', 'Correo', 'Otro') |
 | `fecha_registro`| TIMESTAMPTZ | SÍ | Timestamp de registro (CURRENT_TIMESTAMP) |
 | `activo` | BOOLEAN | NO | Estado lógico (Default: TRUE) |
 
 > **Restricciones Check (`incidencias_servicio`):**
 > - `chk_tipo_incidencia`: `tipo_incidencia IN ('Imprevisto', 'Aviso al Cliente', 'Pieza Extra', 'Hallazgo Tecnico')`
 > - `chk_metodo_aprobacion`: `metodo_aprobacion IS NULL OR metodo_aprobacion IN ('Presencial', 'Llamada', 'WhatsApp', 'Correo', 'Otro')`
+
+#### Comportamiento de Incidencias en la Liquidación y Cierre de Orden
+1. **Incidencias Aprobadas (`aprobado_por_cliente = TRUE`):**
+   - El `costo_adicional_repuesto` se suma de forma vinculante al balance liquidable del servicio:
+     $$\text{Total Liquidado} = \text{Costo Inicial} + \sum(\text{Costos Incidencias Aprobadas}) - \text{Anticipo} - \text{Descuento}$$
+   - Se reflejan detalladas en el desglose contable del `ReciboEntregaTermico`.
+2. **Incidencias Rechazadas (`aprobado_por_cliente = FALSE` Y `fecha_aprobacion IS NOT NULL`):**
+   - El costo extra es formalmente descartado y **no se incluye** en el total a liquidar.
+   - En la interfaz y en los históricos se presenta tachado (`line-through`) junto con un badge descriptivo de "Rechazado por Cliente", permitiendo opción de reconsideración si el cliente cambia de parecer.
+3. **Incidencias Pendientes (`costo_adicional_repuesto > 0` Y `fecha_aprobacion IS NULL`):**
+   - Indican que el cliente aún no ha emitido respuesta. Para garantizar la consistencia financiera, el sistema bloquea preventivamente la liquidación hasta que la novedad sea aprobada o rechazada formalmente.
 
 ### `evidencias_fotograficas` (Galería Multimedia)
 | Campo | Tipo | Nulo | Descripción |
@@ -229,10 +377,39 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | `usuario_id` | INT | NO | FK -> `datos_trabajadores(id)` ON UPDATE CASCADE ON DELETE RESTRICT |
 | `url_foto` | TEXT | NO | URL de la imagen en almacenamiento Cloudinary |
 | `public_id` | VARCHAR(150) | SÍ | ID único del archivo en Cloudinary para gestión y borrado |
-| `tipo_evidencia`| VARCHAR(150) | NO | Clasificación ('Estado Inicial', 'Falla Detectada', 'Incidencia', 'Finalizado') |
+| `tipo_evidencia`| VARCHAR(150) | NO | Clasificación canónica: `'RECEPCION'`, `'INCIDENCIA'`, `'ENTREGA'` |
 | `descripcion` | VARCHAR(150) | SÍ | Descripción o nota visual |
 | `fecha_subida` | TIMESTAMPTZ | SÍ | Timestamp de subida (CURRENT_TIMESTAMP) |
 | `activo` | BOOLEAN | NO | Estado lógico (Default: TRUE) |
+
+#### Clasificación Canónica de Evidencias (`tipo_evidencia`):
+- **`'RECEPCION'`:** Evidencias tomadas al ingresar el equipo (condición cosmética inicial, rayones, golpes, accesorios dejados).
+- **`'INCIDENCIA'`:** Fotografías técnicas adjuntas por el técnico de taller asociadas a un imprevisto, hallazgo o necesidad de repuesto (`incidencia_id`).
+- **`'ENTREGA'`:** Evidencias fotográficas de salida tomadas en mostrador al liquidar y despachar el equipo reparado (demostración funcional de pantalla encendida, entrega conforme en caja).
+
+---
+
+### 13. Tabla de Sesiones de Carga Remota y Temporal de Fotos (`sesiones_carga_fotos`)
+
+Almacena las sesiones temporales (originadas tanto por Código QR móvil como por selección desde PC en `DevicePhotoUploader.jsx`) para la sincronización de evidencias, control de cupos dinámicos y prevención de archivos huérfanos en Cloudinary mediante el recolector de basura (*Garbage Collector*).
+
+| Campo | Tipo | Nulo | Descripción |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL / INT | NO | Llave Primaria (PK) |
+| `session_id` | VARCHAR(64) | NO | Identificador único de sesión (UUID v4) |
+| `fotos` | JSONB | NO | Array JSON de fotos subidas (`[{ url, secure_url, public_id, bytes, size, fecha_subida }]`) |
+| `estado` | VARCHAR(20) | NO | Estado del ciclo de vida: `'PENDIENTE'`, `'COMPLETADO'`, `'EXPIRADO'`, `'UTILIZADA'` (confirmada en orden de servicio), `'PURGADA'` (huérfanos eliminados de Cloudinary) |
+| `expira_en` | TIMESTAMPTZ | NO | Timestamp límite de vigencia (15 minutos desde la creación) |
+| `max_fotos` | INTEGER | SÍ | Límite dinámico de fotos permitidas para la sesión (Default: 5 o cupos disponibles de la orden) |
+| `created_at` | TIMESTAMPTZ | NO | Fecha de apertura de la sesión |
+| `updated_at` | TIMESTAMPTZ | NO | Última actualización o recepción de fotos |
+
+#### Ciclo de Vida y Reglas Operativas:
+1. **Subida Unificada:** Tanto las fotos capturadas vía QR móvil como las cargadas desde la PC quedan asociadas a un `session_id` activo.
+2. **Validación de Cupo:** El endpoint de subida valida que `fotosActuales.length + nuevosArchivos.length <= max_fotos`, rechazando excesos con HTTP `400`.
+3. **Confirmación en Orden (`'UTILIZADA'`):** Al guardar la orden (`POST /api/servicios`), las fotos se migran a `evidencias_fotograficas` y la sesión pasa a `'UTILIZADA'`.
+4. **Purga Automática (`'PURGADA'`):** Las sesiones expiradas no utilizadas son procesadas cada 30 minutos por el Garbage Collector, invocando `cloudinary.uploader.destroy(public_id)` para cada archivo y marcando la sesión como `'PURGADA'`.
+5. **Retención Histórica (15 Días):** Los registros en estado `'PURGADA'` o `'UTILIZADA'` con más de 15 días son eliminados automáticamente de la base de datos.
 
 ---
 
@@ -240,6 +417,7 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 
 - `idx_servicios_sucursal` -> `servicios_recepcion(sucursal_id)`
 - `idx_servicios_cliente` -> `servicios_recepcion(cliente_id)`
+- `idx_servicios_garantia_origen` -> `servicios_recepcion(servicio_origen_id)`
 - `idx_servicios_estado` -> `servicios_recepcion(estado_actual_id)`
 - `idx_servicios_prioridad` -> `servicios_recepcion(prioridad)`
 - `idx_tecnicos_servicio` -> `tecnicos_asignados(servicio_id)`
@@ -248,6 +426,8 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 - `idx_incidencias_usuario` -> `incidencias_servicio(usuario_id)`
 - `idx_evidencias_servicio` -> `evidencias_fotograficas(servicio_id)`
 - `idx_evidencias_usuario` -> `evidencias_fotograficas(usuario_id)`
+- `idx_sesiones_carga_session_id` -> `sesiones_carga_fotos(session_id)`
+- `idx_sesiones_carga_estado_expira` -> `sesiones_carga_fotos(estado, expira_en)`
 
 ---
 

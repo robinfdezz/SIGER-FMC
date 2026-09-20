@@ -28,10 +28,19 @@
   }
 }
 
-/* Custom modern scrollbars */
+/* Custom modern scrollbars - Homologado horizontal y vertical */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #E4E4E7 transparent;
+}
+
+.dark * {
+  scrollbar-color: #27272A transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -76,35 +85,59 @@
   z-index: 99999 !important;
 }
 
-/* Sileo Toast - Centrado Completo del Contenido y Encabezado */
-[data-sileo-header] {
-  left: 0 !important;
-  right: 0 !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-  justify-content: center !important;
-  width: fit-content !important;
+/* ─────────────────────────────────────────────────────────
+   SISTEMA DE IMPRESIÓN DIRECTA DE TICKETS Y ETIQUETAS
+   Aísla completamente el árbol DOM y garantiza que ningún
+   modal, backdrop-blur ni contenedor overflow afecte la hoja
+   ───────────────────────────────────────────────────────── */
+
+/* Fuera del evento de impresión (en pantalla normal), el contenedor debe estar 100% oculto */
+#print-mount-point {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
 }
 
-[data-sileo-header-stack],
-[data-sileo-header-inner] {
-  justify-content: center !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-}
+@media print {
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
 
-[data-sileo-content] {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  text-align: center !important;
-}
+  /* Ocultar cualquier elemento hijo directo de body excepto el portal de impresión */
+  body > *:not(#print-mount-point) {
+    display: none !important;
+  }
 
-[data-sileo-description] {
-  text-align: center !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
+  #print-mount-point {
+    display: block !important;
+    visibility: visible !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    z-index: 99999999 !important;
+    overflow: visible !important;
+    pointer-events: auto !important;
+  }
+
+  #print-mount-point,
+  #print-mount-point * {
+    visibility: visible !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
 }

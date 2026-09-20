@@ -12,7 +12,10 @@ import {
   Calendar,
   Building2,
   CheckCircle2,
-  Sparkles
+  XCircle,
+  Sparkles,
+  Hash,
+  Ticket
 } from 'lucide-react';
 
 export const BranchesTab = ({ branches = [], onRefresh }) => {
@@ -80,21 +83,53 @@ export const BranchesTab = ({ branches = [], onRefresh }) => {
               {/* Header de la tarjeta */}
               <div>
                 <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200/80 dark:border-neutral-700/80 tracking-wide">
+                  <div className="flex items-center flex-wrap gap-2.5">
+                    {/* Identificador */}
+                    <Badge
+                      variant="minimalist"
+                      color="neutral"
+                      size="sm"
+                      icon={Hash}
+                      className="font-medium text-neutral-800 dark:text-neutral-200"
+                    >
                       {branch.codigo_sucursal}
-                    </span>
+                    </Badge>
 
-                    {/* Badge de Sede Asignada al usuario */}
+                    {/* Prefijo */}
+                    <Badge
+                      variant="minimalist"
+                      color="neutral"
+                      size="sm"
+                      icon={Ticket}
+                      className="font-medium text-neutral-500 dark:text-neutral-400"
+                    >
+                      Prefijo: {branch.prefijo_ticket || 'FMC-'}
+                    </Badge>
+
+                    {/* Pertenencia: Mi Sucursal */}
                     {isUserOwnBranch && (
-                      <Badge variant="danger" size="sm" icon={Sparkles}>
+                      <Badge
+                        variant="minimalist"
+                        color="danger"
+                        size="sm"
+                        icon={Sparkles}
+                        className="font-medium"
+                      >
                         Mi Sucursal
                       </Badge>
                     )}
                   </div>
 
-                  {/* Estado Activo Badge */}
-                  <Badge variant="success" icon={CheckCircle2}>Activa</Badge>
+                  {/* Estado: Activa / Inactiva */}
+                  <Badge
+                    variant="minimalist"
+                    color={branch.activo !== false ? 'success' : 'danger'}
+                    size="sm"
+                    icon={branch.activo !== false ? CheckCircle2 : XCircle}
+                    className="font-medium"
+                  >
+                    {branch.activo !== false ? 'Activa' : 'Inactiva'}
+                  </Badge>
                 </div>
 
                 <h4 className="text-base font-semibold text-neutral-900 dark:text-neutral-100 font-outfit mb-3">

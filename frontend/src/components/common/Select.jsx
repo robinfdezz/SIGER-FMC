@@ -33,10 +33,13 @@ export const Select = ({
   disabled = false,
   name,
   error,
+  size = 'md',
   className = '',
   buttonClassName = '',
-  menuClassName = ''
+  menuClassName = '',
+  placement = 'bottom'
 }) => {
+  const isCompact = size === 'sm';
   const [isOpen, setIsOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const containerRef = useRef(null);
@@ -139,7 +142,11 @@ export const Select = ({
         onClick={toggleDropdown}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`w-full flex items-center justify-between gap-2 px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border rounded-xl text-sm transition-all duration-150 text-left outline-none ${
+        className={`w-full flex items-center justify-between ${
+          isCompact
+            ? 'gap-1.5 px-2.5 py-1 rounded-lg text-xs'
+            : 'gap-2 px-3.5 py-2 rounded-xl text-sm'
+        } bg-neutral-50 dark:bg-neutral-900 border transition-all duration-150 text-left outline-none ${
           disabled
             ? 'opacity-60 cursor-not-allowed bg-neutral-100 dark:bg-neutral-800/60 border-neutral-200 dark:border-neutral-800 text-neutral-400 dark:text-neutral-500'
             : error
@@ -186,7 +193,7 @@ export const Select = ({
 
         {/* Flecha Chevron rotativa */}
         <ChevronDown
-          size={16}
+          size={isCompact ? 13 : 16}
           className={`shrink-0 transition-transform duration-200 text-neutral-400 dark:text-neutral-500 ${
             isOpen ? 'rotate-180 text-red-500 dark:text-red-400' : ''
           }`}
@@ -197,7 +204,9 @@ export const Select = ({
       {isOpen && (
         <div
           role="listbox"
-          className={`absolute left-0 right-0 mt-1.5 bg-white dark:bg-[#18181B] border border-neutral-200/90 dark:border-neutral-800 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto py-1.5 animate-in fade-in zoom-in-95 duration-150 ${menuClassName}`}
+          className={`absolute left-0 right-0 ${
+            placement === 'top' ? 'bottom-full mb-1.5' : 'mt-1.5'
+          } bg-white dark:bg-[#18181B] border border-neutral-200/90 dark:border-neutral-800 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto py-1.5 animate-in fade-in zoom-in-95 duration-150 ${menuClassName}`}
         >
           {items.length === 0 ? (
             <div className="px-3.5 py-2.5 text-xs text-neutral-400 dark:text-neutral-500 text-center font-inter">
@@ -216,7 +225,9 @@ export const Select = ({
                   aria-selected={isSelected}
                   aria-disabled={isItemDisabled}
                   onClick={() => handleSelect(item)}
-                  className={`flex items-center justify-between gap-2.5 px-3.5 py-2 text-sm cursor-pointer transition-colors ${
+                  className={`flex items-center justify-between ${
+                    isCompact ? 'gap-1.5 px-2.5 py-1.5 text-xs' : 'gap-2.5 px-3.5 py-2 text-sm'
+                  } cursor-pointer transition-colors ${
                     isItemDisabled
                       ? 'opacity-40 cursor-not-allowed bg-transparent text-neutral-400'
                       : isSelected
@@ -266,7 +277,7 @@ export const Select = ({
 
                   {/* Checkmark de Selección Activa */}
                   {isSelected && (
-                    <Check size={16} className="text-red-600 dark:text-red-400 shrink-0 ml-2" />
+                    <Check size={isCompact ? 13 : 16} className="text-red-600 dark:text-red-400 shrink-0 ml-1.5" />
                   )}
                 </div>
               );

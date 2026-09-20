@@ -21,8 +21,9 @@ const DashboardPage = () => {
 
   return (
     <DashboardLayout>
-      {/* Banner de Bienvenida */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 text-white p-6 sm:p-8 shadow-xl border border-zinc-800">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+        {/* Banner de Bienvenida */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 text-white p-6 sm:p-8 shadow-xl border border-zinc-800">
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-brand-600/20 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -104,9 +105,9 @@ const DashboardPage = () => {
             Tokens JWT sincronizados con API Express
           </p>
         </div>
-
       </div>
-    </DashboardLayout>
+    </div>
+  </DashboardLayout>
   );
 };
 

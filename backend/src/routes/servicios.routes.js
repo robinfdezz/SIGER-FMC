@@ -1,0 +1,115 @@
+'use strict';
+
+const express = require('express');
+const router = express.Router();
+const authMiddleware = require('../middlewares/authMiddleware');
+const { checkRole } = require('../middlewares/roleMiddleware');
+const verifyTurnstile = require('../middlewares/turnstile.middleware');
+const { upload, handleMulterErrors } = require('../middlewares/upload');
+const {
+  createServicio,
+  getServicios,
+  getServicioById,
+  getServicioByTicket,
+  getServiciosTaller,
+  updateServicioEstado,
+  assignTecnicoServicio,
+  removeTecnicoServicio,
+  validarGarantiaTicket,
+  uploadFotosServicio,
+  getIncidenciasServicio,
+  createIncidenciaServicio,
+  updateAprobacionIncidencia,
+  liquidarYEntregarServicio,
+  cancelarServicio,
+  getTicketImpresionData,
+  updateServicio
+} = require('../controllers/servicios.controller');
+
+// ── Ruta pública para consulta / tracking de ticket vía QR (Anti-Bot condicional) ──
+router.get('/ticket/:codigo', verifyTurnstile, getServicioByTicket);
+
+// Todas las demás rutas de servicios requieren autenticación
+router.use(authMiddleware);
+
+// GET /api/servicios/taller - Órdenes activas para el tablero Kanban de taller
+router.get('/taller', getServiciosTaller);
+
+// GET /api/servicios?page=1&limit=20&sucursal_id=&estado_id=&q=
+router.get('/', getServicios);
+
+// GET /api/servicios/validar-garantia/:codigoTicket - Validar vigencia de garantía
+router.get('/validar-garantia/:codigoTicket', validarGarantiaTicket);
+
+// GET /api/servicios/:id/incidencias - Listar incidencias y hallazgos técnicos
+router.get('/:id/incidencias', getIncidenciasServicio);
+
+// POST /api/servicios/:id/incidencias - Registrar nueva incidencia técnica
+router.post('/:id/incidencias', createIncidenciaServicio);
+
+// PATCH /api/servicios/:id/incidencias/:incidenciaId/aprobacion - Actualizar aprobación de cliente de una incidencia
+router.patch('/:id/incidencias/:incidenciaId/aprobacion', updateAprobacionIncidencia);
+
+// GET /api/servicios/:id/ticket-impresion - Validación y consulta para impresión (bloquea canceladas)
+router.get('/:id/ticket-impresion', getTicketImpresionData);
+
+// GET /api/servicios/:id
+router.get('/:id', getServicioById);
+
+// PUT /api/servicios/:id - Edición controlada de orden (Secretaria, Admin, SuperAdmin)
+router.put(
+  '/:id',
+  checkRole(
+    ['SuperAdmin', 'Admin_Sucursal', 'admin', 'superadmin', 'secretaria'],
+    'No tienes permisos para editar órdenes de servicio'
+  ),
+  updateServicio
+);
+router.patch(
+  '/:id',
+  checkRole(
+    ['SuperAdmin', 'Admin_Sucursal', 'admin', 'superadmin', 'secretaria'],
+    'No tienes permisos para editar órdenes de servicio'
+  ),
+  updateServicio
+);
+
+// PATCH /api/servicios/:id/estado - Actualización de estado en taller
+router.patch('/:id/estado', updateServicioEstado);
+
+// POST /api/servicios/:id/tecnicos - Asignar técnico colaborador
+router.post('/:id/tecnicos', assignTecnicoServicio);
+
+// DELETE /api/servicios/:id/tecnicos/:tecnicoId - Remover técnico colaborador
+router.delete('/:id/tecnicos/:tecnicoId', removeTecnicoServicio);
+
+// POST /api/servicios/:id/entregar - Liquidación y entrega de equipo al cliente
+router.post('/:id/entregar', liquidarYEntregarServicio);
+
+// POST /api/servicios/:id/cancelar - Cancelación formal de orden de servicio (restringido a SuperAdmin y Admin_Sucursal)
+router.post(
+  '/:id/cancelar',
+  checkRole(
+    ['SuperAdmin', 'Admin_Sucursal', 'admin', 'superadmin'],
+    'No tienes permisos para desactivar órdenes de servicio'
+  ),
+  cancelarServicio
+);
+
+// POST /api/servicios
+router.post('/', createServicio);
+
+const { eliminarFotoTemporal } = require('../controllers/uploadSession.controller');
+
+// POST /api/servicios/upload-foto  - Subida de hasta 5 fotos a Cloudinary
+router.post(
+  '/upload-foto',
+  handleMulterErrors(upload.any()),
+  uploadFotosServicio
+);
+
+// DELETE /api/servicios/evidencia-temporal - Destrucción en tiempo real de asset huérfano descartado
+router.delete('/evidencia-temporal', eliminarFotoTemporal);
+router.post('/evidencia-temporal', eliminarFotoTemporal);
+
+module.exports = router;
