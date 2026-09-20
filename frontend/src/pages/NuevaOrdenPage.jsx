@@ -10,6 +10,7 @@ import PostCreacionModal from '../components/servicios/PostCreacionModal';
 import Button from '../components/common/Button';
 import Select from '../components/common/Select';
 import DatePicker from '../components/common/DatePicker';
+import InlineConfirmButton from '../components/common/InlineConfirmButton';
 import { getCategorias, createServicio, validarGarantiaTicket } from '../services/servicios.service';
 import { getWorkers } from '../services/workers.service';
 import { getCompanyProfile, getBranches } from '../services/configuracion.service';
@@ -23,6 +24,7 @@ import {
   Smartphone,
   AlertCircle,
   AlertTriangle,
+  RotateCcw,
   DollarSign,
   Calendar,
   ShieldAlert,
@@ -164,6 +166,45 @@ const INITIAL_FORM = {
   tecnicos_asignados: [],
 };
 
+const DRAFT_STORAGE_KEY = 'siger_fmc_nueva_orden_draft';
+const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+const loadDraftFromStorage = () => {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      // 1. Caducidad: Si el borrador supera las 24 horas, descartarlo de sessionStorage
+      if (parsed.savedAt) {
+        const savedTime = new Date(parsed.savedAt).getTime();
+        if (Number.isFinite(savedTime) && Date.now() - savedTime > DRAFT_MAX_AGE_MS) {
+          sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+          return null;
+        }
+      }
+
+      // 2. Blindaje: Si no es garantía, forzar estado inicial limpio para evitar reseteos involuntarios
+      if (parsed.form && !parsed.form.es_garantia) {
+        parsed.form.servicio_origen_id = null;
+        parsed.form.servicio_origen_codigo = '';
+        parsed.form.codigo_ticket_origen = '';
+        parsed.ticketValidation = {
+          loading: false,
+          checked: false,
+          error: null,
+          data: null
+        };
+      }
+
+      return parsed;
+    }
+  } catch (err) {
+    console.warn('⚠️ Error al recuperar borrador de sessionStorage:', err);
+  }
+  return null;
+};
+
 export const NuevaOrdenPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -180,19 +221,52 @@ export const NuevaOrdenPage = () => {
     }
   }, [isTecnico, navigate]);
 
-  const [currentStep, setCurrentStep] = useState(1);
-  const [form, setForm] = useState(INITIAL_FORM);
+  const initialDraftRef = useRef(loadDraftFromStorage());
+  const initialDraft = initialDraftRef.current;
+
+  const [currentStep, setCurrentStep] = useState(() => {
+    const step = initialDraft?.currentStep;
+    if (typeof step === 'number' && step >= 1 && step <= 4) {
+      return step;
+    }
+    return 1;
+  });
+
+  const [form, setForm] = useState(() => {
+    if (initialDraft?.form && typeof initialDraft.form === 'object') {
+      const isGarantia = Boolean(initialDraft.form.es_garantia);
+      return {
+        ...INITIAL_FORM,
+        ...initialDraft.form,
+        es_garantia: isGarantia,
+        servicio_origen_id: isGarantia ? initialDraft.form.servicio_origen_id : null,
+        servicio_origen_codigo: isGarantia ? (initialDraft.form.servicio_origen_codigo || '') : '',
+        codigo_ticket_origen: isGarantia ? (initialDraft.form.codigo_ticket_origen || '') : '',
+        checklist_entrada: initialDraft.form.checklist_entrada || {},
+        fotos_recepcion: Array.isArray(initialDraft.form.fotos_recepcion) ? initialDraft.form.fotos_recepcion : [],
+        datos_acceso_equipo: initialDraft.form.datos_acceso_equipo || INITIAL_FORM.datos_acceso_equipo
+      };
+    }
+    return INITIAL_FORM;
+  });
+
+  const [hasDraft, setHasDraft] = useState(() => Boolean(initialDraft));
   const [categorias, setCategorias] = useState([]);
   const [tecnicosDisponibles, setTecnicosDisponibles] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
 
   // Validación de ticket de garantía previo
-  const [ticketValidation, setTicketValidation] = useState({
-    loading: false,
-    checked: false,
-    error: null,
-    data: null
+  const [ticketValidation, setTicketValidation] = useState(() => {
+    if (initialDraft?.form?.es_garantia && initialDraft?.ticketValidation && typeof initialDraft.ticketValidation === 'object') {
+      return initialDraft.ticketValidation;
+    }
+    return {
+      loading: false,
+      checked: false,
+      error: null,
+      data: null
+    };
   });
 
   // Datos para el comprobante de impresion
@@ -284,6 +358,72 @@ export const NuevaOrdenPage = () => {
   const set = useCallback((key, val) => {
     setForm(prev => ({ ...prev, [key]: val }));
     setErrors(prev => ({ ...prev, [key]: undefined }));
+  }, []);
+
+  // ── Sincronización automática de borrador en sessionStorage con debounce (300ms) ──
+  useEffect(() => {
+    if (isSubmitting || showPostModal) return;
+
+    const timer = setTimeout(() => {
+      try {
+        const isFormDirty =
+          Boolean(form.nombre_cliente_libre) ||
+          Boolean(form.cliente) ||
+          Boolean(form.marca_equipo) ||
+          Boolean(form.modelo_equipo) ||
+          Boolean(form.falla_reportada) ||
+          Boolean(form.observaciones_recepcion) ||
+          Boolean(form.accesorios_recibidos) ||
+          Boolean(form.costo_previsto) ||
+          Boolean(form.monto_anticipo) ||
+          Boolean(form.es_garantia) ||
+          (Array.isArray(form.fotos_recepcion) && form.fotos_recepcion.length > 0) ||
+          (form.checklist_entrada && Object.keys(form.checklist_entrada).length > 0) ||
+          (form.datos_acceso_equipo && form.datos_acceso_equipo.tipo !== 'ninguno') ||
+          currentStep > 1;
+
+        if (isFormDirty) {
+          const draftPayload = {
+            currentStep,
+            form,
+            ticketValidation,
+            savedAt: new Date().toISOString()
+          };
+          sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftPayload));
+          setHasDraft(true);
+        } else {
+          sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+          setHasDraft(false);
+        }
+      } catch (err) {
+        console.warn('⚠️ No se pudo guardar el borrador en sessionStorage:', err);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [form, currentStep, ticketValidation, isSubmitting, showPostModal]);
+
+  // ── Descartar borrador y restablecer formulario a su estado inicial ──
+  const handleClearDraft = useCallback(() => {
+    try {
+      sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+    } catch (err) {
+      console.warn('⚠️ Error al limpiar borrador:', err);
+    }
+    setForm(INITIAL_FORM);
+    setCurrentStep(1);
+    setErrors({});
+    setTicketValidation({
+      loading: false,
+      checked: false,
+      error: null,
+      data: null
+    });
+    setHasDraft(false);
+    sileo.info({
+      title: 'Borrador descartado',
+      description: 'El formulario se ha restablecido a su estado inicial.'
+    });
   }, []);
 
   // Limpieza de campos de orden de garantía sin tocar feedback de error
@@ -644,6 +784,14 @@ export const NuevaOrdenPage = () => {
 
       const res = await createServicio(payload);
       if (res.ok) {
+        // Limpiar el borrador guardado en sessionStorage al crearse exitosamente la orden
+        try {
+          sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+        } catch (storageErr) {
+          console.warn('⚠️ Error al limpiar borrador tras guardar orden:', storageErr);
+        }
+        setHasDraft(false);
+
         const nombreClientePrint = form.cliente
           ? [form.cliente.nombre, form.cliente.apellido].filter(Boolean).join(' ')
           : form.nombre_cliente_libre;
@@ -675,6 +823,14 @@ export const NuevaOrdenPage = () => {
 
   const handlePostModalClose = () => {
     setShowPostModal(false);
+    try {
+      sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+    setForm(INITIAL_FORM);
+    setCurrentStep(1);
+    setHasDraft(false);
     navigate('/tickets');
   };
 
@@ -717,6 +873,25 @@ export const NuevaOrdenPage = () => {
               </p>
             </div>
           </div>
+
+          {hasDraft && (
+            <div className="flex items-center gap-3 animate-fade-in">
+              <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium select-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                Borrador guardado
+              </span>
+              <InlineConfirmButton
+                text="Limpiar borrador"
+                confirmText="¿Descartar borrador?"
+                icon={RotateCcw}
+                variant="card"
+                size="sm"
+                className="!w-auto h-8 px-3 text-xs bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-900/50 shadow-2xs cursor-pointer"
+                confirmClassName="!w-auto h-8 px-2.5 text-xs bg-white dark:bg-neutral-900 border border-red-200 dark:border-red-900/60 shadow-2xs"
+                onConfirm={handleClearDraft}
+              />
+            </div>
+          )}
         </div>
 
         {/* ── Stepper Horizontal sin tarjeta contenedora ── */}
