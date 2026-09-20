@@ -25,7 +25,7 @@ A continuación se detalla la estructura y el propósito de cada documento en el
 - **Backend:** Node.js, Express.js, PostgreSQL (`pg` Connection Pool), JWT, BcryptJS, Cloudinary SDK v2, Multer, Cloudflare Turnstile (Anti-Bot condicional).
 - **Frontend:** React 18, Vite, React Router v6, Tailwind CSS, Lucide React, Morphicons, react-loading-skeleton, Sileo, Axios.
 - **Base de Datos:** PostgreSQL (`siger_fmc_db`).
-- **Almacenamiento Multimedia:** Cloudinary (Streaming en memoria, WebP `500x500`, calidad auto, carpetas `siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`).
+- **Almacenamiento Multimedia:** Cloudinary (Streaming en memoria, WebP `500x500`, calidad auto, carpetas `siger-fmc/personal-fmc`, `siger-fmc/recepcion` y `siger-fmc/evidencias-tickets`).
 
 ---
 

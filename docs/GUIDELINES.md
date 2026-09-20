@@ -107,22 +107,32 @@ frontend/
 ## 5. Reglas de Negocio y Flujo de Trabajo
 
 1. **Creación de Tickets:** Al registrar un servicio, se genera un código correlativo único (ej. `TKT-2026-0001`) y se crea automáticamente el primer registro en `Historial_Estados` con estado `RECIBIDO`.
-2. **Subida y Procesamiento de Imágenes (Cloudinary):**
+2. **Subida y Ciclo de Vida de Evidencias Fotográficas (Cloudinary & Sesión Unificada):**
    * **Pipeline de Backend:** Multer en memoria (`memoryStorage`, límite de 5MB) transmite por streaming en RAM (`Readable.from(buffer)`) al SDK de Cloudinary.
    * **Optimización Automática:** Formato WebP inteligente (`format: 'webp'`), compresión adaptativa (`quality: 'auto'`) y dimensiones restringidas (`500x500`, `crop: 'limit'`).
-   * **Estructura de Carpetas:**
+   * **Estructura Canónica de Carpetas:**
      * `siger-fmc/personal-fmc`: Avatares de trabajadores y administradores.
-     * `siger-fmc/evidencias-tickets`: Fotos de equipos recibidos, diagnóstico y entrega.
-   * **Limpieza de Recursos Huérfanos:** Al actualizar o remover fotos, se invoca `deleteImageByUrl(url)` para destruir el asset previo en Cloudinary.
-   * **Experiencia de Usuario (Dropzone):** Modales con selector dropzone completo (`onDragOver`, `onDrop`, `onClick`), preview instantáneo (`URL.createObjectURL`), feedback animado y timeout de petición extendido a 120 segundos.
+     * `siger-fmc/recepcion`: Evidencias temporales de recepción (sesiones móviles QR y subidas directas desde PC).
+     * `siger-fmc/evidencias-tickets`: Fotos confirmadas de equipos recibidos, incidencias técnicas y entregas.
+   * **Pauta contra Archivos Huérfanos (Sesión Unificada):**
+     * Queda estrictamente prohibida la subida anónima o desvinculada de fotos sin registrar en la base de datos.
+     * Toda foto seleccionada antes de guardar una orden (sea desde PC o desde teléfono móvil vía QR) debe canalizarse o asociarse a una sesión activa en `sesiones_carga_fotos`.
+     * Las sesiones no confirmadas expiran en 15 minutos y son purgadas de Cloudinary tras 30 minutos por el Garbage Collector en background.
+   * **Destrucción Inmediata al Descartar en UI:**
+     * Al presionar el botón de eliminar o la papelera en miniaturas temporales, el frontend debe invocar de inmediato `eliminarFotoTemporal` (`POST /api/upload-session/eliminar-foto` o `DELETE /api/servicios/evidencia-temporal`) para destruir el asset en Cloudinary (`cloudinary.uploader.destroy`) y mantener saneado el almacenamiento.
+   * **Control Dinámico de Cupos:**
+     * Al inicializar una sesión de carga, el componente uploader debe calcular el cupo disponible (`MAX_PHOTOS - currentPhotos.length`) y enviarlo al backend (`maxFotosPermitidas`). Las vistas móviles deben respetar este límite y el backend debe rechazar peticiones que lo desborden.
+   * **Desacoplamiento de Polling:**
+     * El sondeo asíncrono para recibir fotos no debe residir dentro de modales temporales. Debe gestionarse en el componente padre (`DevicePhotoUploader.jsx`) para que continúe en segundo plano si el operador cierra el diálogo QR, informando al usuario mediante toasts (`sileo.success`).
 3. **Manejo de Incidencias:**
    * Si una incidencia incluye costo de repuesto, inicia con `aprobado_por_cliente = 0`.
    * El `costo_final_confirmado` del ticket no suma este valor hasta que se confirme la aprobación.
-4. **Seguridad y Roles:**
-   * `SuperAdmin`: Acceso a todas las sucursales y usuarios.
-   * `Admin_Sucursal`: Filtrado automático de consultas por su `sucursal_id`.
-   * `Tecnico`: Solo gestiona tickets asignados o de su sede.
-   * `Secretaria`: Apertura de órdenes, asignación básica y cobro/entrega.
+4. **Seguridad y Roles (RBAC):**
+   * `SuperAdmin`: Acceso omnicanal a todas las sucursales, finanzas, configuración y control total.
+   * `Admin_Sucursal`: Filtrado automático de consultas por su `sucursal_id` y control operativo local.
+   * `Tecnico`: Solo gestiona tickets asignados o de su sede en el banco de trabajo. No puede crear órdenes de servicio (`403 Forbidden`).
+   * `Secretaria`: Apertura de órdenes en mostrador, emisión de comprobantes y cobro/entrega.
+   * **Restricción Estricta de Cancelación de Órdenes:** Solo `SuperAdmin` y `Admin_Sucursal` están autorizados para cancelar o dar de baja órdenes de servicio (`POST /api/servicios/:id/cancelar`). Usuarios con rol `Tecnico` o `Secretaria` tienen terminantemente denegada esta acción (`403 Forbidden`).
 
 ## 6. Identidad Visual, UI/UX y Sistema de Temas
 

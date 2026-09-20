@@ -389,9 +389,9 @@ Inspección ocular y funcional realizada durante la apertura de la orden:
 
 ---
 
-### 13. Tabla de Sesiones de Carga Remota de Fotos (`sesiones_carga_fotos`)
+### 13. Tabla de Sesiones de Carga Remota y Temporal de Fotos (`sesiones_carga_fotos`)
 
-Almacena las sesiones temporales originadas por Código QR para la sincronización y carga remota de evidencias desde dispositivos móviles sin requerir autenticación de empleado.
+Almacena las sesiones temporales (originadas tanto por Código QR móvil como por selección desde PC en `DevicePhotoUploader.jsx`) para la sincronización de evidencias, control de cupos dinámicos y prevención de archivos huérfanos en Cloudinary mediante el recolector de basura (*Garbage Collector*).
 
 | Campo | Tipo | Nulo | Descripción |
 | :--- | :--- | :--- | :--- |
@@ -400,8 +400,16 @@ Almacena las sesiones temporales originadas por Código QR para la sincronizaci�
 | `fotos` | JSONB | NO | Array JSON de fotos subidas (`[{ url, secure_url, public_id, bytes, size, fecha_subida }]`) |
 | `estado` | VARCHAR(20) | NO | Estado del ciclo de vida: `'PENDIENTE'`, `'COMPLETADO'`, `'EXPIRADO'`, `'UTILIZADA'` (confirmada en orden de servicio), `'PURGADA'` (huérfanos eliminados de Cloudinary) |
 | `expira_en` | TIMESTAMPTZ | NO | Timestamp límite de vigencia (15 minutos desde la creación) |
+| `max_fotos` | INTEGER | SÍ | Límite dinámico de fotos permitidas para la sesión (Default: 5 o cupos disponibles de la orden) |
 | `created_at` | TIMESTAMPTZ | NO | Fecha de apertura de la sesión |
 | `updated_at` | TIMESTAMPTZ | NO | Última actualización o recepción de fotos |
+
+#### Ciclo de Vida y Reglas Operativas:
+1. **Subida Unificada:** Tanto las fotos capturadas vía QR móvil como las cargadas desde la PC quedan asociadas a un `session_id` activo.
+2. **Validación de Cupo:** El endpoint de subida valida que `fotosActuales.length + nuevosArchivos.length <= max_fotos`, rechazando excesos con HTTP `400`.
+3. **Confirmación en Orden (`'UTILIZADA'`):** Al guardar la orden (`POST /api/servicios`), las fotos se migran a `evidencias_fotograficas` y la sesión pasa a `'UTILIZADA'`.
+4. **Purga Automática (`'PURGADA'`):** Las sesiones expiradas no utilizadas son procesadas cada 30 minutos por el Garbage Collector, invocando `cloudinary.uploader.destroy(public_id)` para cada archivo y marcando la sesión como `'PURGADA'`.
+5. **Retención Histórica (15 Días):** Los registros en estado `'PURGADA'` o `'UTILIZADA'` con más de 15 días son eliminados automáticamente de la base de datos.
 
 ---
 

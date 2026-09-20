@@ -376,6 +376,7 @@ Para garantizar la integridad operativa y contable del taller frente a equipos d
 ```
 
 1. **Flujo Transaccional de Cancelación (`POST /api/servicios/:id/cancelar`):**
+   - **Control de Acceso Estricto (RBAC):** Protegido por `checkRole(['SuperAdmin', 'Admin_Sucursal'])`. Usuarios con rol `Secretaria` o `Tecnico` tienen prohibida la anulación de servicios con HTTP `403 Forbidden`.
    - Requiere obligatoriamente un `motivo_cancelacion` descriptivo (longitud mínima validada en backend y frontend).
    - Registra en `servicios_recepcion`: `estado_id = 8` (`CANCELADO_DEVUELTO`), `motivo_cancelacion`, `fecha_cancelacion = NOW()` y `usuario_cancela_id = req.user.id`.
    - Inserta atómicamente el hito en `historial_estados` con la nota de cambio explicativa para auditoría.
@@ -431,7 +432,8 @@ Para garantizar alta disponibilidad, velocidad de carga y mínimo consumo de alm
 | Carpeta Destino | Uso y Tipo de Recurso | Entidad Asociada |
 | :--- | :--- | :--- |
 | **`siger-fmc/personal-fmc`** | Avatares y fotos de perfil de trabajadores | `datos_trabajadores.foto_perfil_url` |
-| **`siger-fmc/evidencias-tickets`** | Fotografías de entrada, diagnóstico y entrega de equipos | `evidencias_fotograficas.foto_url` |
+| **`siger-fmc/recepcion`** | Evidencias temporales de recepción (sesiones móviles QR y subidas desde PC) | `sesiones_carga_fotos.fotos` |
+| **`siger-fmc/evidencias-tickets`** | Fotografías confirmadas de entrada, diagnóstico y entrega de equipos | `evidencias_fotograficas.foto_url` |
 
 ### 5.3 Ciclo de Limpieza de Recursos Huérfanos
 
@@ -515,34 +517,84 @@ Al reimprimir comprobantes o stickers desde tablas operativas (`ServiciosPage.js
 
 ---
 
-## 7. Subsistema de Carga Móvil y Recolector de Huérfanos (Garbage Collector)
+## 7. Subsistema de Evidencias Fotográficas, Sesión Unificada y Recolector de Huérfanos
 
-Para agilizar la recepción de equipos en mostrador y talleres sin requerir cámaras web ni que los operarios deban iniciar sesión en sus teléfonos personales, SIGER-FMC implementa una arquitectura de captura remota desacoplada:
+Para agilizar la recepción de equipos en mostrador y talleres sin requerir cámaras web ni que los operarios deban iniciar sesión en sus teléfonos personales, y al mismo tiempo erradicar la proliferación de archivos huérfanos en Cloudinary, SIGER-FMC implementa una arquitectura de sesión unificada y recolección de basura (*Garbage Collector*):
 
 ```
-┌─────────────────────────┐          Escaneo QR         ┌─────────────────────────┐
-│     PC de Mostrador     │────────────────────────────▶│  Smartphone del Operario │
-│   (Formulario Orden)    │                             │   (UploadMobilePage)    │
-│  - Abre QrUploadModal   │◀────────────────────────────│  - Cámara nativa/galería│
-│  - Genera UUID Sesión   │     Sincronización Polling  │  - Envío a Cloudinary   │
-└────────────┬────────────┘                             └────────────┬────────────┘
-             │                                                       │
-             │ Guardar Orden (POST /servicios)                       │ POST /api/upload-session/:id/subir
-             ▼                                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                          Backend Express + PostgreSQL                           │
-│  - sesiones_carga_fotos: [{ public_id, secure_url, bytes, size }]               │
-│                                                                                 │
-│  [Ciclo de Vida]:                                                               │
-│   1. PENDIENTE / COMPLETADO: Fotos en espera de confirmación.                   │
-│   2. UTILIZADA: Al guardar la orden, la sesión queda confirmada y blindada.     │
-│   3. PURGADA: Si se descarta/expira (> 30m), el Garbage Collector elimina       │
-│      los assets huérfanos de Cloudinary (cloudinary.uploader.destroy)           │
-│      y marca el estado como PURGADA.                                            │
-└─────────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────┐                             ┌─────────────────────────────────┐
+│         PC de Mostrador         │       Escaneo QR            │       Smartphone Operario       │
+│     (DevicePhotoUploader.jsx)   ├────────────────────────────►│       (UploadMobilePage.jsx)    │
+│  - Inicializa session_id        │                             │  - Validación de cupo y sesión  │
+│  - Polling en 2do plano (2.5s)  │                             │  - Captura con cámara o galería │
+│  - Subida directa desde PC      │                             │  - Compresión previa en cliente │
+└────────────────┬────────────────┘                             └────────────────┬────────────────┘
+                 │                                                               │
+                 │ Petición HTTP (POST /api/upload-session/:sessionId/subir)     │
+                 └───────────────────────────────┬───────────────────────────────┘
+                                                 ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   Backend Express + PostgreSQL                                  │
+│  1. sesiones_carga_fotos:                                                                       │
+│     - session_id (UUID v4), max_fotos, expira_en (NOW() + 15m), estado                          │
+│     - fotos JSONB: [{ public_id, secure_url, bytes, size, fecha_subida }]                       │
+│                                                                                                 │
+│  2. Transiciones de Ciclo de Vida:                                                              │
+│     ├── PENDIENTE / COMPLETADO: Fotos preservadas mientras se redacta la orden de servicio.     │
+│     ├── UTILIZADA: Al ejecutar POST /api/servicios, las fotos se transfieren a                  │
+│     │   evidencias_fotograficas (tipo_evidencia = 'RECEPCION') y la sesión se marca UTILIZADA.  │
+│     └── PURGADA: Si la sesión expira (>30m) sin guardarse la orden, el Garbage Collector       │
+│         invoca cloudinary.uploader.destroy(public_id) para cada asset y marca estado PURGADA.   │
+│                                                                                                 │
+│  3. Destrucción en Tiempo Real (eliminarFotoTemporal):                                          │
+│     - Al presionar el icono de basura en UI, se envía DELETE /api/upload-session/foto.           │
+│     - Destruye inmediatamente el recurso en Cloudinary y lo remueve del JSONB en PostgreSQL.    │
+└─────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 7.1 Blindaje Multi-Sucursal y Reglas de Taller
+### 7.1 Arquitectura de Sesión Unificada (Carga desde PC y Móvil QR)
+1. **Prevención de Huérfanas desde PC:**
+   - Anteriormente, la selección de fotos desde PC en `DevicePhotoUploader.jsx` subía directamente a Cloudinary sin registrar la operación en PostgreSQL. Si el usuario cancelaba o cerraba la ventana, las fotos quedaban abandonadas en la nube.
+   - Con la sesión unificada, `DevicePhotoUploader.jsx` inicializa o reutiliza la sesión activa en `sesiones_carga_fotos` y sube los archivos de la PC mediante `subirFotosSession(sessionId, files)`. De esta forma, cualquier archivo subido desde PC queda cubierto por la expiración temporal y la purga automática.
+   - Como blindaje en profundidad (*defense-in-depth*), el endpoint directo `POST /api/servicios/upload-foto` en `servicios.controller.js` también realiza un upsert automático en `sesiones_carga_fotos`.
+
+2. **Desacoplamiento de Polling y Experiencia en Segundo Plano:**
+   - La gestión del temporizador de sondeo (`setInterval` a ~2.5s) y el estado de la sesión (`activeSessionId`, `sessionExpiresAt`) residen en el componente padre `DevicePhotoUploader.jsx`.
+   - Si el usuario cierra el modal QR (`QrUploadModal.jsx`) para continuar completando datos del cliente o del checklist, el sondeo en segundo plano continúa escuchando.
+   - Al detectar que la sesión remota pasa a `'COMPLETADO'`, las fotos se incorporan automáticamente al formulario y se notifica al usuario mediante un toast flotante de éxito (`sileo.success`).
+
+3. **Propagación Dinámica de Cupo de Fotos (`maxFotosPermitidas`):**
+   - Al abrir el QR o iniciar la sesión, se calcula el cupo disponible exacto:
+     $$\text{Cupos Restantes} = \max(0, \text{MAX\_PHOTOS} - \text{fotosActuales.length})$$
+   - El cupo se persiste en la columna `max_fotos` de `sesiones_carga_fotos`.
+   - La interfaz móvil (`UploadMobilePage.jsx`) adapta su conteo visual a la relación exacta (`0 de X`, `1 de X`) y el backend (`subirFotosSesion`) valida que la suma acumulada no exceda el límite permitido, rechazando desbordes con HTTP `400 Bad Request`.
+
+### 7.2 Destrucción en Tiempo Real (`eliminarFotoTemporal`)
+- Endpoint dedicado (`POST /api/upload-session/eliminar-foto` y alias `DELETE /api/servicios/evidencia-temporal`).
+- Al presionar el botón de basura en una miniatura antes de guardar la orden, el frontend solicita la eliminación física inmediata en Cloudinary vía `cloudinary.uploader.destroy(publicId)`.
+- Si se suministra `sessionId`, la foto se remueve atómicamente del array JSONB en `sesiones_carga_fotos`, evitando discrepancias de conteo.
+
+### 7.3 Recolector de Basura Automático (Garbage Collector) y Política de Retención
+- **Ejecución Automática en Servidor (`backend/server.js`):** Un temporizador recurrente con `.unref()` ejecuta `purgarSesionesExpiradas()` cada 30 minutos sin bloquear el ciclo de eventos de Node.js.
+- **Criterio de Purga Cloudinary:** Selecciona sesiones en `sesiones_carga_fotos` cuyo estado sea distinto de `'UTILIZADA'` y cuya expiración supere los 30 minutos de antigüedad (`expira_en < NOW() - INTERVAL '30 minutes'`). Destruye cada asset en Cloudinary y actualiza su estado a `'PURGADA'`.
+- **Política de Retención en Base de Datos (15 Días):** Al finalizar la purga remota, el proceso ejecuta:
+  ```sql
+  DELETE FROM sesiones_carga_fotos 
+  WHERE estado IN ('PURGADA', 'UTILIZADA') 
+    AND created_at < NOW() - INTERVAL '15 days';
+  ```
+  Esto previene el crecimiento indefinido de la tabla sin comprometer la auditoría operativa reciente.
+
+### 7.4 Script de Conciliación y Mantenimiento Administrativo
+- **Ubicación:** `backend/src/scripts/purgar_huerfanas_cloudinary.js`.
+- **Propósito:** Script utilitario ejecutable bajo demanda mediante `node backend/src/scripts/purgar_huerfanas_cloudinary.js`.
+- **Algoritmo de Conciliación:**
+  1. Lista los assets en la carpeta `siger-fmc/recepcion` de Cloudinary vía `cloudinary.api.resources`.
+  2. Consulta en PostgreSQL todos los `public_id` registrados en `evidencias_fotograficas` y en sesiones activas/vigentes de `sesiones_carga_fotos`.
+  3. Filtra archivos en Cloudinary con más de 2 horas de antigüedad (para salvaguardar recepciones activas en curso) que no existan en la base de datos.
+  4. Ejecuta `cloudinary.uploader.destroy` sobre las imágenes huérfanas confirmadas y emite un informe detallado en consola.
+
+### 7.5 Blindaje Multi-Sucursal y Reglas de Taller
 1. **Aislamiento Multi-Sucursal en Taller:** Todas las consultas y mutaciones de la Mesa de Trabajo fuerzan `WHERE sucursal_id = req.user.sucursal_id`. Intentos de acceso inter-sucursal son rechazados con `404 Not Found`.
 2. **Asignación Obligatoria:** No se permite realizar transiciones de estado desde `RECIBIDO` a fases operativas (`EN_DIAGNOSTICO`, `EN_REPARACION`, etc.) sin al menos un técnico asignado en `tecnicos_asignados`.
 3. **Bloqueo de Desasignación Única:** Si un servicio ya inició operaciones y cuenta con un solo técnico asignado, se prohíbe su desasignación hasta que se incorpore otro técnico responsable.

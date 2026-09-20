@@ -9,7 +9,7 @@ Sistema web especializado para el taller de servicio técnico **Franyer Mobile C
 - **Backend:** Node.js, Express, PostgreSQL (`pg` Connection Pool), JWT, BcryptJS, Cloudinary SDK, Multer (Memory Storage), Cloudflare Turnstile (Anti-Bot condicional).
 - **Frontend:** React (Vite), React Router v6, Tailwind CSS (Estilo Supabase Dark/Light), Lucide React, Morphicons (Iconos animados), react-loading-skeleton, Sileo (Toaster), Axios.
 - **Base de Datos:** PostgreSQL (`siger_fmc_db`).
-- **Gestión Multimedia / Cloudinary:** Carga optimizada en buffer, streaming WebP (`siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`), sincronización móvil vía QR y recolección automática de recursos huérfanos.
+- **Gestión Multimedia / Cloudinary:** Carga optimizada en buffer, streaming WebP (`siger-fmc/personal-fmc`, `siger-fmc/recepcion` y `siger-fmc/evidencias-tickets`), sincronización móvil vía QR, subida unificada desde PC y recolección automática de recursos huérfanos.
 - **Flujo de Ramas Git:**
   - `main`: Rama principal / producción estable.
   - `develop`: Rama de integración activa para desarrollo.

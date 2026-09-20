@@ -50,6 +50,7 @@ Cada orden de servicio transita de manera estructurada a través de 8 estados se
    * **Reingreso por Garantía:** Una orden previa únicamente es admisible para un nuevo ticket de garantía si su estado formal es `ENTREGADO` (o cuenta con `fecha_entrega`). Equipos aún no retirados del taller no son elegibles para garantía.
 8. **`CANCELADO_DEVUELTO` (ID: 8 | Rojo):**
    * Cancelación formal mediante `CancelarOrdenModal` por falta de solución técnica, inviabilidad o no aceptación de presupuesto por parte del cliente.
+   * **Restricción Estricta de Rol:** Exclusivo para `SuperAdmin` y `Admin_Sucursal`. Empleados con rol `Secretaria` o `Tecnico` tienen prohibida la anulación (`403 Forbidden`).
    * Registra obligatoriamente `motivo_cancelacion`, marca temporal `fecha_cancelacion = NOW()`, referencia a `usuario_cancela_id` e hito en `historial_estados`.
    * **Salvaguardas Defensivas:** Bloquea de forma inmediata e irreversible cualquier modificación de estado, asignación de técnicos, registro de incidencias o liquidación de entrega en taller (`400 Bad Request`). En la consulta pública se proyecta de manera transparente con el motivo y nodo terminal.
 
@@ -58,19 +59,24 @@ Cada orden de servicio transita de manera estructurada a través de 8 estados se
 ---
 
 ## 5. Módulos y Entidades Clave
-* **`clientes`:** Directorio único de clientes con documento de identidad (Cédula/RNC), contactos y dirección. Soporta búsqueda integral y paginación en servidor.
+* **`clientes`:** Directorio único de clientes con documento de identidad (Cédula/RNC), contactos y dirección. Soporta búsqueda integral, vista rápida 360° (`ClienteDetalleModal.jsx`) y paginación en servidor.
 * **`servicios_recepcion`:** Registro maestro de la orden de reparación, especificaciones del equipo, liquidación financiera y costos.
 * **Banco de Trabajo Técnico (`/taller` / `BancoTrabajoPage.jsx`):** Tablero operativo de taller con tarjetas de servicio (`TallerCard.jsx`), vista conmutativa en tabla con paginación y filtrado por estado mediante pestañas animadas (`AnimatedTabs.jsx`). Incluye la **Ficha Técnica Modal (`FichaTecnicaModal.jsx`)** para transición de estados, asignación multi-técnico y visualización gráfica del patrón/PIN de acceso.
 * **`incidencias_servicio`:** Registro de imprevistos, piezas extra y costos adicionales surgidos durante el diagnóstico o la reparación, con ciclo de vida completo de autorización del cliente (Aprobado o Rechazado formalmente por WhatsApp, Llamada o Presencial).
-* **`evidencias_fotograficas`:** Registro fotográfico en Cloudinary con aislamiento estricto entre fotos de recepción inicial (`tipo_evidencia = 'RECEPCION'`), evidencias técnicas de incidencias (`tipo_evidencia = 'INCIDENCIA'`) y fotos de despacho (`tipo_evidencia = 'ENTREGA'`).
+* **Pipeline Unificado de Evidencias Fotográficas (`sesiones_carga_fotos` y `evidencias_fotograficas`):**
+  * Subida desacoplada tanto por QR móvil (`UploadMobilePage.jsx`) como desde PC en mostrador (`DevicePhotoUploader.jsx`), garantizando que ninguna foto quede desvinculada en Cloudinary.
+  * Sondeo en segundo plano (*background polling*) que recibe evidencias sin bloquear el trabajo en la PC.
+  * Eliminación inmediata en la nube al descartar fotos en la interfaz (`eliminarFotoTemporal`).
+  * Recolector de basura (*Garbage Collector*) programado cada 30 minutos y política de retención histórica de 15 días en base de datos.
 * **`categorias_dispositivos`:** Clasificación de equipos atendidos (Smartphone, Tablet/iPad, Laptop, Consola de Videojuegos, Smartwatch, Otros).
 * **Portal de Seguimiento Público (`EstadoOrdenPage.jsx`):** Consulta web pública en tiempo real (`/estado` y `/estado/:codigo`) accesible vía escaneo de código QR generado por `TicketQR.jsx` con enlace dinámico corporativo, protegida por Cloudflare Turnstile y con transiciones de carga fluidas mediante `react-loading-skeleton`.
+* **Comprobantes Térmicos de Salida (`ReciboEntregaTermico.jsx`):** Emisión térmica oficial de 58mm y 80mm al liquidar y despachar equipos, con desglose de mano de obra, repuestos aprobados, garantías y firmas.
 
 ---
 
 ## 6. Stack Tecnológico
 * **Frontend:** React, Tailwind CSS, Vite, Lucide Icons, Morphicons, QRCode.react (`qrcode.react`), react-loading-skeleton, Sileo (Toaster).
 * **Backend:** Node.js, Express.js.
-* **Base de Datos:** PostgreSQL (`siger_fmc_db`) vía driver nativo `pg` con Connection Pooling.
-* **Gestión Multimedia:** Cloudinary SDK v2 + Multer (MemoryStorage), compresión adaptativa a WebP (`siger-fmc/personal-fmc` y `siger-fmc/evidencias-tickets`), sincronización móvil de fotos vía QR y recolección automática de imágenes huérfanas.
-* **Seguridad y Sesión:** Autenticación basada en JSON Web Tokens (JWT) con contraseñas encriptadas en `bcryptjs` y protección anti-bot opcional vía Cloudflare Turnstile.
+* **Base de Datos:** PostgreSQL (`siger_fmc_db`) vía driver nativo `pg` con Connection Pooling y retención histórica automatizada.
+* **Gestión Multimedia:** Cloudinary SDK v2 + Multer (MemoryStorage), compresión adaptativa a WebP (`siger-fmc/personal-fmc`, `siger-fmc/recepcion` y `siger-fmc/evidencias-tickets`), sincronización móvil de fotos vía QR, subida unificada desde PC y recolección autónoma de imágenes huérfanas.
+* **Seguridad y Sesión:** Autenticación basada en JSON Web Tokens (JWT) con contraseñas encriptadas en `bcryptjs`, RBAC estricto para operaciones críticas y protección anti-bot opcional vía Cloudflare Turnstile.

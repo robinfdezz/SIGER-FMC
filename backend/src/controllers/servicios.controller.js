@@ -1079,13 +1079,40 @@ const uploadFotosServicio = async (req, res) => {
       urls.push(result.secure_url);
     }
 
+    // Registrar fotos en sesiones_carga_fotos para que queden vinculadas a una sesión temporal
+    // y el purgador automático las limpie si la recepción se abandona sin guardar.
+    let sessionId = req.body?.session_id || req.body?.sessionId || null;
+    try {
+      const crypto = require('crypto');
+      const pool = getPool();
+      if (!sessionId) {
+        sessionId = crypto.randomUUID();
+      }
+      const expiraEn = new Date(Date.now() + 15 * 60 * 1000);
+      await pool.query(
+        `INSERT INTO sesiones_carga_fotos (session_id, fotos, estado, expira_en, max_fotos)
+         VALUES ($1, $2::jsonb, 'COMPLETADO', $3, $4)
+         ON CONFLICT (session_id) DO UPDATE
+         SET fotos = sesiones_carga_fotos.fotos || $2::jsonb,
+             estado = 'COMPLETADO',
+             updated_at = NOW()`,
+        [sessionId, JSON.stringify(fotos), expiraEn, files.length]
+      );
+    } catch (sessionErr) {
+      console.warn('⚠️ No se pudo registrar sesión temporal en uploadFotosServicio:', sessionErr.message);
+    }
+
     return res.status(200).json({
       ok: true,
+      sessionId: sessionId,
+      session_id: sessionId,
       url: fotos[0]?.url,
       public_id: fotos[0]?.public_id,
       fotos: fotos,
       urls: urls,
       data: {
+        sessionId: sessionId,
+        session_id: sessionId,
         url: fotos[0]?.url,
         public_id: fotos[0]?.public_id,
         fotos: fotos

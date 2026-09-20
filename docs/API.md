@@ -825,21 +825,28 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 
 ---
 
-### 5.6 Subir Fotografías de Recepción
+### 5.6 Subir Fotografías de Recepción (Endpoint Directo)
 - **Ruta:** `POST /api/servicios/upload-foto`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Headers:** `multipart/form-data` con campo `fotos` (hasta 5 imágenes).
-- **Procesamiento:** Streaming a Cloudinary en carpeta `siger-fmc/evidencias-tickets` en formato optimizado WebP.
+- **Procesamiento y Prevención de Huérfanas:** Transmite los buffers a Cloudinary en carpeta `siger-fmc/recepcion` en formato optimizado WebP. Como salvaguarda defensiva, **registra o actualiza de forma automática una sesión temporal en `sesiones_carga_fotos`** (`estado = 'COMPLETADO'`, `expira_en = NOW() + 15 min`), vinculando los `public_id` para que el Garbage Collector automático los destruya si el usuario cancela o abandona el formulario.
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
     "ok": true,
-    "message": "2 foto(s) subida(s) exitosamente.",
-    "data": [
+    "sessionId": "e4f8c12a-3b56-4c78-9f12-0abc3456def7",
+    "url": "https://res.cloudinary.com/.../siger-fmc/recepcion/foto1.webp",
+    "public_id": "siger-fmc/recepcion/foto1",
+    "fotos": [
       {
-        "url": "https://res.cloudinary.com/.../siger-fmc/evidencias-tickets/foto1.webp",
-        "public_id": "siger-fmc/evidencias-tickets/foto1"
+        "url": "https://res.cloudinary.com/.../siger-fmc/recepcion/foto1.webp",
+        "public_id": "siger-fmc/recepcion/foto1",
+        "bytes": 245000,
+        "size": "0.23"
       }
+    ],
+    "urls": [
+      "https://res.cloudinary.com/.../siger-fmc/recepcion/foto1.webp"
     ]
   }
   ```
@@ -1035,26 +1042,34 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 
 Permite a clientes o recepcionistas escanear un código QR desde cualquier dispositivo móvil para tomar fotografías de evidencias físicas y sincronizarlas en tiempo real con el formulario de recepción en PC, sin requerir inicio de sesión en el móvil.
 
-#### 5.13.1 Crear Sesión de Carga QR
-- **Ruta:** `POST /api/upload-session`
+#### 5.13.1 Crear Sesión de Carga QR o PC
+- **Ruta:** `POST /api/upload-session/crear`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Vigencia:** 15 minutos desde el momento de emisión.
+- **Body (JSON opcional):**
+  ```json
+  {
+    "maxFotosPermitidas": 4
+  }
+  ```
 - **Respuesta Exitosa (`201 Created`):**
   ```json
   {
     "ok": true,
+    "sessionId": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
     "data": {
       "session_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
-      "url_subida": "http://192.168.1.50:5173/subir-fotos?session=9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
-      "expira_en": "2026-09-17T12:15:00.000Z",
-      "minutos_vigencia": 15
+      "url_subida": "http://192.168.1.50:5173/subir-fotos/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      "expira_en": "2026-09-20T14:15:00.000Z",
+      "minutos_vigencia": 15,
+      "max_fotos": 4
     }
   }
   ```
 
 #### 5.13.2 Consultar Estado de la Sesión
 - **Ruta:** `GET /api/upload-session/:sessionId`
-- **Acceso:** Público (utilizado por el móvil y por el polling del modal en PC)
+- **Acceso:** Público (utilizado por el móvil y por el polling en segundo plano en PC)
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
@@ -1063,26 +1078,32 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
       "session_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
       "estado": "COMPLETADO",
       "expirado": false,
-      "expira_en": "2026-09-17T12:15:00.000Z",
+      "expira_en": "2026-09-20T14:15:00.000Z",
       "total_fotos": 2,
+      "max_fotos": 4,
+      "limiteEfectivo": 4,
+      "fotosExistentes": 2,
       "fotos": [
         {
-          "url": "https://res.cloudinary.com/demo/image/upload/v1/siger-fmc/evidencias/foto1.webp",
-          "secure_url": "https://res.cloudinary.com/demo/image/upload/v1/siger-fmc/evidencias/foto1.webp",
-          "public_id": "siger-fmc/evidencias/foto1",
+          "url": "https://res.cloudinary.com/demo/image/upload/v1/siger-fmc/recepcion/foto1.webp",
+          "secure_url": "https://res.cloudinary.com/demo/image/upload/v1/siger-fmc/recepcion/foto1.webp",
+          "public_id": "siger-fmc/recepcion/foto1",
           "bytes": 245000,
           "size": 245000,
-          "fecha_subida": "2026-09-17T12:02:00.000Z"
+          "fecha_subida": "2026-09-20T14:02:00.000Z"
         }
       ]
     }
   }
   ```
 
-#### 5.13.3 Subir Evidencias desde Dispositivo Móvil
+#### 5.13.3 Subir Evidencias desde Dispositivo Móvil o PC
 - **Ruta:** `POST /api/upload-session/:sessionId/subir`
 - **Acceso:** Público (validado por `:sessionId` activo y no expirado)
-- **Formato:** `multipart/form-data` con campo `fotos` (hasta 10 fotos) o JSON `{ "imagenes": ["data:image/..."] }`.
+- **Formato:** `multipart/form-data` con campo `fotos` (hasta el límite de cupos disponibles).
+- **Validaciones:**
+  - Si la sesión está en estado `'COMPLETADO'`, `'UTILIZADA'` o `'PURGADA'`, rechaza la petición con HTTP `400 Bad Request` (*"Esta sesión de carga ya ha sido finalizada o utilizada."*).
+  - Si `fotosActuales.length + nuevosArchivos.length > limiteEfectivo`, rechaza la subida con HTTP `400 Bad Request` indicando que se excede el cupo disponible.
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
@@ -1092,14 +1113,35 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
       "session_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
       "nuevas_fotos": [ ... ],
       "total_fotos": 2
-    }
+    },
+    "fotos": [ ... ],
+    "nuevasFotos": [ ... ]
   }
   ```
 
-#### 5.13.4 Purgar Sesiones Huérfanas (Garbage Collector Manual)
+#### 5.13.4 Destruir Evidencia Temporal en Tiempo Real (Cloudinary)
+- **Rutas:** `POST /api/upload-session/eliminar-foto` o `DELETE /api/servicios/evidencia-temporal`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Descripción:** Destruye inmediatamente el recurso físico en Cloudinary vía `cloudinary.uploader.destroy(publicId)` al presionar el icono de basura en la interfaz, y si se suministra `sessionId`, lo remueve del array JSONB en `sesiones_carga_fotos`.
+- **Body (JSON):**
+  ```json
+  {
+    "publicId": "siger-fmc/recepcion/foto1",
+    "sessionId": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+  }
+  ```
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Fotografía eliminada exitosamente de Cloudinary y sesión temporal."
+  }
+  ```
+
+#### 5.13.5 Purgar Sesiones Huérfanas (Garbage Collector Manual)
 - **Ruta:** `POST /api/upload-session/purgar`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
-- **Descripción:** Ejecuta inmediatamente la rutina de recolección de huérfanos.
+- **Descripción:** Ejecuta inmediatamente la rutina de recolección de huérfanos. Purga los archivos de Cloudinary de sesiones expiradas mayores a 30 minutos y elimina registros históricos de `sesiones_carga_fotos` con más de 15 días de antigüedad.
 - **Respuesta Exitosa (`200 OK`):**
   ```json
   {
@@ -1107,15 +1149,17 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
     "message": "Purga de sesiones huérfanas completada.",
     "data": {
       "purgadas": 3,
-      "fotosEliminadas": 6
+      "fotosEliminadas": 6,
+      "registrosHistoricosEliminados": 12
     }
   }
   ```
 
 #### Ciclo de Vida y Prevención de Huérfanos:
-1. **`PENDIENTE` / `COMPLETADO`**: La sesión recibe fotos desde el móvil y las preserva temporalmente mientras el operador redacta la orden de servicio en la PC.
-2. **`UTILIZADA`**: Al presionar "Guardar Orden de Servicio" (`POST /api/servicios`), la orden vincula las fotos y actualiza la sesión a `'UTILIZADA'`. Las fotos de sesiones `'UTILIZADA'` **nunca** son borradas.
-3. **`PURGADA`**: Si la orden se cancela, la ventana se cierra o expira y pasan más de 30 minutos sin ser confirmada, el Garbage Collector automático elimina las imágenes de Cloudinary (`cloudinary.uploader.destroy`) y marca la sesión como `'PURGADA'`.
+1. **`PENDIENTE` / `COMPLETADO`**: La sesión recibe fotos desde el móvil o la PC y las preserva temporalmente mientras el operador redacta la orden de servicio.
+2. **`UTILIZADA`**: Al presionar "Guardar Orden de Servicio" (`POST /api/servicios`), la orden vincula las fotos en `evidencias_fotograficas` y actualiza la sesión a `'UTILIZADA'`. Las fotos de sesiones `'UTILIZADA'` **nunca** son borradas por el purgador.
+3. **`PURGADA`**: Si la orden se cancela, la ventana se cierra o expira y pasan más de 30 minutos sin ser confirmada, el Garbage Collector automático (que corre cada 30 minutos en background) elimina las imágenes de Cloudinary (`cloudinary.uploader.destroy`) y marca la sesión como `'PURGADA'`.
+4. **Depuración de Base de Datos (15 Días):** Cada ejecución del Garbage Collector elimina filas en `sesiones_carga_fotos` en estado `'PURGADA'` o `'UTILIZADA'` con más de 15 días.
 
 ---
 
@@ -1157,7 +1201,8 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
 
 ### 5.15 Cancelar Orden de Servicio
 - **Ruta:** `POST /api/servicios/:id/cancelar`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico` de la sede)
+- **Acceso:** Privado Estricto (`SuperAdmin`, `Admin_Sucursal` únicamente)
+- **Restricción de Rol:** Protegido por `checkRole(['SuperAdmin', 'Admin_Sucursal'])`. Usuarios con rol `Secretaria` o `Tecnico` son rechazados con HTTP `403 Forbidden` (*"No tienes permisos para desactivar órdenes de servicio"*).
 - **Descripción:** Da de baja formalmente una orden técnica que no continuará en reparación (ej. cliente rechaza presupuesto, equipo irreparable o desistimiento). Ejecuta una transacción atómica bloqueando el registro con `FOR UPDATE`, valida aislamiento multi-sucursal, impide cancelar órdenes previamente entregadas o ya canceladas, exige un motivo descriptivo obligatorio (mínimo 5 caracteres), actualiza el estado al catálogo `CANCELADO_DEVUELTO` (`orden_flujo = 8`), persiste `motivo_cancelacion`, `fecha_cancelacion` y `usuario_cancela_id` en `servicios_recepcion` e inserta el registro inmutable en `historial_estados`.
 - **Body (JSON):**
   ```json
@@ -1186,7 +1231,7 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
   ```
 - **Errores Posibles:**
   - `400 Bad Request`: "El motivo de cancelación es obligatorio y debe contener al menos 5 caracteres.", "No es posible cancelar una orden que ya fue entregada al cliente.", o "Esta orden ya se encuentra cancelada."
-  - `403 Forbidden`: "Acceso denegado: no tiene permisos para cancelar órdenes de otra sucursal."
+  - `403 Forbidden`: "No tienes permisos para desactivar órdenes de servicio" o acceso a órdenes de otra sucursal.
   - `404 Not Found`: "Orden de servicio no encontrada."
 
 ---

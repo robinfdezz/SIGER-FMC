@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Camera, Trash2, Plus, Loader2, QrCode } from 'lucide-react';
 import { uploadFotosRecepcion, eliminarFotoTemporal } from '../../services/servicios.service';
-import { crearUploadSession, getUploadSession } from '../../services/uploadSession.service';
+import { crearUploadSession, getUploadSession, subirFotosSession } from '../../services/uploadSession.service';
 import QrUploadModal from './QrUploadModal';
 import { sileo } from 'sileo';
 
@@ -244,34 +244,37 @@ const DevicePhotoUploader = ({
 
     setIsUploading(true);
     try {
-      const result = await uploadFotosRecepcion(validFiles);
-      if (result && (result.ok || result.status === 200)) {
+      // 1. Obtener o crear sesión temporal unificada para registrar en BD y habilitar purga
+      let sessionIdToUse = activeSessionId;
+      const isSessionAlive = sessionIdToUse && !isSessionExpired && sessionExpiresAt && Date.now() < sessionExpiresAt;
+
+      if (!isSessionAlive) {
+        const sessionRes = await crearUploadSession({ maxFotosPermitidas: availableSlots });
+        if (sessionRes && sessionRes.ok && sessionRes.sessionId) {
+          sessionIdToUse = sessionRes.sessionId;
+          setActiveSessionId(sessionRes.sessionId);
+          setSessionExpiresAt(Date.now() + SESSION_TIMEOUT_MS);
+          setIsSessionExpired(false);
+        } else {
+          throw new Error('No se pudo inicializar la sesión temporal de evidencias.');
+        }
+      }
+
+      // 2. Subir fotos utilizando el endpoint de sesión unificada
+      const result = await subirFotosSession(sessionIdToUse, validFiles);
+      if (result && result.ok) {
         let uploaded = [];
-        if (Array.isArray(result.fotos) && result.fotos.length > 0) {
-          uploaded = result.fotos.map((f, idx) => ({
+        if (Array.isArray(result.nuevasFotos) && result.nuevasFotos.length > 0) {
+          uploaded = result.nuevasFotos.map((f, idx) => ({
             url: f.url || f.secure_url,
             public_id: f.public_id || null,
             size: f.size || (validFiles[idx]?.size ? (validFiles[idx].size / (1024 * 1024)).toFixed(2) : null)
           }));
-        } else if (Array.isArray(result.data?.fotos) && result.data.fotos.length > 0) {
-          uploaded = result.data.fotos.map((f, idx) => ({
+        } else if (Array.isArray(result.fotos) && result.fotos.length > 0) {
+          uploaded = result.fotos.slice(-validFiles.length).map((f, idx) => ({
             url: f.url || f.secure_url,
             public_id: f.public_id || null,
             size: f.size || (validFiles[idx]?.size ? (validFiles[idx].size / (1024 * 1024)).toFixed(2) : null)
-          }));
-        } else if (result.url || result.data?.url) {
-          uploaded = [
-            {
-              url: result.url || result.data?.url,
-              public_id: result.public_id || result.data?.public_id || null,
-              size: validFiles[0]?.size ? (validFiles[0].size / (1024 * 1024)).toFixed(2) : null
-            }
-          ];
-        } else if (Array.isArray(result.urls)) {
-          uploaded = result.urls.map((url, idx) => ({
-            url,
-            public_id: null,
-            size: validFiles[idx]?.size ? (validFiles[idx].size / (1024 * 1024)).toFixed(2) : null
           }));
         }
 
@@ -283,11 +286,20 @@ const DevicePhotoUploader = ({
 
         const newPhotos = [...normalizedCurrent, ...uploaded].slice(0, MAX_PHOTOS);
         onChange(newPhotos);
+
+        // Resetear sesión completada tras la subida para que cualquier apertura posterior
+        // del QR recalcule el cupo exacto de las fotos restantes
+        setActiveSessionId(null);
+        setSessionExpiresAt(null);
       } else {
         sileo.error({ title: 'Error de subida', description: result?.message || 'No se pudieron subir las imágenes.' });
       }
-    } catch {
-      sileo.error({ title: 'Error de subida', description: 'No se pudo subir la imagen. Intenta de nuevo.' });
+    } catch (err) {
+      console.error('Error al subir fotos desde PC:', err);
+      sileo.error({
+        title: 'Error de subida',
+        description: err.response?.data?.message || err.message || 'No se pudo subir la imagen. Intenta de nuevo.'
+      });
     } finally {
       setIsUploading(false);
     }
