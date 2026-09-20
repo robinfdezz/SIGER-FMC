@@ -42,3 +42,5 @@ Thumbs.db
 .vscode/
 *.sublime-workspace
 *.sublime-project
+
+DIAGRAMAS_CASOS_DE_USO_Y_FLUJO.md
