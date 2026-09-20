@@ -156,3 +156,13 @@ export const liquidarYEntregarServicio = async (id, data = {}) => {
   const response = await api.post(`/servicios/${id}/entregar`, data);
   return response.data;
 };
+
+/**
+ * Cancelar orden de servicio técnico
+ * @param {number|string} id - ID del servicio
+ * @param {Object} data - { motivo_cancelacion }
+ */
+export const cancelarServicio = async (id, data = {}) => {
+  const response = await api.post(`/servicios/${id}/cancelar`, data);
+  return response.data;
+};

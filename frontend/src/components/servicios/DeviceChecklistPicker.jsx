@@ -110,17 +110,18 @@ export const DeviceChecklistPicker = ({
         {CHECKLIST_ITEMS.map(({ key, label }) => {
           const estado = getState(key);
           const { color, Icon } = CHECKLIST_BADGE_CONFIG[estado] || CHECKLIST_BADGE_CONFIG.sin_revisar;
+          const isMinimalBadge = badgeVariant === 'minimal' || badgeVariant === 'minimalist';
 
           if (readOnly) {
             return (
               <Badge
                 key={key}
-                variant={badgeVariant}
+                variant={isMinimalBadge ? 'minimal' : badgeVariant}
                 color={color}
                 icon={Icon}
                 size="md"
                 className={`font-semibold select-none transition-colors ${
-                  badgeVariant === 'minimal'
+                  isMinimalBadge
                     ? 'px-2.5 py-1'
                     : 'py-1.5 px-3 rounded-xl border shadow-2xs'
                 }`}

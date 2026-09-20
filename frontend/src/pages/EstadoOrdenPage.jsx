@@ -228,6 +228,8 @@ export const EstadoOrdenPage = () => {
 
     const isCancelado =
       estadoNorm === 'CANCELADO_DEVUELTO' ||
+      estadoNorm.includes('CANCEL') ||
+      Number(ord.orden_flujo) === 8 ||
       estadoNombre.includes('cancel') ||
       estadoNombre.includes('devuelt') ||
       estadoNombre.includes('no reparado');
@@ -339,7 +341,7 @@ export const EstadoOrdenPage = () => {
     return { steps, activeIndex, isCancelado, isEntregado };
   };
 
-  const { steps: timelineSteps, activeIndex: currentStepIndex, isEntregado } = buildTimelineSteps(orden);
+  const { steps: timelineSteps, activeIndex: currentStepIndex, isCancelado, isEntregado } = buildTimelineSteps(orden);
 
   // Determinar si la vista está vacía / en espera de búsqueda
   const isVistaInicial = !orden && !loading && !error;
@@ -756,7 +758,7 @@ export const EstadoOrdenPage = () => {
             <div className="w-full my-6 sm:my-8 overflow-x-auto no-scrollbar pb-3 pt-1 px-1 select-none">
               <div className="min-w-[540px] sm:min-w-0 w-full flex items-start justify-between relative">
                 {timelineSteps.map((s, index) => {
-                  const isOrderFinished = isEntregado;
+                  const isOrderFinished = isEntregado || isCancelado;
                   const isCompleted = index < currentStepIndex || (isOrderFinished && index === currentStepIndex);
                   const isCurrent = index === currentStepIndex && !isOrderFinished;
                   const isPending = index > currentStepIndex;
@@ -773,13 +775,17 @@ export const EstadoOrdenPage = () => {
                       >
                         {/* Indicador Circular con Icono */}
                         <div className="flex items-center justify-center">
-                          {/* Paso Completado: Tono cálido correspondiente con Check */}
+                          {/* Paso Completado: Tono cálido correspondiente con Check o X para cancelación */}
                           {isCompleted && (
                             <div
                               className="w-10 h-10 sm:w-11 sm:h-11 rounded-full text-white flex items-center justify-center shadow-xs"
                               style={{ backgroundColor: colorStage.hex }}
                             >
-                              <Check size={18} strokeWidth={2.8} />
+                              {s.isCancelledNode ? (
+                                <X size={20} strokeWidth={2.8} />
+                              ) : (
+                                <Check size={18} strokeWidth={2.8} />
+                              )}
                             </div>
                           )}
 
@@ -839,12 +845,12 @@ export const EstadoOrdenPage = () => {
                             className="h-full transition-all duration-300"
                             style={{
                               background:
-                                index < currentStepIndex || isEntregado
+                                index < currentStepIndex || isEntregado || isCancelado
                                   ? `linear-gradient(to right, ${colorStage.hex}, ${nextColorStage.hex})`
                                   : undefined
                             }}
                           >
-                            {!isEntregado && index >= currentStepIndex && (
+                            {!isEntregado && !isCancelado && index >= currentStepIndex && (
                               <div className="h-full bg-neutral-200 dark:bg-neutral-800" />
                             )}
                           </div>
@@ -957,9 +963,13 @@ export const EstadoOrdenPage = () => {
 
                     <div>
                       <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block mb-1">
-                        Fecha Est. Entrega
+                        {isCancelado ? 'Fecha de Cancelación' : 'Fecha Est. Entrega'}
                       </span>
-                      {fechaEstimadaFormateada ? (
+                      {isCancelado ? (
+                        <span className="text-sm font-bold text-rose-600 dark:text-rose-400 font-inter tabular-nums block leading-normal">
+                          {formatFechaLegible(orden.fecha_cancelacion) || '—'}
+                        </span>
+                      ) : fechaEstimadaFormateada ? (
                         <span className="text-sm font-bold text-neutral-800 dark:text-neutral-100 font-inter tabular-nums block leading-normal">
                           {fechaEstimadaFormateada}
                         </span>
@@ -970,6 +980,18 @@ export const EstadoOrdenPage = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* Motivo de Cancelación (si aplica) */}
+                  {isCancelado && orden.motivo_cancelacion && (
+                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1">
+                      <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 block">
+                        Motivo de Cancelación
+                      </span>
+                      <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 leading-relaxed italic">
+                        "{orden.motivo_cancelacion}"
+                      </p>
+                    </div>
+                  )}
 
                   {/* Técnicos Asignados (Soporte Múltiple con envoltorio flex) */}
                   <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5">

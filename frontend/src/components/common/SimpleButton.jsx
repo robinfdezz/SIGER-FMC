@@ -14,7 +14,8 @@ import React from 'react';
  * @param {'sm' | 'xs'} [props.size='sm'] - Tamaño del botón
  * @param {string} [props.type='button'] - Tipo de botón HTML
  * @param {string} [props.className=''] - Clases adicionales de Tailwind
- * @param {string} [props.title] - Tooltip nativo
+ * @param {string} [props.title] - Descripción accesible (usada en aria-label)
+ * @param {boolean} [props.showNativeTitle=false] - Si es true, activa el tooltip flotante nativo del navegador
  */
 export const SimpleButton = ({
   children,
@@ -27,6 +28,7 @@ export const SimpleButton = ({
   type = 'button',
   className = '',
   title,
+  showNativeTitle = false,
   ...rest
 }) => {
   // El texto siempre maneja el color neutral estándar de las acciones en línea
@@ -54,7 +56,8 @@ export const SimpleButton = ({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      title={title}
+      title={showNativeTitle ? title : undefined}
+      aria-label={title || (typeof children === 'string' ? children : undefined)}
       className={`${baseStyles} ${appliedSize} ${className}`}
       {...rest}
     >

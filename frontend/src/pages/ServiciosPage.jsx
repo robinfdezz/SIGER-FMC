@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import PostCreacionModal from '../components/servicios/PostCreacionModal';
 import EntregaServicioModal from '../components/servicios/EntregaServicioModal';
+import OrdenDetalleModal from '../components/servicios/OrdenDetalleModal';
+import CancelarOrdenModal from '../components/servicios/CancelarOrdenModal';
 import Select from '../components/common/Select';
 import Badge from '../components/common/Badge';
 import Pagination from '../components/common/Pagination';
@@ -14,11 +16,11 @@ import { getEstados, getSucursales } from '../services/catalogs.service';
 import { getWorkers } from '../services/workers.service';
 import { getCompanyProfile, getBranches } from '../services/configuracion.service';
 import { sileo } from 'sileo';
-import { RotateCcw } from 'lucide';
 import {
   Plus,
   Search,
   RefreshCw,
+  RotateCcw,
   Ticket,
   Printer,
   User,
@@ -45,7 +47,8 @@ import {
   CheckCircle2,
   XCircle,
   Inbox,
-  PackageCheck
+  PackageCheck,
+  Ban
 } from 'lucide-react';
 
 const extractArray = (res) => {
@@ -108,6 +111,39 @@ const getDeviceCategoryIcon = (categoria) => {
     return <Smartphone size={14} className={iconClass} />;
   }
   return <Package size={14} className={iconClass} />;
+};
+
+/**
+ * Normaliza y desduplica marca y modelo (ej: "Google Pixel" y "Google Pixel 7 Pro" -> "Google Pixel · 7 Pro")
+ */
+const formatDeviceName = (marca = '', modelo = '') => {
+  const m = String(marca || '').trim();
+  let mod = String(modelo || '').trim();
+
+  if (m && mod.toLowerCase().startsWith(m.toLowerCase())) {
+    mod = mod.slice(m.length).replace(/^[\s\-_/]+/, '').trim();
+  }
+
+  if (m && mod) {
+    return (
+      <>
+        <span className="font-semibold text-neutral-800 dark:text-neutral-200">{m}</span>
+        <span className="text-neutral-300 dark:text-neutral-600 mx-1 font-light">·</span>
+        <span>{mod}</span>
+      </>
+    );
+  }
+  return m || mod || 'Dispositivo Sin Identificar';
+};
+
+const getDeviceFullCleanName = (marca = '', modelo = '') => {
+  const m = String(marca || '').trim();
+  let mod = String(modelo || '').trim();
+  if (m && mod.toLowerCase().startsWith(m.toLowerCase())) {
+    mod = mod.slice(m.length).replace(/^[\s\-_/]+/, '').trim();
+  }
+  if (m && mod) return `${m} · ${mod}`;
+  return m || mod || 'Dispositivo Sin Identificar';
 };
 
 const normalizeEstadoKey = (estado) => {
@@ -248,6 +284,7 @@ export const ServiciosPage = () => {
   const userRole = String(currentUser?.rol_nombre || currentUser?.rol || '').toLowerCase();
   const isSuperAdmin = userRole === 'superadmin';
   const isTecnico = userRole === 'tecnico' || userRole.includes('tecnic') || Number(currentUser?.rol_id) === 4;
+  const canAccessTaller = isSuperAdmin || userRole.includes('admin') || isTecnico;
 
   // Datos de empresa y sucursal para reimpresión
   const [companyData, setCompanyData] = useState(null);
@@ -290,6 +327,18 @@ export const ServiciosPage = () => {
 
   // Modal de liquidación y entrega
   const [ordenParaEntregar, setOrdenParaEntregar] = useState(null);
+
+  // Modal de cancelación de orden
+  const [ordenParaCancelar, setOrdenParaCancelar] = useState(null);
+
+  // Modal de visualización rápida / Ficha de la Orden
+  const [isDetalleModalOpen, setIsDetalleModalOpen] = useState(false);
+  const [selectedOrdenDetalle, setSelectedOrdenDetalle] = useState(null);
+
+  const handleOpenDetalleModal = (orden) => {
+    setSelectedOrdenDetalle(orden);
+    setIsDetalleModalOpen(true);
+  };
 
   // Debounce de búsqueda (300ms)
   useEffect(() => {
@@ -427,6 +476,18 @@ export const ServiciosPage = () => {
   };
 
   const handleImprimirClick = async (orden) => {
+    if (!orden) return;
+    const flujo = Number(orden.orden_flujo || 0);
+    const cod = String(orden.codigo_estado || '').toUpperCase();
+    const nom = String(orden.estado || orden.nombre_estado || '').toLowerCase();
+    if (flujo === 8 || cod.includes('CANCEL') || nom.includes('cancelad')) {
+      sileo.warning({
+        title: 'Impresión no permitida',
+        description: 'No se permite emitir comprobantes o etiquetas para órdenes canceladas.'
+      });
+      return;
+    }
+
     try {
       const res = await getServicioById(orden.id);
       if (res?.ok && res?.data) {
@@ -473,8 +534,8 @@ export const ServiciosPage = () => {
           valB = (b.nombre_cliente || b.cliente_nombre || b.cliente || '').toLowerCase();
           break;
         case 'equipo':
-          valA = `${a.marca_equipo || a.marca || ''} ${a.modelo_equipo || a.modelo || ''}`.toLowerCase();
-          valB = `${b.marca_equipo || b.marca || ''} ${b.modelo_equipo || b.modelo || ''}`.toLowerCase();
+          valA = getDeviceFullCleanName(a.marca_equipo || a.marca, a.modelo_equipo || a.modelo).toLowerCase();
+          valB = getDeviceFullCleanName(b.marca_equipo || b.marca, b.modelo_equipo || b.modelo).toLowerCase();
           break;
         case 'estado':
           valA = (a.estado || a.estado_nombre || a.nombre_estado || '').toLowerCase();
@@ -790,10 +851,18 @@ export const ServiciosPage = () => {
                     const estadoNormKey = normalizeEstadoKey(estadoObj);
                     const isListoParaEntrega = estadoNormKey === 'LISTO_ENTREGA' || Number(orden.orden_flujo) === 6 || orden.codigo_estado === 'LISTO_ENTREGA';
 
+                    const codEstadoRow = String(orden.codigo_estado || '').toUpperCase();
+                    const flujoRow = Number(orden.orden_flujo || 0);
+                    const nomEstadoRow = String(orden.estado || orden.nombre_estado || '').toLowerCase();
+                    const isCancelado = flujoRow === 8 || codEstadoRow.includes('CANCEL') || nomEstadoRow.includes('cancelad');
+                    const isEntregado = flujoRow === 7 || codEstadoRow.includes('ENTREG') || nomEstadoRow.includes('entregad');
+                    const esInactiva = isEntregado || isCancelado;
+
                     return (
                       <tr
                         key={orden.id}
-                        className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all"
+                        onClick={() => handleOpenDetalleModal(orden)}
+                        className="hover:bg-neutral-50/80 dark:hover:bg-neutral-800/30 transition-all cursor-pointer"
                       >
                         {/* Columna 1: Ticket */}
                         <td className="py-3 px-2.5 sm:px-3 whitespace-nowrap align-middle">
@@ -834,8 +903,11 @@ export const ServiciosPage = () => {
                         <td className="py-3 px-3 sm:px-4 align-middle min-w-[165px] max-w-[230px]">
                           <div className="flex items-start gap-1.5">
                             {getDeviceCategoryIcon(orden.categoria)}
-                            <span className="text-neutral-700 dark:text-neutral-300 font-medium text-xs leading-snug whitespace-normal break-words">
-                              {orden.marca_equipo} {orden.modelo_equipo}
+                            <span
+                              className="text-neutral-700 dark:text-neutral-300 font-medium text-xs leading-snug whitespace-normal break-words"
+                              title={getDeviceFullCleanName(orden.marca_equipo, orden.modelo_equipo)}
+                            >
+                              {formatDeviceName(orden.marca_equipo, orden.modelo_equipo)}
                             </span>
                           </div>
                           {Array.isArray(orden.tecnicos) && orden.tecnicos.length > 0 ? (
@@ -925,21 +997,43 @@ export const ServiciosPage = () => {
                             {isListoParaEntrega && !isTecnico && (
                               <button
                                 type="button"
-                                onClick={() => setOrdenParaEntregar(orden)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOrdenParaEntregar(orden);
+                                }}
                                 className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
                                 title="Liquidar y entregar equipo"
                               >
                                 <PackageCheck size={16} />
                               </button>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => handleImprimirClick(orden)}
-                              className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-                              title="Imprimir comprobante o etiqueta"
-                            >
-                              <Printer size={15} />
-                            </button>
+                            {!isCancelado && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleImprimirClick(orden);
+                                }}
+                                className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                                title="Imprimir comprobante o etiqueta"
+                              >
+                                <Printer size={15} />
+                              </button>
+                            )}
+
+                            {!esInactiva && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOrdenParaCancelar(orden);
+                                }}
+                                className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                                title="Cancelar orden de servicio"
+                              >
+                                <Ban size={15} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -963,6 +1057,35 @@ export const ServiciosPage = () => {
           />
         </div>
       </div>
+
+      {/* Modal de Detalle / Ficha de la Orden */}
+      <OrdenDetalleModal
+        isOpen={isDetalleModalOpen}
+        onClose={() => {
+          setIsDetalleModalOpen(false);
+          setSelectedOrdenDetalle(null);
+        }}
+        ordenId={selectedOrdenDetalle?.id}
+        orden={selectedOrdenDetalle}
+        onOpenTaller={canAccessTaller ? (targetOrder) => {
+          const ord = targetOrder || selectedOrdenDetalle;
+          setIsDetalleModalOpen(false);
+          setSelectedOrdenDetalle(null);
+          navigate('/taller', {
+            state: {
+              autoOpenOrdenId: ord?.id,
+              autoOpenCodigo: ord?.codigo_ticket || ord?.codigo_orden
+            }
+          });
+        } : null}
+        onPrintTicket={(ord) => {
+          setIsDetalleModalOpen(false);
+          handleImprimirClick(ord);
+        }}
+        onOrderUpdated={() => {
+          fetchOrdenes(page, limit);
+        }}
+      />
 
       {/* Modal de Impresión */}
       <PostCreacionModal
@@ -995,6 +1118,30 @@ export const ServiciosPage = () => {
             )
           );
           fetchOrdenes(pagination.page || 1);
+        }}
+      />
+
+      {/* Modal de Cancelación de Orden */}
+      <CancelarOrdenModal
+        isOpen={Boolean(ordenParaCancelar)}
+        onClose={() => setOrdenParaCancelar(null)}
+        orden={ordenParaCancelar}
+        onSuccess={(updatedOrden) => {
+          setOrdenes((prev) =>
+            prev.map((o) =>
+              o.id === updatedOrden.id
+                ? {
+                    ...o,
+                    ...updatedOrden,
+                    estado: updatedOrden.estado || 'Cancelado / No Reparado',
+                    codigo_estado: updatedOrden.codigo_estado || 'CANCELADO_DEVUELTO',
+                    orden_flujo: 8,
+                    estado_color: '#EF4444'
+                  }
+                : o
+            )
+          );
+          fetchOrdenes(page, limit);
         }}
       />
     </DashboardLayout>

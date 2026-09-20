@@ -764,6 +764,7 @@ const getServicioByTicket = async (req, res) => {
       '  sr.falla_reportada, sr.observaciones_recepcion, sr.observaciones_recepcion AS observaciones, sr.accesorios_recibidos, sr.accesorios_recibidos AS accesorios,\n' +
       '  sr.prioridad, sr.es_garantia, sr.checklist_entrada,\n' +
       '  sr.costo_previsto, sr.costo_final_confirmado, sr.monto_anticipo, sr.monto_descuento, sr.monto_liquidado,\n' +
+      '  sr.motivo_cancelacion, sr.fecha_cancelacion, sr.usuario_cancela_id,\n' +
       '  sr.fecha_entrega_estimada, sr.fecha_entrega_estimada AS fecha_estimada_entrega, sr.fecha_entrega_real, sr.created_at, sr.updated_at,\n' +
       '  es.id AS estado_id, es.codigo_estado, es.nombre_estado AS estado, es.color_badge AS estado_color, es.orden_flujo,\n' +
       '  COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, \' \', c.apellido)), \'\'), c.nombre) AS nombre_cliente,\n' +
@@ -908,11 +909,48 @@ const getServicioByTicket = async (req, res) => {
       return res.status(404).json({ ok: false, message: 'No se encontro ninguna orden con ese codigo de ticket.' });
     }
 
-    return res.status(200).json({ ok: true, data: result.rows[0] });
+    const ordenTicket = result.rows[0];
+    return res.status(200).json({ ok: true, data: ordenTicket });
 
   } catch (error) {
     console.error('Error en getServicioByTicket:', error);
     return res.status(500).json({ ok: false, message: 'Error al buscar por codigo de ticket.' });
+  }
+};
+
+/**
+ * GET /api/servicios/:id/ticket-impresion
+ * Validación y consulta previa a emisión de ticket/etiqueta física.
+ * Bloquea formalmente la emisión de comprobantes para órdenes canceladas.
+ */
+const getTicketImpresionData = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = getPool();
+    const result = await pool.query(
+      `SELECT sr.id, sr.codigo_ticket, es.codigo_estado, es.orden_flujo
+       FROM servicios_recepcion sr
+       JOIN estados_servicio es ON es.id = sr.estado_actual_id
+       WHERE (sr.id::text = $1 OR sr.codigo_ticket = $1) AND sr.activo = TRUE`,
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada.' });
+    }
+
+    const order = result.rows[0];
+    if (Number(order.orden_flujo) === 8 || String(order.codigo_estado || '').toUpperCase().includes('CANCEL')) {
+      return res.status(400).json({
+        ok: false,
+        message: 'No se permite emitir comprobantes o etiquetas para órdenes canceladas'
+      });
+    }
+
+    return res.status(200).json({ ok: true, data: order });
+  } catch (error) {
+    console.error('Error en getTicketImpresionData:', error);
+    return res.status(500).json({ ok: false, message: 'Error al consultar datos de impresión.' });
   }
 };
 
@@ -1337,20 +1375,33 @@ const updateServicioEstado = async (req, res) => {
     // 2. Verificar existencia de la orden y sucursal autorizada
     const isSuperAdmin = isUserSuperAdmin(req.user);
 
-    let checkQuery = 'SELECT id, codigo_ticket, sucursal_id, estado_actual_id FROM servicios_recepcion WHERE id = $1 AND activo = TRUE';
+    let checkQuery = `
+      SELECT sr.id, sr.codigo_ticket, sr.sucursal_id, sr.estado_actual_id, es.codigo_estado, es.orden_flujo
+      FROM servicios_recepcion sr
+      JOIN estados_servicio es ON es.id = sr.estado_actual_id
+      WHERE sr.id = $1 AND sr.activo = TRUE
+    `;
     const checkParams = [id];
 
     if (!isSuperAdmin) {
       if (!req.user?.sucursal_id) {
         return res.status(403).json({ ok: false, message: 'Acceso denegado: El usuario no tiene una sucursal asignada.' });
       }
-      checkQuery += ' AND sucursal_id = $2';
+      checkQuery += ' AND sr.sucursal_id = $2';
       checkParams.push(parseInt(req.user.sucursal_id, 10));
     }
 
     const ordenRes = await client.query(checkQuery, checkParams);
     if (ordenRes.rowCount === 0) {
       return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada o fuera de su sucursal.' });
+    }
+
+    const ordenActual = ordenRes.rows[0];
+    if (Number(ordenActual.orden_flujo) === 8 || String(ordenActual.codigo_estado || '').toUpperCase().includes('CANCEL')) {
+      return res.status(400).json({
+        ok: false,
+        message: 'No se pueden realizar cambios de estado en una orden cancelada.'
+      });
     }
 
     await client.query('BEGIN');
@@ -1581,13 +1632,18 @@ const assignTecnicoServicio = async (req, res) => {
     }
 
     // Verificar que la orden exista, esté activa y pertenezca a la sucursal autorizada
-    let checkOrderQuery = 'SELECT id, codigo_ticket, sucursal_id FROM servicios_recepcion WHERE id = $1 AND activo = TRUE';
+    let checkOrderQuery = `
+      SELECT sr.id, sr.codigo_ticket, sr.sucursal_id, es.codigo_estado, es.orden_flujo
+      FROM servicios_recepcion sr
+      JOIN estados_servicio es ON es.id = sr.estado_actual_id
+      WHERE sr.id = $1 AND sr.activo = TRUE
+    `;
     const checkOrderParams = [id];
     if (!isSuperAdmin) {
       if (!req.user?.sucursal_id) {
         return res.status(403).json({ ok: false, message: 'Acceso denegado: El usuario no tiene una sucursal asignada.' });
       }
-      checkOrderQuery += ' AND sucursal_id = $2';
+      checkOrderQuery += ' AND sr.sucursal_id = $2';
       checkOrderParams.push(parseInt(req.user.sucursal_id, 10));
     }
 
@@ -1596,6 +1652,13 @@ const assignTecnicoServicio = async (req, res) => {
       return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada o fuera de su sucursal.' });
     }
     const ordenInfo = ordenRes.rows[0];
+
+    if (Number(ordenInfo.orden_flujo) === 8 || String(ordenInfo.codigo_estado || '').toUpperCase().includes('CANCEL')) {
+      return res.status(400).json({
+        ok: false,
+        message: 'No se pueden asignar técnicos a una orden cancelada.'
+      });
+    }
 
     // Validar que el técnico pertenezca a la misma sucursal de la orden (o sea superadmin / rol global)
     if (tecnicoInfo.sucursal_id && ordenInfo.sucursal_id && Number(tecnicoInfo.sucursal_id) !== Number(ordenInfo.sucursal_id)) {
@@ -1699,6 +1762,12 @@ const removeTecnicoServicio = async (req, res) => {
     }
 
     const estadoOrden = ordenRes.rows[0];
+    if (Number(estadoOrden.orden_flujo) === 8 || String(estadoOrden.codigo_estado || '').toUpperCase().includes('CANCEL')) {
+      return res.status(400).json({
+        ok: false,
+        message: 'No se pueden modificar los técnicos de una orden cancelada.'
+      });
+    }
     const esEstadoPosterior = estadoOrden.codigo_estado !== 'RECIBIDO' && Number(estadoOrden.orden_flujo) > 1;
 
     if (esEstadoPosterior) {
@@ -1871,19 +1940,32 @@ const createIncidenciaServicio = async (req, res) => {
     const isSuperAdmin = isUserSuperAdmin(req.user);
 
     // Verificar que la orden exista, esté activa y pertenezca a la sucursal autorizada
-    let checkOrderQuery = 'SELECT id, codigo_ticket, sucursal_id, estado_actual_id FROM servicios_recepcion WHERE id = $1 AND activo = TRUE';
+    let checkOrderQuery = `
+      SELECT sr.id, sr.codigo_ticket, sr.sucursal_id, sr.estado_actual_id, es.codigo_estado, es.orden_flujo
+      FROM servicios_recepcion sr
+      JOIN estados_servicio es ON es.id = sr.estado_actual_id
+      WHERE sr.id = $1 AND sr.activo = TRUE
+    `;
     const checkOrderParams = [id];
     if (!isSuperAdmin) {
       if (!req.user?.sucursal_id) {
         return res.status(403).json({ ok: false, message: 'Acceso denegado: El usuario no tiene una sucursal asignada.' });
       }
-      checkOrderQuery += ' AND sucursal_id = $2';
+      checkOrderQuery += ' AND sr.sucursal_id = $2';
       checkOrderParams.push(parseInt(req.user.sucursal_id, 10));
     }
 
     const ordenRes = await client.query(checkOrderQuery, checkOrderParams);
     if (ordenRes.rowCount === 0) {
       return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada o fuera de su sucursal.' });
+    }
+
+    const ordenActualInc = ordenRes.rows[0];
+    if (Number(ordenActualInc.orden_flujo) === 8 || String(ordenActualInc.codigo_estado || '').toUpperCase().includes('CANCEL')) {
+      return res.status(400).json({
+        ok: false,
+        message: 'No se pueden registrar repuestos o incidencias en una orden cancelada.'
+      });
     }
 
     const repuestoFinal = isBlank(repuesto_requerido) ? null : String(repuesto_requerido).trim();
@@ -2081,19 +2163,32 @@ const updateAprobacionIncidencia = async (req, res) => {
     const isSuperAdmin = isUserSuperAdmin(req.user);
 
     // Verificar que la orden exista y pertenezca a la sucursal autorizada
-    let checkOrderQuery = 'SELECT id, sucursal_id FROM servicios_recepcion WHERE id = $1 AND activo = TRUE';
+    let checkOrderQuery = `
+      SELECT sr.id, sr.sucursal_id, es.codigo_estado, es.orden_flujo
+      FROM servicios_recepcion sr
+      JOIN estados_servicio es ON es.id = sr.estado_actual_id
+      WHERE sr.id = $1 AND sr.activo = TRUE
+    `;
     const checkOrderParams = [servicioId];
     if (!isSuperAdmin) {
       if (!req.user?.sucursal_id) {
         return res.status(403).json({ ok: false, message: 'Acceso denegado: El usuario no tiene una sucursal asignada.' });
       }
-      checkOrderQuery += ' AND sucursal_id = $2';
+      checkOrderQuery += ' AND sr.sucursal_id = $2';
       checkOrderParams.push(parseInt(req.user.sucursal_id, 10));
     }
 
     const ordenRes = await pool.query(checkOrderQuery, checkOrderParams);
     if (ordenRes.rowCount === 0) {
       return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada o fuera de su sucursal.' });
+    }
+
+    const ordenActualAprob = ordenRes.rows[0];
+    if (Number(ordenActualAprob.orden_flujo) === 8 || String(ordenActualAprob.codigo_estado || '').toUpperCase().includes('CANCEL')) {
+      return res.status(400).json({
+        ok: false,
+        message: 'No se pueden modificar incidencias de una orden cancelada.'
+      });
     }
 
     // Verificar que la incidencia exista para este servicio
@@ -2272,12 +2367,20 @@ const liquidarYEntregarServicio = async (req, res) => {
       });
     }
 
-    // Validar si ya está entregada
+    // Validar si ya está entregada o cancelada
     if (order.codigo_estado === 'ENTREGADO' || Number(order.orden_flujo) === 7) {
       await client.query('ROLLBACK');
       return res.status(400).json({
         ok: false,
         message: 'Esta orden ya fue entregada anteriormente.'
+      });
+    }
+
+    if (Number(order.orden_flujo) === 8 || String(order.codigo_estado || '').toUpperCase().includes('CANCEL')) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        ok: false,
+        message: 'No se puede liquidar o entregar una orden cancelada.'
       });
     }
 
@@ -2490,6 +2593,159 @@ const liquidarYEntregarServicio = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/servicios/:id/cancelar
+ * Cancelación formal de una orden de servicio técnico.
+ * Valida que no esté previamente entregada ni cancelada, exige motivo,
+ * actualiza el estado a CANCELADO_DEVUELTO, persiste motivo/fecha/usuario y
+ * registra el evento en historial_estados.
+ */
+const cancelarServicio = async (req, res) => {
+  const { id } = req.params;
+  const { motivo_cancelacion } = req.body || {};
+  const usuarioId = req.user?.id;
+  const isSuperAdmin = Number(req.user?.rol_id) === 1;
+
+  if (!motivo_cancelacion || typeof motivo_cancelacion !== 'string' || motivo_cancelacion.trim().length < 5) {
+    return res.status(400).json({
+      ok: false,
+      success: false,
+      message: 'El motivo de cancelación es obligatorio y debe contener al menos 5 caracteres.'
+    });
+  }
+
+  const motivoLimpio = motivo_cancelacion.trim();
+  const pool = getPool();
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Obtener la orden bloqueándola para actualización
+    const orderRes = await client.query(
+      `SELECT sr.id, sr.codigo_ticket, sr.sucursal_id, sr.estado_actual_id,
+              es.codigo_estado, es.nombre_estado, es.orden_flujo
+       FROM servicios_recepcion sr
+       JOIN estados_servicio es ON es.id = sr.estado_actual_id
+       WHERE sr.id = $1 AND sr.activo = TRUE
+       FOR UPDATE OF sr`,
+      [id]
+    );
+
+    if (orderRes.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        ok: false,
+        success: false,
+        message: 'Orden de servicio no encontrada.'
+      });
+    }
+
+    const order = orderRes.rows[0];
+
+    // Validación multi-sucursal
+    if (!isSuperAdmin && req.user?.sucursal_id && Number(order.sucursal_id) !== Number(req.user.sucursal_id)) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        ok: false,
+        success: false,
+        message: 'Acceso denegado: no tiene permisos para cancelar órdenes de otra sucursal.'
+      });
+    }
+
+    const codEstadoActual = String(order.codigo_estado || '').toUpperCase();
+    const flujoActual = Number(order.orden_flujo || 0);
+
+    // Impedir cancelación si ya fue entregada
+    if (codEstadoActual.includes('ENTREG') || flujoActual === 7) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        ok: false,
+        success: false,
+        message: 'No es posible cancelar una orden que ya fue entregada al cliente.'
+      });
+    }
+
+    // Impedir cancelación si ya está cancelada
+    if (codEstadoActual.includes('CANCEL') || flujoActual === 8) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        ok: false,
+        success: false,
+        message: 'Esta orden ya se encuentra cancelada.'
+      });
+    }
+
+    // 2. Buscar estado 'CANCELADO_DEVUELTO' (orden_flujo 8)
+    const estadoCanceladoRes = await client.query(
+      `SELECT id, codigo_estado, nombre_estado, color_badge, orden_flujo
+       FROM estados_servicio
+       WHERE codigo_estado = 'CANCELADO_DEVUELTO' OR codigo_estado ILIKE '%CANCEL%' OR orden_flujo = 8
+       ORDER BY orden_flujo DESC
+       LIMIT 1`
+    );
+
+    if (estadoCanceladoRes.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(500).json({
+        ok: false,
+        success: false,
+        message: 'No se encontró el estado de cancelación en el catálogo del sistema.'
+      });
+    }
+
+    const estadoCancelado = estadoCanceladoRes.rows[0];
+
+    // 3. Actualizar orden
+    await client.query(
+      `UPDATE servicios_recepcion
+       SET estado_actual_id = $1,
+           motivo_cancelacion = $2,
+           fecha_cancelacion = NOW(),
+           usuario_cancela_id = $3,
+           updated_at = NOW()
+       WHERE id = $4`,
+      [estadoCancelado.id, motivoLimpio, usuarioId, id]
+    );
+
+    // 4. Registrar en historial_estados
+    await client.query(
+      `INSERT INTO historial_estados (servicio_id, estado_id, usuario_id, nota_cambio, fecha_registro)
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [id, estadoCancelado.id, usuarioId, `Cancelación de orden: ${motivoLimpio}`]
+    );
+
+    await client.query('COMMIT');
+
+    return res.status(200).json({
+      ok: true,
+      success: true,
+      message: 'Orden de servicio cancelada correctamente.',
+      data: {
+        id: Number(id),
+        codigo_ticket: order.codigo_ticket,
+        estado_actual_id: estadoCancelado.id,
+        estado: estadoCancelado.nombre_estado,
+        codigo_estado: estadoCancelado.codigo_estado,
+        estado_color: estadoCancelado.color_badge,
+        orden_flujo: estadoCancelado.orden_flujo,
+        motivo_cancelacion: motivoLimpio,
+        fecha_cancelacion: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error en cancelarServicio:', error);
+    return res.status(500).json({
+      ok: false,
+      success: false,
+      message: 'Error al procesar la cancelación de la orden de servicio.'
+    });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   createServicio,
   getServicios,
@@ -2504,5 +2760,7 @@ module.exports = {
   getIncidenciasServicio,
   createIncidenciaServicio,
   updateAprobacionIncidencia,
-  liquidarYEntregarServicio
+  liquidarYEntregarServicio,
+  cancelarServicio,
+  getTicketImpresionData
 };

@@ -1764,6 +1764,7 @@ export const FichaTecnicaModal = ({
                   <DeviceChecklistPicker
                     value={checklistData}
                     readOnly={true}
+                    badgeVariant="minimal"
                     showCard={false}
                     showHeader={false}
                   />

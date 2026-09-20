@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import AnimatedTabs from '../components/common/AnimatedTabs';
 import TallerCard from '../components/taller/TallerCard';
@@ -12,7 +13,8 @@ import { useAuth } from '../context/AuthContext';
 import {
   getServiciosTaller,
   updateServicioEstado,
-  assignTecnicoServicio
+  assignTecnicoServicio,
+  getServicioById
 } from '../services/servicios.service';
 import { getEstados } from '../services/catalogs.service';
 import { sileo } from 'sileo';
@@ -149,6 +151,10 @@ const getPrioridadConfig = (prioridad) => {
 
 export const BancoTrabajoPage = () => {
   const { user: currentUser } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const handledAutoOpenRef = useRef(null);
+
   const userRole = String(currentUser?.rol_nombre || currentUser?.rol || '').trim().toLowerCase();
   const isTecnico = userRole === 'tecnico' || userRole.includes('tecnic') || Number(currentUser?.rol_id) === 4;
 
@@ -446,6 +452,56 @@ export const BancoTrabajoPage = () => {
     setSelectedOrdenId(orden.id);
     setIsModalOpen(true);
   };
+
+  // Detección y Apertura Automática (Deep Linking desde Detalle de Orden o Parámetro de Consulta)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const targetId = location.state?.autoOpenOrdenId || searchParams.get('ordenId');
+
+    if (!targetId || isLoading) return;
+
+    // Prevenir aperturas redundantes si ya fue procesado en el ciclo actual
+    if (handledAutoOpenRef.current === String(targetId)) return;
+
+    const numId = Number(targetId);
+    const foundOrden = ordenes.find(
+      (o) =>
+        (numId > 0 && Number(o.id) === numId) ||
+        String(o.codigo_ticket || '').toLowerCase() === String(targetId).toLowerCase() ||
+        String(o.codigo_orden || '').toLowerCase() === String(targetId).toLowerCase()
+    );
+
+    const limpiarRastrosNavegacion = () => {
+      handledAutoOpenRef.current = String(targetId);
+      if (searchParams.has('ordenId')) {
+        searchParams.delete('ordenId');
+        const newSearch = searchParams.toString();
+        navigate(`${location.pathname}${newSearch ? `?${newSearch}` : ''}`, { replace: true, state: {} });
+      } else if (location.state?.autoOpenOrdenId) {
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    };
+
+    if (foundOrden) {
+      openFicha(foundOrden);
+      limpiarRastrosNavegacion();
+    } else if (numId > 0) {
+      // Si la orden no está en la bandeja visible, consultarla directamente por API
+      getServicioById(numId)
+        .then((res) => {
+          const ord = res?.data || res;
+          if (ord && ord.id) {
+            openFicha(ord);
+          }
+        })
+        .catch((err) => {
+          console.warn('No se pudo cargar la orden para apertura automática en taller:', err);
+        })
+        .finally(() => {
+          limpiarRastrosNavegacion();
+        });
+    }
+  }, [location, ordenes, isLoading, navigate]);
 
   const hasActiveFilters = Boolean(searchTerm.trim() || quickFilter !== 'all');
 

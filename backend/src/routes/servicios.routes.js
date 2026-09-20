@@ -19,7 +19,9 @@ const {
   getIncidenciasServicio,
   createIncidenciaServicio,
   updateAprobacionIncidencia,
-  liquidarYEntregarServicio
+  liquidarYEntregarServicio,
+  cancelarServicio,
+  getTicketImpresionData
 } = require('../controllers/servicios.controller');
 
 // ── Ruta pública para consulta / tracking de ticket vía QR (Anti-Bot condicional) ──
@@ -46,6 +48,9 @@ router.post('/:id/incidencias', createIncidenciaServicio);
 // PATCH /api/servicios/:id/incidencias/:incidenciaId/aprobacion - Actualizar aprobación de cliente de una incidencia
 router.patch('/:id/incidencias/:incidenciaId/aprobacion', updateAprobacionIncidencia);
 
+// GET /api/servicios/:id/ticket-impresion - Validación y consulta para impresión (bloquea canceladas)
+router.get('/:id/ticket-impresion', getTicketImpresionData);
+
 // GET /api/servicios/:id
 router.get('/:id', getServicioById);
 
@@ -60,6 +65,9 @@ router.delete('/:id/tecnicos/:tecnicoId', removeTecnicoServicio);
 
 // POST /api/servicios/:id/entregar - Liquidación y entrega de equipo al cliente
 router.post('/:id/entregar', liquidarYEntregarServicio);
+
+// POST /api/servicios/:id/cancelar - Cancelación formal de orden de servicio
+router.post('/:id/cancelar', cancelarServicio);
 
 // POST /api/servicios
 router.post('/', createServicio);
