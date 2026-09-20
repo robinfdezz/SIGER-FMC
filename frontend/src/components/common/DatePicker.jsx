@@ -16,7 +16,7 @@ const DIAS_SEMANA = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
 /**
  * Obtiene la fecha actual en formato local YYYY-MM-DD sin desfase UTC
  */
-const getTodayString = () => {
+export const getTodayString = () => {
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -124,8 +124,17 @@ export const DatePicker = ({
     };
   }, [isOpen]);
 
+  // Calcular si el mes anterior debe estar deshabilitado por minDate
+  const isPrevMonthDisabled = Boolean(minDate && (() => {
+    const parts = minDate.split('-').map(Number);
+    if (parts.length < 2) return false;
+    const [minY, minM] = parts;
+    return viewYear < minY || (viewYear === minY && viewMonth <= minM - 1);
+  })());
+
   const handlePrevMonth = (e) => {
     e.stopPropagation();
+    if (isPrevMonthDisabled) return;
     if (viewMonth === 0) {
       setViewMonth(11);
       setViewYear((y) => y - 1);
@@ -159,6 +168,7 @@ export const DatePicker = ({
 
   const handleSelectToday = (e) => {
     e.stopPropagation();
+    if (minDate && todayStr < minDate) return;
     if (onChange) {
       onChange(todayStr);
     }
@@ -282,7 +292,12 @@ export const DatePicker = ({
             <button
               type="button"
               onClick={handlePrevMonth}
-              className="p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors cursor-pointer"
+              disabled={isPrevMonthDisabled}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isPrevMonthDisabled
+                  ? 'text-neutral-300 dark:text-neutral-700 opacity-40 cursor-not-allowed'
+                  : 'hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 cursor-pointer'
+              }`}
               title="Mes anterior"
             >
               <ChevronLeft size={16} />
@@ -393,7 +408,7 @@ export const DatePicker = ({
                         : isToday
                         ? 'border border-red-500/60 dark:border-red-500 text-red-600 dark:text-red-400 font-semibold hover:bg-red-50 dark:hover:bg-red-950/30'
                         : isDisabled
-                        ? 'text-neutral-300 dark:text-neutral-700 cursor-not-allowed'
+                        ? 'text-neutral-300 dark:text-neutral-700 opacity-40 cursor-not-allowed pointer-events-none'
                         : 'text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800'
                     }`}
                   >

@@ -56,11 +56,21 @@ Cada orden de servicio transita de manera estructurada a través de 8 estados se
 
 *Cada cambio de estado genera un registro inmutable en la tabla `historial_estados` con fecha, usuario responsable y nota explicativa.*
 
+### 4.1 Políticas de Edición Controlada de Órdenes de Servicio (`EditarOrdenModal.jsx`)
+Para mantener la integridad operativa del taller y la trazabilidad de los diagnósticos:
+* **Restricción de Acceso (RBAC):** La edición está reservada a `SuperAdmin`, `Admin_Sucursal`, `admin` y `administrador`. El rol `Tecnico` tiene terminantemente prohibido editar órdenes de servicio (`403 Forbidden`).
+* **Regla de Congelación según Estado de Taller:**
+  - **En Recepción Inicial (`RECIBIDO_REVISION`, `PENDIENTE_REVISION`):** Es posible editar libremente los datos del equipo (marca, modelo, IMEI/serie, categoría, falla y costo estimado), así como credenciales de acceso, fecha estimada, prioridad y observaciones.
+  - **En Fases Avanzadas de Taller (`EN_DIAGNOSTICO`, `EN_REPARACION`, `ESPERANDO_REPUESTO`, `LISTO_ENTREGA`):** El hardware y la avería original quedan congelados en modo solo lectura (`readOnly`). Solo se autoriza la modificación de credenciales de seguridad (PIN/patrón), fecha estimada de entrega, prioridad, observaciones y accesorios.
+  - **En Estados Terminales (`ENTREGADO`, `CANCELADO_DEVUELTO`):** Edición completamente bloqueada (`400 Bad Request`).
+* **Exclusión Estricta de Asignación Técnica:** La asignación o desasignación de técnicos se realiza única y exclusivamente en el Tablero de Taller (`BancoTrabajoPage.jsx`). El modal de edición no interviene ni modifica asignaciones de personal.
+* **Restricción de Fecha Estimada de Entrega:** Tanto en la creación como en la edición de órdenes, no se permite ingresar ni guardar fechas anteriores al día en curso (`fecha_estimada_entrega >= hoy`).
+
 ---
 
 ## 5. Módulos y Entidades Clave
 * **`clientes`:** Directorio único de clientes con documento de identidad (Cédula/RNC), contactos y dirección. Soporta búsqueda integral, vista rápida 360° (`ClienteDetalleModal.jsx`) y paginación en servidor.
-* **`servicios_recepcion`:** Registro maestro de la orden de reparación, especificaciones del equipo, liquidación financiera y costos.
+* **`servicios_recepcion`:** Registro maestro de la orden de reparación, especificaciones del equipo, liquidación financiera y costos. Soporta edición controlada mediante `EditarOrdenModal.jsx`.
 * **Banco de Trabajo Técnico (`/taller` / `BancoTrabajoPage.jsx`):** Tablero operativo de taller con tarjetas de servicio (`TallerCard.jsx`), vista conmutativa en tabla con paginación y filtrado por estado mediante pestañas animadas (`AnimatedTabs.jsx`). Incluye la **Ficha Técnica Modal (`FichaTecnicaModal.jsx`)** para transición de estados, asignación multi-técnico y visualización gráfica del patrón/PIN de acceso.
 * **`incidencias_servicio`:** Registro de imprevistos, piezas extra y costos adicionales surgidos durante el diagnóstico o la reparación, con ciclo de vida completo de autorización del cliente (Aprobado o Rechazado formalmente por WhatsApp, Llamada o Presencial).
 * **Pipeline Unificado de Evidencias Fotográficas (`sesiones_carga_fotos` y `evidencias_fotograficas`):**

@@ -179,3 +179,13 @@ export const cancelarServicio = async (id, data = {}) => {
   const response = await api.post(`/servicios/${id}/cancelar`, data);
   return response.data;
 };
+
+/**
+ * Actualizar/editar orden de servicio (edición controlada)
+ * @param {number|string} id - ID de la orden
+ * @param {Object} data - Campos a actualizar
+ */
+export const updateServicio = async (id, data = {}) => {
+  const response = await api.put(`/servicios/${id}`, data);
+  return response.data;
+};

@@ -22,7 +22,8 @@ const {
   updateAprobacionIncidencia,
   liquidarYEntregarServicio,
   cancelarServicio,
-  getTicketImpresionData
+  getTicketImpresionData,
+  updateServicio
 } = require('../controllers/servicios.controller');
 
 // ── Ruta pública para consulta / tracking de ticket vía QR (Anti-Bot condicional) ──
@@ -54,6 +55,24 @@ router.get('/:id/ticket-impresion', getTicketImpresionData);
 
 // GET /api/servicios/:id
 router.get('/:id', getServicioById);
+
+// PUT /api/servicios/:id - Edición controlada de orden (Secretaria, Admin, SuperAdmin)
+router.put(
+  '/:id',
+  checkRole(
+    ['SuperAdmin', 'Admin_Sucursal', 'admin', 'superadmin', 'secretaria'],
+    'No tienes permisos para editar órdenes de servicio'
+  ),
+  updateServicio
+);
+router.patch(
+  '/:id',
+  checkRole(
+    ['SuperAdmin', 'Admin_Sucursal', 'admin', 'superadmin', 'secretaria'],
+    'No tienes permisos para editar órdenes de servicio'
+  ),
+  updateServicio
+);
 
 // PATCH /api/servicios/:id/estado - Actualización de estado en taller
 router.patch('/:id/estado', updateServicioEstado);

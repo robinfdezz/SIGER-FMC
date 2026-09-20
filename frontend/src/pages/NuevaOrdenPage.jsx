@@ -9,7 +9,7 @@ import DeviceChecklistPicker from '../components/servicios/DeviceChecklistPicker
 import PostCreacionModal from '../components/servicios/PostCreacionModal';
 import Button from '../components/common/Button';
 import Select from '../components/common/Select';
-import DatePicker from '../components/common/DatePicker';
+import DatePicker, { getTodayString } from '../components/common/DatePicker';
 import InlineConfirmButton from '../components/common/InlineConfirmButton';
 import { getCategorias, createServicio, validarGarantiaTicket } from '../services/servicios.service';
 import { getWorkers } from '../services/workers.service';
@@ -698,6 +698,14 @@ export const NuevaOrdenPage = () => {
       } else if (isNaN(Number(form.costo_previsto)) || Number(form.costo_previsto) < 0) {
         errs.costo_previsto = 'Ingresa un monto válido';
       }
+
+      if (form.fecha_entrega_estimada && String(form.fecha_entrega_estimada).trim()) {
+        const todayStr = getTodayString();
+        const selectedDate = String(form.fecha_entrega_estimada).trim().split('T')[0];
+        if (selectedDate < todayStr) {
+          errs.fecha_entrega_estimada = 'La fecha estimada de entrega no puede ser anterior a la fecha actual';
+        }
+      }
     }
     return errs;
   };
@@ -739,8 +747,14 @@ export const NuevaOrdenPage = () => {
         setCurrentStep(1);
       } else if (errsStep2.falla_reportada) {
         setCurrentStep(2);
-      } else if (errsStep4.costo_previsto) {
+      } else if (errsStep4.costo_previsto || errsStep4.fecha_entrega_estimada) {
         setCurrentStep(4);
+        if (errsStep4.fecha_entrega_estimada) {
+          sileo.warning({
+            title: 'Fecha inválida',
+            description: errsStep4.fecha_entrega_estimada
+          });
+        }
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -1495,6 +1509,8 @@ export const NuevaOrdenPage = () => {
                       value={form.fecha_entrega_estimada}
                       onChange={(dateStr) => set('fecha_entrega_estimada', dateStr)}
                       placeholder="Seleccionar fecha..."
+                      minDate={getTodayString()}
+                      error={errors.fecha_entrega_estimada}
                     />
                   </div>
                   <div>

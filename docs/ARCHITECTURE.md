@@ -300,10 +300,7 @@ Para visualizar de manera segura el acceso al equipo, el componente `UnlockMetho
    - **Paleta Estrictamente Monocromática:** Trazos y círculos en negro sólido (`#111827`) con números blancos sobre fondo blanco puro, evitando cualquier color rojo para prevenir tramas de escala de grises o manchas borrosas al imprimir.
    - **Contenedor Acotado:** Dimensiones restringidas a `w-20 sm:w-24 max-w-[96px]` con secuencia numérica en píldora micro `wrap` centrada, asegurando convivencia limpia con la columna de datos del cliente (`flex-1 min-w-0 pr-2`).
 
-### 4.6 Módulo de Entrega Final, Liquidación y Comprobantes de Salida [Planificado / Próximo Sprint]
-
-> [!NOTE]
-> Este módulo representa la especificación técnica de la fase de cierre de orden y caja para el próximo sprint.
+### 4.6 Módulo de Entrega Final, Liquidación y Comprobantes de Salida [Implementado]
 
 Arquitectura desacoplada en tres componentes especializados para la culminación y despacho formal del servicio técnico:
 
@@ -395,6 +392,74 @@ Para garantizar la integridad operativa y contable del taller frente a equipos d
 4. **Componentes Visuales Homologados:**
    - **`CancelarOrdenModal.jsx`:** Ventana modal con ancho adaptado (`max-w-xl`), cabecera homologada sin iconos de bloqueo discordantes, metadatos contextuales jerarquizados (código de ticket con badge destacado, cliente con icono `<User />`, equipo con icono `<Smartphone />`), área de texto con validación reactiva y botón de confirmación inline destructivo.
    - **`OrdenDetalleModal.jsx`:** Visor integral 360° de la orden con botón de enlace directo al banco de trabajo (`/taller?buscar=SFM-...`), desglose financiero, checklist con badges minimalistas (`badgeVariant="minimal"`), historial de estados e incidencias unificado, y formateo inteligente de dispositivo (`formatDeviceName`) para prevenir duplicidades de marca/modelo.
+
+### 4.8 Arquitectura de Edición Controlada y Mutabilidad por Estado (`EditarOrdenModal.jsx`, `PUT /api/servicios/:id`)
+
+El sistema implementa una política de inmutabilidad progresiva para evitar que la edición administrativa comprometa el historial técnico o falsee el diagnóstico emitido por los técnicos en el taller:
+
+```
+                  ┌──────────────────────────────────────────────┐
+                  │    Orden en Estado Inicial (Recibido)        │
+                  └──────────────────────┬───────────────────────┘
+                                         │
+                         ¿Estado avanzado de taller?
+                                         │
+                  ┌──────────────────────┴──────────────────────┐
+                  ▼ SÍ                                          ▼ NO
+    ┌───────────────────────────┐                ┌───────────────────────────┐
+    │  Modo Solo Lectura Parcial│                │     Edición Completa      │
+    │  - Hardware Congelado     │                │  - Dispositivo y Falla    │
+    │  - Falla Congelada        │                │  - Seguridad / PIN / Clave│
+    │  - Seguridad / Contacto OK│                │  - Fecha Estimada Entrega │
+    │  - Prioridad / Obs. OK    │                │  - Prioridad y Notas      │
+    └───────────────────────────┘                └───────────────────────────┘
+```
+
+1. **Matriz de Permisos y Mutabilidad según Estado:**
+   - **Estados Iniciales (`RECIBIDO_REVISION`, `PENDIENTE_REVISION`):** El cliente o la recepción pueden corregir erratas en la marca, modelo, número de serie/IMEI, problema reportado, categoría y costo estimado, además de notas de recepción y credenciales de acceso.
+   - **Estados Avanzados (`EN_DIAGNOSTICO`, `EN_REPARACION`, `ESPERANDO_REPUESTO`, `LISTO_ENTREGA`):** El hardware y la falla reportada quedan estrictamente en modo solo lectura (`readOnly`). Esto salvaguarda la concordancia entre la inspección física del técnico y la orden original. Se autoriza la actualización de:
+     * Métodos de desbloqueo, PIN y patrón (si el cliente suministra nuevas credenciales para pruebas).
+     * Fecha estimada de entrega (renegociaciones de tiempo).
+     * Nivel de prioridad (`baja`, `media`, `alta`, `urgente`).
+     * Observaciones generales de recepción y accesorios.
+   - **Estados Terminales (`ENTREGADO`, `CANCELADO_DEVUELTO`):** Edición bloqueada al 100% con HTTP `400 Bad Request`.
+
+2. **Aislamiento de la Asignación Técnica:**
+   - La asignación o reasignación de colaboradores técnicos **no** forma parte del modal de edición de orden. Esta responsabilidad pertenece exclusivamente al Tablero de Taller (`BancoTrabajoPage.jsx`), previniendo desincronizaciones en la carga operativa de los técnicos.
+
+3. **Trazabilidad y Auditoría Continua (`historial_estados`):**
+   - Cada actualización exitosa registra automáticamente un hito inmutable en `historial_estados` especificando qué campos fueron modificados (`cambiosAudit`), la estampa de tiempo y el `usuario_id` responsable.
+
+4. **Componente de Interfaz Homologado (`EditarOrdenModal.jsx`):**
+   - **Cabecera Unificada:** Comparte exactamente la misma estructura tipográfica y de badges que `OrdenDetalleModal.jsx`: título limpio, píldoras de Estado y Prioridad, y metadatos con iconos vectoriales `# Código`, fecha de recepción, cliente, sucursal y recepcionista.
+   - **Menú de Pestañas Segmentado:** Navegación entre "Dispositivo y Falla", "Seguridad y Acceso" y "Prioridad y Observaciones".
+   - **Aviso Discreto de Solo Lectura:** Micro-banner compacto (`flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 py-1.5`) con icono de candado que sustituye cajas invasivas de alerta.
+
+### 4.9 Control y Validación Temporal de Fecha Estimada de Entrega
+
+Para prevenir la programación de órdenes con fechas ya vencidas al momento de su apertura o reprogramación:
+
+1. **Restricción en Componente Calendario (`DatePicker.jsx`):**
+   - Soporte nativo para la prop `minDate`.
+   - Inhabilita la interacción del puntero (`cursor-not-allowed`) y atenúa la opacidad (`opacity-25`) de todas las celdas de días anteriores a la fecha mínima permitida (`isBefore(day, startOfDay(minDate))`).
+
+2. **Validación Preventiva en Formularios Frontend (`NuevaOrdenPage.jsx` & `EditarOrdenModal.jsx`):**
+   - Enlace automático de `minDate={new Date()}` en los selectores de fecha estimada.
+   - Bloqueo preventivo en la función `validarFormulario()` previo a la petición Axios: si la fecha ingresada es estrictamente anterior al inicio del día de hoy (`startOfDay(new Date())`), interrumpe el flujo y notifica mediante toast interactivo (`sileo.warning`).
+
+3. **Validación Defensiva en Capa Backend (`servicios.controller.js`):**
+   - Comprobación tanto en `createServicio` como en `updateServicio` evaluando la fecha a nivel de día calendario:
+     ```javascript
+     const hoy = new Date();
+     hoy.setHours(0, 0, 0, 0);
+     const fechaEst = new Date(fecha_estimada_entrega);
+     if (fechaEst < hoy) {
+       return res.status(400).json({
+         ok: false,
+         message: 'La fecha estimada de entrega no puede ser anterior a la fecha actual.'
+       });
+     }
+     ```
 
 ---
 

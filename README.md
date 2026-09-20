@@ -47,6 +47,7 @@ SIGER-FMC/
 │   ├── vite.config.js        # Proxy a /api
 │   └── .env                  # Variables de entorno frontend
 │
+├── DIAGRAMAS_CASOS_DE_USO_Y_FLUJO.md # Especificación formal UML y flujos Mermaid (CU-01 a CU-18)
 └── docs/
     ├── DOCUMENTACION_GENERAL.md # Índice maestro y mapa documental del proyecto
     ├── ARCHITECTURE.md          # Arquitectura global, capas y pipeline de imágenes

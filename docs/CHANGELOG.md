@@ -8,7 +8,31 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-20
+
 ### Added
+- **Módulo de Edición Controlada de Órdenes de Servicio (`PUT /api/servicios/:id` & `EditarOrdenModal.jsx`):**
+  - **Backend Transaccional y Matriz de Mutabilidad por Estado:** Endpoint transaccional seguro que evalúa el progreso técnico de la orden en el taller:
+    - **Estados Iniciales (`RECIBIDO_REVISION`, `PENDIENTE_REVISION`):** Habilita la corrección de datos descriptivos del equipo (`categoria_id`, `marca`, `modelo`, `numero_serie_imei`, `problema_reportado`, `costo_estimado`), así como credenciales de seguridad (`metodo_desbloqueo`, `pin_desbloqueo`, `patron_desbloqueo`), `fecha_estimada_entrega`, `prioridad`, `observaciones_recepcion` y `accesorios_recibidos`.
+    - **Estados Avanzados (`EN_DIAGNOSTICO`, `EN_REPARACION`, `ESPERANDO_REPUESTO`, `LISTO_ENTREGA`):** Congela en modo solo lectura los campos de dispositivo y falla para preservar la integridad del diagnóstico emitido en taller, permitiendo actualizar únicamente credenciales de seguridad/acceso, fecha estimada de entrega, prioridad, observaciones de recepción y accesorios.
+    - **Estados Terminales:** Bloqueo terminante si la orden se encuentra en estado `ENTREGADO` o `CANCELADO_DEVUELTO` con HTTP `400 Bad Request` (*"No es posible editar una orden finalizada o cancelada"*).
+  - **Protección de Roles (RBAC):** Restringido exclusivamente a `SuperAdmin`, `Admin_Sucursal`, `admin` y `administrador`. Bloqueo terminante para el rol `Tecnico` con HTTP `403 Forbidden`.
+  - **Exclusión Estricta de Asignación Técnica:** Se respeta la separación de responsabilidades: la asignación/desasignación de técnicos se gestiona de forma exclusiva en la Mesa de Trabajo / Tablero de Taller, sin exponerse en este modal.
+  - **Auditoría Exhaustiva de Cambios (`historial_estados`):** Cada edición genera un registro automático de trazabilidad con la lista exacta de campos modificados (`cambiosAudit`) y el identificador del usuario responsable.
+  - **Payload Enriquecido en Tiempo Real:** El endpoint retorna la entidad completa con todas sus relaciones (`tecnicos_asignados`, `historial_estados`, `incidencias`, `fotos`, `cliente`, `sucursal`, `recepcionista`), garantizando sincronización instantánea en la interfaz de usuario.
+  - **Componente Modal Homologado (`EditarOrdenModal.jsx`):**
+    - Cabecera visual estandarizada con `OrdenDetalleModal.jsx`: Título formal "Editar Orden", badges de estado y prioridad idénticos al visualizador, y fila de metadatos con iconos vectoriales (`# Código`, fecha de recepción, cliente, sucursal, recepcionista).
+    - Menú de pestañas segmentado (Tabs): "Dispositivo y Falla", "Seguridad y Acceso", "Prioridad y Observaciones".
+    - Banner de solo lectura minimalista y discreto (`flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 py-1.5`) para advertir de campos congelados sin saturar la UI.
+    - Selector interactivo de credenciales de desbloqueo (Ninguno, PIN / Contraseña, Patrón táctil).
+- **Restricción Estricta y Validación Temporal de Fecha Estimada de Entrega (`fecha_estimada_entrega`):**
+  - **Soporte de Fecha Mínima en Componente Reutilizable (`DatePicker.jsx`):** Incorporación de la prop `minDate` que desactiva clics e inhabilita visualmente (`opacity-25 cursor-not-allowed`) todos los días anteriores a la fecha mínima calendarizada (`isBefore(day, startOfDay(minDate))`).
+  - **Validación Preventiva en Formularios Frontend (`NuevaOrdenPage.jsx` & `EditarOrdenModal.jsx`):** Bloqueo en cliente con alerta contextual (`sileo.warning`) antes de enviar si la fecha seleccionada es anterior al inicio del día actual (`startOfDay(new Date())`).
+  - **Blindaje en Backend (`servicios.controller.js`):** Doble validación en `createServicio` y `updateServicio` a nivel de día calendario (`new Date().setHours(0,0,0,0)`), rechazando con HTTP `400 Bad Request` cualquier intento de programar fechas en el pasado.
+- **Auditoría y Preservación de Esquema Limpio en Base de Datos:**
+  - Garantía de conformidad con el diccionario relacional oficial en `servicios_recepcion`, prescindiendo de columnas no canónicas (`color_equipo`, `telefono_contacto_alterno`) y canalizando notas adicionales a través de `observaciones_recepcion`.
+- **Especificación Formal de Casos de Uso y Diagramas de Flujo (`DIAGRAMAS_CASOS_DE_USO_Y_FLUJO.md`):**
+  - Nuevo documento maestro de modelado UML y diagramas de flujo interactivos con sintaxis Mermaid cubriendo 18 casos de uso (CU-01 a CU-18), taxonomía RBAC, transiciones de estados de taller, pipeline multimedia Cloudinary y emisión de comprobantes.
 - **Pipeline Unificado de Evidencias Fotográficas y Prevención de Huérfanas (`DevicePhotoUploader.jsx`, `uploadSession.controller.js`, `servicios.controller.js`):**
   - **Subida Unificada desde PC:** Las imágenes seleccionadas desde PC en `DevicePhotoUploader.jsx` se canalizan a través de `subirFotosSession` (`POST /api/upload-session/:sessionId/subir`), inicializando o reutilizando la sesión activa en `sesiones_carga_fotos` con vigencia temporal de 15 minutos.
   - **Blindaje en Profundidad en Endpoint Directo (`POST /api/servicios/upload-foto`):** `uploadFotosServicio` genera o actualiza automáticamente una sesión en `sesiones_carga_fotos` con estado `COMPLETADO` y fecha de expiración, garantizando que ninguna foto quede sin registrar en base de datos.

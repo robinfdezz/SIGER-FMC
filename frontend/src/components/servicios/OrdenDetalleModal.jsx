@@ -34,7 +34,8 @@ import {
   Search,
   ClipboardCheck,
   PackageCheck,
-  Shield
+  Shield,
+  Pencil
 } from 'lucide-react';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
@@ -43,6 +44,8 @@ import SimpleButton from '../common/SimpleButton';
 import { DeviceChecklistPicker } from './DeviceChecklistPicker';
 import { UnlockMethodView } from '../common/PatternLock';
 import { ServiceTimeline } from './ServiceTimeline';
+import EditarOrdenModal from './EditarOrdenModal';
+import { useAuth } from '../../context/AuthContext';
 import { getServicioById } from '../../services/servicios.service';
 
 /**
@@ -171,6 +174,17 @@ export const OrdenDetalleModal = ({
   const [detalles, setDetalles] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activePhoto, setActivePhoto] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const { user } = useAuth();
+  const userRole = String(user?.rol_nombre || user?.rol || '').toLowerCase();
+
+  const handleOrderEdited = (updatedOrder) => {
+    setDetalles(updatedOrder);
+    if (onOrderUpdated) {
+      onOrderUpdated(updatedOrder);
+    }
+  };
 
   const targetId = ordenId || orden?.id;
 
@@ -521,21 +535,39 @@ export const OrdenDetalleModal = ({
     nomEstado.includes('entregad') ||
     nomEstado.includes('cancelad');
 
+  const canEdit = !esEstadoInactivo && userRole !== 'tecnico';
   const canShowOpenTaller = Boolean(onOpenTaller && !esEstadoInactivo);
 
-  const footer = canShowOpenTaller ? (
-    <div className="flex items-center justify-end w-full">
-      <Button
-        variant="primary"
-        icon={Wrench}
-        size="sm"
-        onClick={() => {
-          onClose?.();
-          onOpenTaller(currentOrder);
-        }}
-      >
-        Abrir en Banco de Trabajo
-      </Button>
+  const footer = (canEdit || canShowOpenTaller) ? (
+    <div className="flex items-center justify-between w-full gap-3 flex-wrap">
+      <div>
+        {canEdit && (
+          <Button
+            variant="secondary"
+            icon={Pencil}
+            size="sm"
+            onClick={() => setIsEditModalOpen(true)}
+          >
+            Editar Orden
+          </Button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2.5 ml-auto">
+        {canShowOpenTaller && (
+          <Button
+            variant="primary"
+            icon={Wrench}
+            size="sm"
+            onClick={() => {
+              onClose?.();
+              onOpenTaller(currentOrder);
+            }}
+          >
+            Abrir en Banco de Trabajo
+          </Button>
+        )}
+      </div>
     </div>
   ) : null;
 
@@ -836,6 +868,16 @@ export const OrdenDetalleModal = ({
           </div>,
           document.body
         )}
+
+      {/* Modal de Edición de Orden */}
+      {isEditModalOpen && (
+        <EditarOrdenModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          orden={currentOrder}
+          onUpdated={handleOrderEdited}
+        />
+      )}
     </>
   );
 };

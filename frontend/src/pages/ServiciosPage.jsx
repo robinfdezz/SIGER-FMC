@@ -5,6 +5,7 @@ import PostCreacionModal from '../components/servicios/PostCreacionModal';
 import EntregaServicioModal from '../components/servicios/EntregaServicioModal';
 import OrdenDetalleModal from '../components/servicios/OrdenDetalleModal';
 import CancelarOrdenModal from '../components/servicios/CancelarOrdenModal';
+import EditarOrdenModal from '../components/servicios/EditarOrdenModal';
 import Select from '../components/common/Select';
 import Badge from '../components/common/Badge';
 import Pagination from '../components/common/Pagination';
@@ -48,7 +49,8 @@ import {
   XCircle,
   Inbox,
   PackageCheck,
-  Ban
+  Ban,
+  Pencil
 } from 'lucide-react';
 
 const extractArray = (res) => {
@@ -337,6 +339,9 @@ export const ServiciosPage = () => {
   // Modal de cancelación de orden
   const [ordenParaCancelar, setOrdenParaCancelar] = useState(null);
 
+  // Modal de edición de orden
+  const [ordenParaEditar, setOrdenParaEditar] = useState(null);
+
   // Modal de visualización rápida / Ficha de la Orden
   const [isDetalleModalOpen, setIsDetalleModalOpen] = useState(false);
   const [selectedOrdenDetalle, setSelectedOrdenDetalle] = useState(null);
@@ -344,6 +349,21 @@ export const ServiciosPage = () => {
   const handleOpenDetalleModal = (orden) => {
     setSelectedOrdenDetalle(orden);
     setIsDetalleModalOpen(true);
+  };
+
+  const handleOpenEditModal = (orden) => {
+    setOrdenParaEditar(orden);
+  };
+
+  const handleOrdenUpdated = (updatedOrder) => {
+    if (!updatedOrder || !updatedOrder.id) return;
+    setOrdenes((prev) =>
+      prev.map((o) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o))
+    );
+    if (selectedOrdenDetalle?.id === updatedOrder.id) {
+      setSelectedOrdenDetalle((prev) => ({ ...prev, ...updatedOrder }));
+    }
+    fetchOrdenes(page, limit);
   };
 
   // Debounce de búsqueda (300ms)
@@ -1000,6 +1020,20 @@ export const ServiciosPage = () => {
                         {/* Columna 7: Acciones */}
                         <td className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-center align-middle">
                           <div className="flex items-center justify-center gap-1">
+                            {!esInactiva && !isTecnico && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditModal(orden);
+                                }}
+                                className="p-1.5 rounded-lg text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
+                                title="Editar orden de servicio"
+                              >
+                                <Pencil size={16} />
+                              </button>
+                            )}
+
                             {isListoParaEntrega && !isTecnico && (
                               <button
                                 type="button"
@@ -1150,6 +1184,16 @@ export const ServiciosPage = () => {
             );
             fetchOrdenes(page, limit);
           }}
+        />
+      )}
+
+      {/* Modal de Edición de Orden */}
+      {ordenParaEditar && (
+        <EditarOrdenModal
+          isOpen={Boolean(ordenParaEditar)}
+          onClose={() => setOrdenParaEditar(null)}
+          orden={ordenParaEditar}
+          onUpdated={handleOrdenUpdated}
         />
       )}
     </DashboardLayout>

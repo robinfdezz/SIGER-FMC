@@ -789,12 +789,75 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
   }
   ```
 - **Errores:**
-  - `400 Bad Request`: Falta de campos obligatorios (`categoria_id`, `falla_reportada`, `marca_equipo`, etc.).
+  - `400 Bad Request`: Falta de campos obligatorios (`categoria_id`, `falla_reportada`, `marca_equipo`, etc.) o fecha estimada de entrega anterior a la fecha actual.
   - `403 Forbidden`: Usuario con rol `Tecnico` o usuario sin sucursal asignada.
 
 ---
 
-### 5.4 Consultar por Código de Ticket (Público / Seguimiento Online)
+### 5.4 Actualización / Edición Controlada de Orden de Servicio
+- **Ruta:** `PUT /api/servicios/:id`
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `admin`, `administrador`). **Bloqueado para `Tecnico` con `403 Forbidden`**.
+- **Reglas RBAC, Ciclo de Vida y Matriz de Mutabilidad:**
+  - **Bloqueo de Técnicos:** Los técnicos no tienen autorización para editar órdenes de servicio (`403 Forbidden`).
+  - **Aislamiento Multi-Sucursal:** Usuarios con rol `Admin_Sucursal` únicamente pueden editar órdenes pertenecientes a su `sucursal_id` asignada. Intentos en órdenes de otras sucursales son rechazados con `403 Forbidden`.
+  - **Validación de Estados Terminales:** Si la orden se encuentra en estado `ENTREGADO` o `CANCELADO_DEVUELTO`, la petición es rechazada con `400 Bad Request` (*"No es posible editar una orden finalizada o cancelada"*).
+  - **Campos Editables según Estado de la Orden:**
+    - **Estados Iniciales (`RECIBIDO_REVISION`, `PENDIENTE_REVISION`):** Permite actualizar datos descriptivos del hardware (`categoria_id`, `marca`, `modelo`, `numero_serie_imei`, `problema_reportado`, `costo_estimado`), credenciales de seguridad (`metodo_desbloqueo`, `pin_desbloqueo`, `patron_desbloqueo`), `fecha_estimada_entrega`, `prioridad`, `observaciones_recepcion` y `accesorios_recibidos`.
+    - **Estados Avanzados (`EN_DIAGNOSTICO`, `EN_REPARACION`, `ESPERANDO_REPUESTO`, `LISTO_ENTREGA`):** Los campos descriptivos de equipo y falla reportada quedan congelados en modo solo lectura para proteger el diagnóstico de taller. Solo se permite actualizar credenciales de acceso/seguridad, `fecha_estimada_entrega`, `prioridad`, `observaciones_recepcion` y `accesorios_recibidos`.
+  - **Validación de Fecha Estimada de Entrega:** Si se proporciona `fecha_estimada_entrega`, esta no puede ser anterior a la fecha actual a nivel de día calendario (`new Date().setHours(0,0,0,0)`). Si se envía una fecha pasada, responde `400 Bad Request` (*"La fecha estimada de entrega no puede ser anterior a la fecha actual."*).
+  - **Exclusión de Técnicos:** La asignación de técnicos NO se gestiona en este endpoint (se administra de forma exclusiva en la Mesa de Trabajo mediante `/api/servicios/:id/asignar-tecnico`).
+  - **Auditoría:** Cada modificación registra una entrada en `historial_estados` indicando el usuario ejecutor y la lista exacta de campos actualizados.
+- **Body (JSON Ejemplo):**
+  ```json
+  {
+    "categoria_id": 1,
+    "marca": "Samsung",
+    "modelo": "Galaxy S23 Ultra",
+    "numero_serie_imei": "358921000123456",
+    "problema_reportado": "Pantalla no responde y batería se descarga rápidamente",
+    "costo_estimado": 6200.00,
+    "fecha_estimada_entrega": "2026-09-25",
+    "prioridad": "alta",
+    "observaciones_recepcion": "Bordes con desgaste cosmético leve. Cliente dejó cable tipo C.",
+    "accesorios_recibidos": "Cable original USB-C",
+    "metodo_desbloqueo": "pin",
+    "pin_desbloqueo": "1234",
+    "patron_desbloqueo": null
+  }
+  ```
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Orden de servicio actualizada exitosamente.",
+    "cambios": ["problema_reportado", "costo_estimado", "prioridad", "observaciones_recepcion"],
+    "data": {
+      "id": 1,
+      "codigo_ticket": "FMC-2026-0001",
+      "marca": "Samsung",
+      "modelo": "Galaxy S23 Ultra",
+      "estado": "Recibido",
+      "codigo_estado": "RECIBIDO_REVISION",
+      "prioridad": "alta",
+      "costo_previsto": 6200.00,
+      "observaciones": "Bordes con desgaste cosmético leve. Cliente dejó cable tipo C.",
+      "tecnicos_asignados": [],
+      "historial_estados": [],
+      "incidencias": [],
+      "fotos": []
+    }
+  }
+  ```
+- **Errores:**
+  - `400 Bad Request`: ID inválido, orden finalizada/cancelada, o fecha estimada anterior a hoy.
+  - `401 Unauthorized`: Token ausente o inválido.
+  - `403 Forbidden`: Rol `Tecnico` o intento de modificar una orden de otra sucursal.
+  - `404 Not Found`: Orden no encontrada o inactiva.
+  - `500 Internal Server Error`: Error al persistir cambios o en la transacción.
+
+---
+
+### 5.5 Consultar por Código de Ticket (Público / Seguimiento Online)
 - **Ruta:** `GET /api/servicios/ticket/:codigo`
 - **Acceso:** Público (Protegido condicionalmente por `verifyTurnstile` si `ENABLE_TURNSTILE === 'true'`)
 - **Headers:** `cf-turnstile-response: <token_turnstile>` (opcional si se pasa por query param `turnstileToken`)
@@ -804,7 +867,7 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 
 ---
 
-### 5.5 Validar Vigencia de Garantía
+### 5.6 Validar Vigencia de Garantía
 - **Ruta:** `GET /api/servicios/validar-garantia/:codigoTicket`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Descripción:** Comprueba si un ticket previo existe, si fue entregado y calcula si la fecha actual está dentro del periodo cubierto por `tiempo_garantia`.
@@ -825,7 +888,7 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 
 ---
 
-### 5.6 Subir Fotografías de Recepción (Endpoint Directo)
+### 5.7 Subir Fotografías de Recepción (Endpoint Directo)
 - **Ruta:** `POST /api/servicios/upload-foto`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Headers:** `multipart/form-data` con campo `fotos` (hasta 5 imágenes).
@@ -851,7 +914,7 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
   }
   ```
 
-### 5.7 Listar Órdenes para Tablero de Taller
+### 5.8 Listar Órdenes para Tablero de Taller
 - **Ruta:** `GET /api/servicios/taller`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`, `Secretaria`)
 - **Descripción:** Obtiene las órdenes activas en taller agrupadas y filtradas para la mesa de trabajo (`BancoTrabajoPage.jsx`), ordenadas por prioridad y fecha de ingreso.
@@ -877,7 +940,7 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 
 ---
 
-### 5.8 Actualizar Estado Técnico en Taller
+### 5.9 Actualizar Estado Técnico en Taller
 - **Ruta:** `PATCH /api/servicios/:id/estado`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`)
 - **Aislamiento Multi-Sucursal Estricto:**
@@ -906,7 +969,7 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 
 ---
 
-### 5.9 Gestión de Técnicos en Taller
+### 5.10 Gestión de Técnicos en Taller
 - **Aislamiento Multi-Sucursal y Restricción de Roles:**
   - Solo se pueden asignar usuarios que pertenezcan a la misma sucursal física de la orden de servicio (excepto `SuperAdmin`).
   - **Exclusión Estricta de Secretaría:** Solo se admiten usuarios con rol `Tecnico`, `Admin_Sucursal` o `SuperAdmin`. Si se intenta asignar a un usuario con rol `Secretaria`, la petición es rechazada con `400 Bad Request` (*"El usuario seleccionado tiene rol de Secretaría/Recepción y no puede ser asignado como técnico operativo de taller"*).
@@ -920,7 +983,7 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 
 ---
 
-### 5.10 Registrar Incidencia o Hallazgo Técnico
+### 5.11 Registrar Incidencia o Hallazgo Técnico
 - **Ruta:** `POST /api/servicios/:id/incidencias`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`)
 - **Body (JSON):**
@@ -964,7 +1027,7 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 
 ---
 
-### 5.11 Listar Incidencias de una Orden
+### 5.12 Listar Incidencias de una Orden
 - **Ruta:** `GET /api/servicios/:id/incidencias`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Tecnico`, `Secretaria`)
 - **Respuesta Exitosa (`200 OK`):**
@@ -993,7 +1056,7 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 
 ---
 
-### 5.12 Actualizar Ciclo de Aprobación/Rechazo de Incidencia
+### 5.13 Actualizar Ciclo de Aprobación/Rechazo de Incidencia
 - **Ruta:** `PATCH /api/servicios/:id/incidencias/:incidenciaId/aprobacion`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Acción de Aprobación (JSON):**
@@ -1038,11 +1101,11 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
   }
   ```
 
-### 5.13 Módulo de Sesiones de Carga Móvil y Recolector de Huérfanos (`/api/upload-session`)
+### 5.14 Módulo de Sesiones de Carga Móvil y Recolector de Huérfanos (`/api/upload-session`)
 
 Permite a clientes o recepcionistas escanear un código QR desde cualquier dispositivo móvil para tomar fotografías de evidencias físicas y sincronizarlas en tiempo real con el formulario de recepción en PC, sin requerir inicio de sesión en el móvil.
 
-#### 5.13.1 Crear Sesión de Carga QR o PC
+#### 5.14.1 Crear Sesión de Carga QR o PC
 - **Ruta:** `POST /api/upload-session/crear`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Vigencia:** 15 minutos desde el momento de emisión.
@@ -1067,7 +1130,7 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
   }
   ```
 
-#### 5.13.2 Consultar Estado de la Sesión
+#### 5.14.2 Consultar Estado de la Sesión
 - **Ruta:** `GET /api/upload-session/:sessionId`
 - **Acceso:** Público (utilizado por el móvil y por el polling en segundo plano en PC)
 - **Respuesta Exitosa (`200 OK`):**
@@ -1097,7 +1160,7 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
   }
   ```
 
-#### 5.13.3 Subir Evidencias desde Dispositivo Móvil o PC
+#### 5.14.3 Subir Evidencias desde Dispositivo Móvil o PC
 - **Ruta:** `POST /api/upload-session/:sessionId/subir`
 - **Acceso:** Público (validado por `:sessionId` activo y no expirado)
 - **Formato:** `multipart/form-data` con campo `fotos` (hasta el límite de cupos disponibles).
@@ -1119,7 +1182,7 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
   }
   ```
 
-#### 5.13.4 Destruir Evidencia Temporal en Tiempo Real (Cloudinary)
+#### 5.14.4 Destruir Evidencia Temporal en Tiempo Real (Cloudinary)
 - **Rutas:** `POST /api/upload-session/eliminar-foto` o `DELETE /api/servicios/evidencia-temporal`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Descripción:** Destruye inmediatamente el recurso físico en Cloudinary vía `cloudinary.uploader.destroy(publicId)` al presionar el icono de basura en la interfaz, y si se suministra `sessionId`, lo remueve del array JSONB en `sesiones_carga_fotos`.
@@ -1138,7 +1201,7 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
   }
   ```
 
-#### 5.13.5 Purgar Sesiones Huérfanas (Garbage Collector Manual)
+#### 5.14.5 Purgar Sesiones Huérfanas (Garbage Collector Manual)
 - **Ruta:** `POST /api/upload-session/purgar`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`)
 - **Descripción:** Ejecuta inmediatamente la rutina de recolección de huérfanos. Purga los archivos de Cloudinary de sesiones expiradas mayores a 30 minutos y elimina registros históricos de `sesiones_carga_fotos` con más de 15 días de antigüedad.
@@ -1163,7 +1226,7 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
 
 ---
 
-### 5.14 Liquidar y Entregar Orden de Servicio
+### 5.15 Liquidar y Entregar Orden de Servicio
 - **Ruta:** `POST /api/servicios/:id/entregar`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`)
 - **Descripción:** Concluye el ciclo técnico y financiero de la orden de servicio en mostrador. Verifica que la orden pertenezca a la sucursal del usuario (aislamiento de sede), que no haya sido entregada previamente ni cancelada, que no existan incidencias pendientes de aprobación del cliente, liquida el saldo neto, actualiza el estado a `ENTREGADO` (`orden_flujo = 7`), registra la fecha y usuario de entrega e inserta el evento de auditoría en `historial_estados`.
@@ -1199,7 +1262,7 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
 
 ---
 
-### 5.15 Cancelar Orden de Servicio
+### 5.16 Cancelar Orden de Servicio
 - **Ruta:** `POST /api/servicios/:id/cancelar`
 - **Acceso:** Privado Estricto (`SuperAdmin`, `Admin_Sucursal` únicamente)
 - **Restricción de Rol:** Protegido por `checkRole(['SuperAdmin', 'Admin_Sucursal'])`. Usuarios con rol `Secretaria` o `Tecnico` son rechazados con HTTP `403 Forbidden` (*"No tienes permisos para desactivar órdenes de servicio"*).
@@ -1236,7 +1299,7 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
 
 ---
 
-### 5.16 Validar y Consultar Datos para Emisión de Comprobante / Etiqueta
+### 5.17 Validar y Consultar Datos para Emisión de Comprobante / Etiqueta
 - **Ruta:** `GET /api/servicios/:id/ticket-impresion`
 - **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
 - **Descripción:** Endpoint especializado para validar la precondición de impresión antes de generar el comprobante térmico o la etiqueta de taller. Verifica que la orden exista y **bloquea la emisión para órdenes canceladas**, asegurando la integridad física y documental del taller.

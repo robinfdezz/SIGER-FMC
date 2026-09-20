@@ -24,6 +24,34 @@ function isBlank(str) {
 }
 
 /**
+ * Obtiene la fecha actual en formato local YYYY-MM-DD sin desfase UTC
+ */
+function getTodayCivilDate() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Valida que una fecha estimada de entrega no sea anterior a hoy a nivel de día civil
+ */
+function validateFechaEstimadaNoPasada(fechaStr) {
+  if (!fechaStr || isBlank(fechaStr)) return { ok: true, cleanDate: null };
+  const cleanDateStr = String(fechaStr).trim().split('T')[0];
+  const match = cleanDateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return { ok: false, message: 'El formato de la fecha estimada de entrega es inválido (esperado: YYYY-MM-DD).' };
+  }
+  const today = getTodayCivilDate();
+  if (cleanDateStr < today) {
+    return { ok: false, message: 'La fecha estimada de entrega no puede ser anterior a la fecha actual.' };
+  }
+  return { ok: true, cleanDate: cleanDateStr };
+}
+
+/**
  * Determina si el usuario posee rol SuperAdministrador.
  */
 function isUserSuperAdmin(user) {
@@ -190,6 +218,17 @@ const createServicio = async (req, res) => {
     var prioridades = ['baja', 'media', 'alta', 'urgente'];
     var prioridadFinal = prioridades.includes(prioridad) ? prioridad : 'media';
 
+    // Validación de fecha estimada de entrega (no puede ser pasada)
+    const rawFechaEstimada = fecha_entrega_estimada || fecha_estimada_entrega;
+    let sanitizedFechaEntrega = null;
+    if (rawFechaEstimada && !isBlank(rawFechaEstimada)) {
+      const valFecha = validateFechaEstimadaNoPasada(rawFechaEstimada);
+      if (!valFecha.ok) {
+        return res.status(400).json({ ok: false, message: valFecha.message });
+      }
+      sanitizedFechaEntrega = valFecha.cleanDate;
+    }
+
     // Tiempo de garantía en días (entero >= 0, default 30)
     const tiempoGarantia = Number.isInteger(Number(tiempo_garantia)) ? Math.max(0, parseInt(tiempo_garantia, 10)) : 30;
 
@@ -333,7 +372,7 @@ const createServicio = async (req, res) => {
         montoImpuesto,
         tiempoGarantia,
         isBlank(condiciones_garantia) ? null : String(condiciones_garantia).trim(),
-        fecha_entrega_estimada || null,
+        sanitizedFechaEntrega || null,
         validOrigenId,
         isGarantia
       ]
@@ -2922,6 +2961,398 @@ const cancelarServicio = async (req, res) => {
   }
 };
 
+// ============================================================
+// PUT /api/servicios/:id — Edición controlada de orden de servicio
+// ============================================================
+const updateServicio = async (req, res) => {
+  const pool = getPool();
+  const client = await pool.connect();
+
+  try {
+    const id = parseInt(req.params.id);
+    if (!id || id < 1) {
+      return res.status(400).json({ ok: false, message: 'ID de orden inválido.' });
+    }
+
+    const usuarioId = req.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ ok: false, message: 'Usuario no autenticado.' });
+    }
+
+    const userRole = String(req.user?.rol_nombre || req.user?.rol || '').toLowerCase();
+    if (userRole === 'tecnico') {
+      return res.status(403).json({
+        ok: false,
+        message: 'Los técnicos no tienen permisos para editar órdenes de servicio.'
+      });
+    }
+
+    const isSuperAdmin = isUserSuperAdmin(req.user);
+
+    // 1. Obtener la orden actual con su estado
+    let checkQuery = `
+      SELECT sr.*, es.codigo_estado, es.nombre_estado, es.orden_flujo
+      FROM servicios_recepcion sr
+      JOIN estados_servicio es ON es.id = sr.estado_actual_id
+      WHERE sr.id = $1 AND sr.activo = TRUE
+    `;
+    const checkParams = [id];
+
+    if (!isSuperAdmin) {
+      if (!req.user?.sucursal_id) {
+        return res.status(403).json({ ok: false, message: 'Acceso denegado: El usuario no tiene una sucursal asignada.' });
+      }
+      checkQuery += ' AND sr.sucursal_id = $2';
+      checkParams.push(parseInt(req.user.sucursal_id, 10));
+    }
+
+    const ordenRes = await client.query(checkQuery, checkParams);
+    if (ordenRes.rowCount === 0) {
+      return res.status(404).json({ ok: false, message: 'Orden de servicio no encontrada o fuera de su sucursal.' });
+    }
+
+    const ordenActual = ordenRes.rows[0];
+    const flujoActual = Number(ordenActual.orden_flujo || 0);
+    const codigoEstado = String(ordenActual.codigo_estado || '').toUpperCase();
+    const nombreEstado = String(ordenActual.nombre_estado || '').toLowerCase();
+
+    // 2. Validación de estados terminales / cerrados
+    const isEntregado = flujoActual === 7 || codigoEstado.includes('ENTREG') || nombreEstado.includes('entregad');
+    const isCancelado = flujoActual === 8 || codigoEstado.includes('CANCEL') || nombreEstado.includes('cancelad');
+
+    if (isEntregado || isCancelado) {
+      return res.status(400).json({
+        ok: false,
+        message: 'No es posible editar una orden finalizada o cancelada.'
+      });
+    }
+
+    // 3. Determinar fase de la orden: inicial (Recibido/Diagnóstico) vs avanzada
+    const isFaseInicial = flujoActual <= 2 || codigoEstado === 'RECIBIDO' || codigoEstado === 'EN_DIAGNOSTICO';
+
+    const {
+      // Seguridad y Acceso (siempre editable)
+      datos_acceso_equipo,
+      metodo_desbloqueo,
+      pin_desbloqueo,
+      patron_desbloqueo,
+
+      // Contacto y prioridad (siempre editable)
+      prioridad,
+      fecha_entrega_estimada,
+      fecha_estimada_entrega,
+      observaciones_recepcion,
+      notas_internas,
+
+      // Dispositivo y falla (solo editable en fase inicial)
+      marca_equipo,
+      marca,
+      modelo_equipo,
+      modelo,
+      num_serie_imei,
+      serial_imei,
+      falla_reportada,
+      accesorios_recibidos,
+      accesorios,
+      checklist_entrada,
+      checklist
+    } = req.body;
+
+    const updates = [];
+    const values = [];
+    const cambiosAudit = [];
+
+    // Helper para agregar updates
+    const addFieldUpdate = (colName, newVal, label) => {
+      values.push(newVal);
+      updates.push(`${colName} = $${values.length}`);
+      if (label) cambiosAudit.push(label);
+    };
+
+    // ── A. Campos SIEMPRE editables ───────────────────────────
+
+    // 1. Datos de acceso / seguridad
+    let nuevosDatosAcceso = null;
+    if (datos_acceso_equipo !== undefined) {
+      nuevosDatosAcceso = typeof datos_acceso_equipo === 'object' && datos_acceso_equipo !== null
+        ? datos_acceso_equipo
+        : (typeof datos_acceso_equipo === 'string' && datos_acceso_equipo.trim() ? JSON.parse(datos_acceso_equipo) : null);
+    } else if (metodo_desbloqueo !== undefined || pin_desbloqueo !== undefined || patron_desbloqueo !== undefined) {
+      const prevAcceso = typeof ordenActual.datos_acceso_equipo === 'object' && ordenActual.datos_acceso_equipo !== null
+        ? ordenActual.datos_acceso_equipo
+        : (typeof ordenActual.datos_acceso_equipo === 'string' ? JSON.parse(ordenActual.datos_acceso_equipo || '{}') : {});
+      nuevosDatosAcceso = {
+        ...prevAcceso,
+        metodo: metodo_desbloqueo || prevAcceso.metodo || 'ninguno',
+        tipo: metodo_desbloqueo || prevAcceso.tipo || 'ninguno',
+        valor: pin_desbloqueo !== undefined ? pin_desbloqueo : (prevAcceso.valor || ''),
+        patron: patron_desbloqueo !== undefined ? patron_desbloqueo : (prevAcceso.patron || [])
+      };
+    }
+
+    if (nuevosDatosAcceso !== null) {
+      const serializedNuevo = JSON.stringify(nuevosDatosAcceso);
+      const serializedActual = typeof ordenActual.datos_acceso_equipo === 'object'
+        ? JSON.stringify(ordenActual.datos_acceso_equipo)
+        : (ordenActual.datos_acceso_equipo || '');
+      if (serializedNuevo !== serializedActual) {
+        addFieldUpdate('datos_acceso_equipo', serializedNuevo, 'seguridad y acceso del equipo');
+      }
+    }
+
+    // 2. Prioridad
+    if (prioridad !== undefined) {
+      const prioridadesValidas = ['baja', 'media', 'alta', 'urgente'];
+      const priorLimpia = String(prioridad).trim().toLowerCase();
+      if (prioridadesValidas.includes(priorLimpia) && priorLimpia !== ordenActual.prioridad) {
+        addFieldUpdate('prioridad', priorLimpia, `prioridad (${ordenActual.prioridad} ➔ ${priorLimpia})`);
+      }
+    }
+
+    // 3. Fecha estimada de entrega
+    const nuevaFechaEntrega = fecha_entrega_estimada !== undefined ? fecha_entrega_estimada : fecha_estimada_entrega;
+    if (nuevaFechaEntrega !== undefined) {
+      const cleanFechaRaw = isBlank(nuevaFechaEntrega) ? null : String(nuevaFechaEntrega).trim();
+      const actualFechaStr = ordenActual.fecha_entrega_estimada
+        ? new Date(ordenActual.fecha_entrega_estimada).toISOString().slice(0, 10)
+        : null;
+      let cleanFecha = null;
+      if (cleanFechaRaw) {
+        const cleanDatePart = cleanFechaRaw.split('T')[0];
+        // Si la fecha fue cambiada respecto a la que ya tenía la orden, validar que no sea anterior a hoy
+        if (cleanDatePart !== actualFechaStr) {
+          const valFecha = validateFechaEstimadaNoPasada(cleanDatePart);
+          if (!valFecha.ok) {
+            return res.status(400).json({ ok: false, message: valFecha.message });
+          }
+          cleanFecha = valFecha.cleanDate;
+        } else {
+          cleanFecha = cleanDatePart;
+        }
+      }
+      if (cleanFecha !== actualFechaStr) {
+        addFieldUpdate('fecha_entrega_estimada', cleanFecha, 'fecha estimada de entrega');
+      }
+    }
+
+    // 4. Notas internas / observaciones de recepción
+    const nuevasNotas = observaciones_recepcion !== undefined ? observaciones_recepcion : notas_internas;
+    if (nuevasNotas !== undefined) {
+      const sanitizedNotas = isBlank(nuevasNotas) ? null : String(nuevasNotas).trim();
+      if (sanitizedNotas !== (ordenActual.observaciones_recepcion || null)) {
+        addFieldUpdate('observaciones_recepcion', sanitizedNotas, 'observaciones de recepción');
+      }
+    }
+
+    // ── B. Campos Editables SOLO en fase inicial ──────────────
+    if (isFaseInicial) {
+      // 5. Marca
+      const nuevaMarca = marca_equipo !== undefined ? marca_equipo : marca;
+      if (nuevaMarca !== undefined) {
+        if (isBlank(nuevaMarca)) {
+          return res.status(400).json({ ok: false, message: 'La marca del equipo no puede quedar vacía.' });
+        }
+        const cleanMarca = String(nuevaMarca).trim().slice(0, 50);
+        if (cleanMarca !== ordenActual.marca_equipo) {
+          addFieldUpdate('marca_equipo', cleanMarca, `marca (${ordenActual.marca_equipo || '—'} ➔ ${cleanMarca})`);
+        }
+      }
+
+      // 6. Modelo
+      const nuevoModelo = modelo_equipo !== undefined ? modelo_equipo : modelo;
+      if (nuevoModelo !== undefined) {
+        if (isBlank(nuevoModelo)) {
+          return res.status(400).json({ ok: false, message: 'El modelo del equipo no puede quedar vacío.' });
+        }
+        const cleanModelo = String(nuevoModelo).trim().slice(0, 50);
+        if (cleanModelo !== ordenActual.modelo_equipo) {
+          addFieldUpdate('modelo_equipo', cleanModelo, `modelo (${ordenActual.modelo_equipo || '—'} ➔ ${cleanModelo})`);
+        }
+      }
+
+      // 7. Serial / IMEI
+      const nuevoSerial = num_serie_imei !== undefined ? num_serie_imei : serial_imei;
+      if (nuevoSerial !== undefined) {
+        const cleanSerial = isBlank(nuevoSerial) ? null : String(nuevoSerial).trim().slice(0, 50);
+        if (cleanSerial !== (ordenActual.num_serie_imei || null)) {
+          addFieldUpdate('num_serie_imei', cleanSerial, 'número de serie / IMEI');
+        }
+      }
+
+      // 8. Falla reportada
+      if (falla_reportada !== undefined) {
+        if (isBlank(falla_reportada)) {
+          return res.status(400).json({ ok: false, message: 'La falla reportada no puede quedar vacía.' });
+        }
+        const cleanFalla = String(falla_reportada).trim();
+        if (cleanFalla !== ordenActual.falla_reportada) {
+          addFieldUpdate('falla_reportada', cleanFalla, 'falla reportada');
+        }
+      }
+
+      // 11. Accesorios recibidos
+      const nuevosAccesorios = accesorios_recibidos !== undefined ? accesorios_recibidos : accesorios;
+      if (nuevosAccesorios !== undefined) {
+        const cleanAccesorios = isBlank(nuevosAccesorios) ? null : String(nuevosAccesorios).trim();
+        if (cleanAccesorios !== (ordenActual.accesorios_recibidos || null)) {
+          addFieldUpdate('accesorios_recibidos', cleanAccesorios, 'accesorios recibidos');
+        }
+      }
+
+      // 12. Checklist entrada
+      const nuevoChecklist = checklist_entrada !== undefined ? checklist_entrada : checklist;
+      if (nuevoChecklist !== undefined) {
+        const serializedChecklist = typeof nuevoChecklist === 'object' && nuevoChecklist !== null
+          ? JSON.stringify(nuevoChecklist)
+          : (typeof nuevoChecklist === 'string' && nuevoChecklist.trim() ? nuevoChecklist.trim() : null);
+        const serializedActual = typeof ordenActual.checklist_entrada === 'object'
+          ? JSON.stringify(ordenActual.checklist_entrada)
+          : (ordenActual.checklist_entrada || null);
+        if (serializedChecklist !== serializedActual) {
+          addFieldUpdate('checklist_entrada', serializedChecklist, 'checklist inicial de recepción');
+        }
+      }
+    }
+
+    if (updates.length === 0) {
+      return res.status(200).json({
+        ok: true,
+        message: 'No se realizaron modificaciones porque los datos coinciden con la orden actual.',
+        data: ordenActual
+      });
+    }
+
+    // Actualizar updated_at
+    updates.push('updated_at = NOW()');
+
+    await client.query('BEGIN');
+
+    // 4. Ejecutar UPDATE
+    values.push(id);
+    const updateSql = `
+      UPDATE servicios_recepcion
+      SET ${updates.join(', ')}
+      WHERE id = $${values.length}
+      RETURNING *
+    `;
+    const updatedRes = await client.query(updateSql, values);
+
+    // 5. Trazabilidad / Auditoría en historial_estados
+    const notaAuditoria = `Edición de orden por usuario #${usuarioId}. Campos actualizados: ${cambiosAudit.join(', ')}.`;
+    await client.query(
+      `INSERT INTO historial_estados (servicio_id, estado_id, usuario_id, nota_cambio, fecha_registro)
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [id, ordenActual.estado_actual_id, usuarioId, notaAuditoria]
+    );
+
+    await client.query('COMMIT');
+
+    // 6. Consultar la orden enriquecida completa usando la misma lógica de getServicioById
+    const enrichedRes = await pool.query(
+      `SELECT
+        sr.*,
+        COALESCE(sr.tasa_impuesto, (SELECT tasa_impuesto_defecto FROM datos_companhia LIMIT 1), 18.00) AS tasa_impuesto,
+        COALESCE(sr.monto_impuesto, 0.00) AS monto_impuesto,
+        COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS nombre_cliente,
+        COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS cliente_nombre,
+        COALESCE(sr.telefono_cliente, c.telefono) AS telefono_cliente,
+        COALESCE(sr.telefono_cliente, c.telefono) AS cliente_telefono,
+        sr.checklist_entrada AS checklist_recepcion,
+        sr.observaciones_recepcion AS observaciones,
+        sr.accesorios_recibidos AS accesorios,
+        es.nombre_estado AS estado,
+        es.codigo_estado,
+        es.orden_flujo,
+        es.color_badge AS estado_color,
+        cd.nombre_categoria AS categoria,
+        ds.nombre_sucursal AS sucursal,
+        TRIM(CONCAT(dt.nombre, ' ', dt.apellido)) AS recepcionista,
+        TRIM(CONCAT(dt_ent.nombre, ' ', dt_ent.apellido)) AS despachado_por,
+        TRIM(CONCAT(c.nombre, ' ', c.apellido)) AS nombre_cliente_reg,
+        c.telefono AS telefono_cliente_reg,
+        COALESCE((SELECT TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido)) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id ORDER BY ta.id ASC LIMIT 1), 'Sin asignar') AS tecnico_nombre,
+        COALESCE((SELECT string_agg(TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido)), ', ' ORDER BY ta.id ASC) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), 'Sin asignar') AS tecnicos_nombres,
+        COALESCE((SELECT json_agg(json_build_object('id', dt_tec.id, 'nombre', dt_tec.nombre, 'apellido', dt_tec.apellido, 'nombre_completo', TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido)), 'usuario', dt_tec.usuario, 'foto_perfil_url', dt_tec.foto_perfil_url) ORDER BY ta.id ASC) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), '[]'::json) AS tecnicos,
+        COALESCE((SELECT json_agg(json_build_object('id', dt_tec.id, 'nombre', dt_tec.nombre, 'apellido', dt_tec.apellido, 'nombre_completo', TRIM(CONCAT(dt_tec.nombre, ' ', dt_tec.apellido)), 'usuario', dt_tec.usuario, 'foto_perfil_url', dt_tec.foto_perfil_url) ORDER BY ta.id ASC) FROM tecnicos_asignados ta JOIN datos_trabajadores dt_tec ON dt_tec.id = ta.tecnico_id WHERE ta.servicio_id = sr.id), '[]'::json) AS tecnicos_asignados,
+        COALESCE((SELECT json_agg(json_build_object('id', ef.id, 'url', ef.url_foto, 'url_foto', ef.url_foto, 'public_id', ef.public_id, 'tipo_evidencia', ef.tipo_evidencia, 'fecha_subida', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE AND ef.incidencia_id IS NULL AND ef.tipo_evidencia != 'INCIDENCIA'), '[]'::json) AS fotos,
+        COALESCE((SELECT json_agg(json_build_object('id', ef.id, 'url', ef.url_foto, 'url_foto', ef.url_foto, 'public_id', ef.public_id, 'tipo_evidencia', ef.tipo_evidencia, 'fecha_subida', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE AND ef.incidencia_id IS NULL AND (ef.tipo_evidencia = 'RECEPCION' OR ef.tipo_evidencia IS NULL)), '[]'::json) AS fotos_recepcion,
+        COALESCE((SELECT json_agg(json_build_object('id', ef.id, 'url', ef.url_foto, 'url_foto', ef.url_foto, 'public_id', ef.public_id, 'tipo_evidencia', ef.tipo_evidencia, 'fecha_subida', ef.fecha_subida) ORDER BY ef.id ASC) FROM evidencias_fotograficas ef WHERE ef.servicio_id = sr.id AND ef.activo = TRUE AND ef.incidencia_id IS NULL AND ef.tipo_evidencia = 'ENTREGA'), '[]'::json) AS fotos_entrega,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object(
+              'id', he.id,
+              'estado_id', he.estado_id,
+              'nombre_estado', es_h.nombre_estado,
+              'codigo_estado', es_h.codigo_estado,
+              'color_badge', es_h.color_badge,
+              'orden_flujo', es_h.orden_flujo,
+              'usuario_id', he.usuario_id,
+              'usuario_nombre', TRIM(CONCAT(dt_h.nombre, ' ', dt_h.apellido)),
+              'nota_cambio', he.nota_cambio,
+              'fecha_registro', he.fecha_registro
+            ) ORDER BY he.fecha_registro ASC, he.id ASC
+          )
+          FROM historial_estados he
+          LEFT JOIN estados_servicio es_h ON es_h.id = he.estado_id
+          LEFT JOIN datos_trabajadores dt_h ON dt_h.id = he.usuario_id
+          WHERE he.servicio_id = sr.id
+        ), '[]'::json) AS historial_estados,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object(
+              'id', inc.id,
+              'servicio_id', inc.servicio_id,
+              'tipo_incidencia', inc.tipo_incidencia,
+              'descripcion', inc.descripcion,
+              'repuesto_requerido', inc.repuesto_requerido,
+              'costo_adicional_repuesto', inc.costo_adicional_repuesto,
+              'aprobado_por_cliente', inc.aprobado_por_cliente,
+              'fecha_aprobacion', inc.fecha_aprobacion,
+              'metodo_aprobacion', inc.metodo_aprobacion,
+              'estado_aprobacion', CASE WHEN inc.aprobado_por_cliente = TRUE THEN 'APROBADO' WHEN inc.fecha_aprobacion IS NOT NULL THEN 'RECHAZADO' ELSE 'PENDIENTE' END,
+              'rechazado_por_cliente', (inc.aprobado_por_cliente = FALSE AND inc.fecha_aprobacion IS NOT NULL),
+              'fecha_registro', inc.fecha_registro,
+              'usuario_id', inc.usuario_id,
+              'usuario_nombre', TRIM(CONCAT(dt_inc.nombre, ' ', dt_inc.apellido))
+            ) ORDER BY inc.fecha_registro DESC, inc.id DESC
+          )
+          FROM incidencias_servicio inc
+          LEFT JOIN datos_trabajadores dt_inc ON dt_inc.id = inc.usuario_id
+          WHERE inc.servicio_id = sr.id AND inc.activo = TRUE
+        ), '[]'::json) AS incidencias
+      FROM servicios_recepcion sr
+      LEFT JOIN estados_servicio es ON es.id = sr.estado_actual_id
+      LEFT JOIN categorias_dispositivos cd ON cd.id = sr.categoria_id
+      LEFT JOIN datos_sucursales ds ON ds.id = sr.sucursal_id
+      LEFT JOIN datos_trabajadores dt ON dt.id = sr.usuario_recepcion_id
+      LEFT JOIN datos_trabajadores dt_ent ON dt_ent.id = sr.usuario_entrega_id
+      LEFT JOIN clientes c ON c.id = sr.cliente_id
+      WHERE sr.id = $1`,
+      [id]
+    );
+
+    const orderData = enrichedRes.rows[0] || updatedRes.rows[0];
+
+    return res.status(200).json({
+      ok: true,
+      message: 'Orden de servicio actualizada exitosamente.',
+      cambios: cambiosAudit,
+      data: orderData
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error en updateServicio:', error);
+    return res.status(500).json({
+      ok: false,
+      message: 'Error al actualizar la orden de servicio.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   createServicio,
   getServicios,
@@ -2929,6 +3360,7 @@ module.exports = {
   getServicioByTicket,
   getServiciosTaller,
   updateServicioEstado,
+  updateServicio,
   assignTecnicoServicio,
   removeTecnicoServicio,
   validarGarantiaTicket,
