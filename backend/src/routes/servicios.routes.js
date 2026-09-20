@@ -80,11 +80,17 @@ router.post(
 // POST /api/servicios
 router.post('/', createServicio);
 
+const { eliminarFotoTemporal } = require('../controllers/uploadSession.controller');
+
 // POST /api/servicios/upload-foto  - Subida de hasta 5 fotos a Cloudinary
 router.post(
   '/upload-foto',
   handleMulterErrors(upload.any()),
   uploadFotosServicio
 );
+
+// DELETE /api/servicios/evidencia-temporal - Destrucción en tiempo real de asset huérfano descartado
+router.delete('/evidencia-temporal', eliminarFotoTemporal);
+router.post('/evidencia-temporal', eliminarFotoTemporal);
 
 module.exports = router;

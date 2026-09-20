@@ -10,7 +10,7 @@ import {
   AlertCircle,
   RefreshCw
 } from 'lucide-react';
-import { getUploadSession, subirFotosSession } from '../services/uploadSession.service';
+import { getUploadSession, subirFotosSession, eliminarFotoUploadSession } from '../services/uploadSession.service';
 import { getCompanyPublicProfile } from '../services/configuracion.service';
 import { useTheme } from '../context/ThemeContext';
 import { MorphIcon } from 'morphicons/react';
@@ -37,6 +37,17 @@ export const UploadMobilePage = () => {
 
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
+
+  const [maxPhotosAllowed, setMaxPhotosAllowed] = useState(() => {
+    const urlParam = new URLSearchParams(window.location.search).get('max');
+    const parsed = parseInt(urlParam, 10);
+    return !isNaN(parsed) && parsed > 0 ? parsed : 5;
+  });
+
+  const fotosYaSubidas = Array.isArray(sessionData?.fotos) ? sessionData.fotos.length : 0;
+  const limiteEfectivo = typeof sessionData?.maxFotos === 'number' ? sessionData.maxFotos : maxPhotosAllowed;
+  const fotosRestantes = Math.max(0, limiteEfectivo - fotosYaSubidas);
+  const slotsDisponibles = Math.max(0, fotosRestantes - selectedFiles.length);
 
   // Cargar logotipo oficial homologado con /estado
   useEffect(() => {
@@ -68,10 +79,20 @@ export const UploadMobilePage = () => {
     try {
       const res = await getUploadSession(sessionId);
       if (res && res.ok) {
-        if (res.estado === 'EXPIRADO') {
-          setSessionError('Esta sesión ha expirado. Por favor, escanea un nuevo código QR en la computadora.');
+        if (res.estado === 'EXPIRADO' || res.estado === 'PURGADA') {
+          setSessionError('Esta sesión ha expirado o ya no está disponible. Por favor, solicita un nuevo código QR en recepción.');
+        } else if (res.estado === 'COMPLETADO' || res.estado === 'UTILIZADA') {
+          // Sesión ya completada previamente
+          setSessionData(res);
+          if (typeof res.maxFotos === 'number') {
+            setMaxPhotosAllowed(res.maxFotos);
+          }
+          setUploadSuccess(true);
         } else {
           setSessionData(res);
+          if (typeof res.maxFotos === 'number') {
+            setMaxPhotosAllowed(res.maxFotos);
+          }
         }
       } else {
         setSessionError(res?.message || 'Código de sesión no encontrado o inválido.');
@@ -95,11 +116,27 @@ export const UploadMobilePage = () => {
   const handleFilesAdded = (files) => {
     if (!files || files.length === 0) return;
 
+    if (slotsDisponibles <= 0) {
+      sileo.error({
+        title: 'Cupo completado',
+        description: `Esta orden solo admite ${limiteEfectivo} fotografía${limiteEfectivo === 1 ? '' : 's'} en esta sesión.`
+      });
+      return;
+    }
+
+    const filesToProcess = Array.from(files).slice(0, slotsDisponibles);
+    if (Array.from(files).length > slotsDisponibles) {
+      sileo.info({
+        title: 'Límite alcanzado',
+        description: `Solo se añadieron ${slotsDisponibles} fotografía(s) para no exceder el cupo de ${limiteEfectivo}.`
+      });
+    }
+
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
     const newFiles = [];
     const newUrls = [];
 
-    Array.from(files).forEach((file) => {
+    filesToProcess.forEach((file) => {
       if (!validTypes.includes(file.type)) {
         sileo.error({
           title: 'Formato no compatible',
@@ -128,9 +165,15 @@ export const UploadMobilePage = () => {
   };
 
   const handleRemoveFile = (index) => {
+    const fileItem = previewUrls[index];
     // Liberar memoria del objectURL
-    if (previewUrls[index]?.url) {
-      URL.revokeObjectURL(previewUrls[index].url);
+    if (fileItem?.url) {
+      URL.revokeObjectURL(fileItem.url);
+    }
+    if (fileItem?.public_id && !String(fileItem.public_id).startsWith('local-')) {
+      eliminarFotoUploadSession(fileItem.public_id, sessionId).catch((err) =>
+        console.warn('⚠️ No se pudo eliminar foto remota:', err?.message)
+      );
     }
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
     setPreviewUrls((prev) => prev.filter((_, i) => i !== index));
@@ -244,27 +287,34 @@ export const UploadMobilePage = () => {
             </button>
           </div>
         ) : uploadSuccess ? (
-          <div className="bg-white dark:bg-[#18181b] p-6 sm:p-8 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 text-center space-y-4 my-auto animate-fade-in">
+          <div className="bg-white dark:bg-[#18181b] p-6 sm:p-8 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 text-center space-y-4 my-auto animate-fade-in shadow-xs">
             <CheckCircle2 size={48} className="text-emerald-500 mx-auto" strokeWidth={2.2} />
             <div className="space-y-2">
               <h2 className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-neutral-100 font-outfit">
-                ¡Fotografías enviadas!
+                ¡Fotografías ya enviadas!
               </h2>
               <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed max-w-xs mx-auto">
-                Las imágenes se transfirieron exitosamente y ya están visibles en la pantalla de la computadora. Ya puedes cerrar esta pestaña.
+                Las imágenes se transfirieron exitosamente y ya están sincronizadas en la computadora. Esta sesión ha sido completada, puedes cerrar esta ventana.
               </p>
             </div>
           </div>
         ) : (
           <div className="space-y-6">
             {/* Título institucional homologado con /estado */}
-            <div className="max-w-xl mx-auto space-y-2 text-center px-1">
+            <div className="max-w-xl mx-auto space-y-2.5 text-center px-1">
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-outfit text-neutral-900 dark:text-white tracking-tight">
                 Captura de Evidencias
               </h1>
               <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 font-inter leading-relaxed">
                 Toma fotos del dispositivo con la cámara o elígelas de tu galería para transferirlas en tiempo real.
               </p>
+
+              {/* Badge de conteo de fotos */}
+              <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-neutral-200/60 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-inter">
+                <span className="font-semibold text-neutral-900 dark:text-white">{selectedFiles.length}</span>
+                <span>de</span>
+                <span className="font-semibold text-neutral-900 dark:text-white">{limiteEfectivo}</span>
+              </div>
             </div>
 
             {/* Inputs ocultos nativos */}
@@ -293,12 +343,26 @@ export const UploadMobilePage = () => {
               }}
             />
 
-            {/* Botones de acción táctil directos (sin recuadro blanco y sin sombras) */}
+            {/* Botones de acción táctil directos */}
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => cameraInputRef.current?.click()}
-                className="py-4 px-3 rounded-xl bg-red-600 hover:bg-red-700 active:scale-98 text-white font-semibold text-xs flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer select-none"
+                disabled={slotsDisponibles <= 0}
+                onClick={() => {
+                  if (slotsDisponibles <= 0) {
+                    sileo.info({
+                      title: 'Cupo completado',
+                      description: `Has alcanzado el límite máximo de ${limiteEfectivo} fotos permitidas.`
+                    });
+                    return;
+                  }
+                  cameraInputRef.current?.click();
+                }}
+                className={`py-4 px-3 rounded-xl font-semibold text-xs flex flex-col items-center justify-center gap-1.5 transition-all select-none ${
+                  slotsDisponibles <= 0
+                    ? 'bg-neutral-200 dark:bg-neutral-800/60 text-neutral-400 dark:text-neutral-500 cursor-not-allowed border border-transparent'
+                    : 'bg-red-600 hover:bg-red-700 active:scale-98 text-white cursor-pointer shadow-xs'
+                }`}
               >
                 <Camera size={22} />
                 <span>Tomar Foto</span>
@@ -306,8 +370,22 @@ export const UploadMobilePage = () => {
 
               <button
                 type="button"
-                onClick={() => galleryInputRef.current?.click()}
-                className="py-4 px-3 rounded-xl bg-white dark:bg-[#18181b] hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-98 text-neutral-800 dark:text-neutral-200 font-semibold text-xs flex flex-col items-center justify-center gap-1.5 border border-neutral-200/80 dark:border-neutral-700/80 transition-all cursor-pointer select-none"
+                disabled={slotsDisponibles <= 0}
+                onClick={() => {
+                  if (slotsDisponibles <= 0) {
+                    sileo.info({
+                      title: 'Cupo completado',
+                      description: `Has alcanzado el límite máximo de ${limiteEfectivo} fotos permitidas.`
+                    });
+                    return;
+                  }
+                  galleryInputRef.current?.click();
+                }}
+                className={`py-4 px-3 rounded-xl font-semibold text-xs flex flex-col items-center justify-center gap-1.5 border transition-all select-none ${
+                  slotsDisponibles <= 0
+                    ? 'bg-neutral-100 dark:bg-neutral-900 border-neutral-200/60 dark:border-neutral-800 text-neutral-400 dark:text-neutral-500 cursor-not-allowed'
+                    : 'bg-white dark:bg-[#18181b] hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-98 text-neutral-800 dark:text-neutral-200 border-neutral-200/80 dark:border-neutral-700/80 cursor-pointer shadow-xs'
+                }`}
               >
                 <ImageIcon size={22} />
                 <span>Elegir Galería</span>

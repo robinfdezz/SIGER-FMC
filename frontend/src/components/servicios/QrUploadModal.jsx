@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
@@ -12,33 +12,26 @@ import {
   AlertCircle,
   ExternalLink
 } from 'lucide-react';
-import { crearUploadSession, getUploadSession } from '../../services/uploadSession.service';
 import { getCompanyPublicProfile } from '../../services/configuracion.service';
 import { sileo } from 'sileo';
 
-const POLLING_INTERVAL_MS = 2500;
-const SESSION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos en frontend
-
 /**
  * QrUploadModal
- * Modal interactivo para sincronización en tiempo real de fotografías desde móviles vía QR y Polling.
+ * Componente visual controlado para visualización de Código QR y enlace
+ * de sincronización móvil. La sesión y el sondeo son gestionados por el padre (DevicePhotoUploader).
  */
 export const QrUploadModal = ({
   isOpen,
   onClose,
-  onPhotosReceived,
+  sessionId = null,
+  loading = false,
+  error = null,
+  isExpired = false,
+  onGenerateNew,
   maxPhotos = 5
 }) => {
-  const [sessionId, setSessionId] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [domainBase, setDomainBase] = useState('');
-  const [pollCount, setPollCount] = useState(0);
-  const [isExpired, setIsExpired] = useState(false);
-
-  const pollTimerRef = useRef(null);
-  const sessionTimeoutRef = useRef(null);
 
   // Determinar dominio base para construir la URL móvil
   useEffect(() => {
@@ -48,8 +41,6 @@ export const QrUploadModal = ({
         const res = await getCompanyPublicProfile();
         if (isMounted) {
           const remoteDomain = res?.data?.dominio_sistema?.trim();
-          // Si estamos en localhost y hay un dominio remoto de producción no accesible localmente,
-          // preferimos window.location.origin para pruebas en red local, o remoteDomain si es HTTPS público
           const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
           if (isLocal) {
             setDomainBase(window.location.origin);
@@ -68,99 +59,9 @@ export const QrUploadModal = ({
     };
   }, []);
 
-  const clearTimers = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-    if (sessionTimeoutRef.current) {
-      clearTimeout(sessionTimeoutRef.current);
-      sessionTimeoutRef.current = null;
-    }
-  }, []);
-
-  // Iniciar o reiniciar sesión QR
-  const startSession = useCallback(async () => {
-    clearTimers();
-    setLoading(true);
-    setError(null);
-    setIsExpired(false);
-    setPollCount(0);
-
-    try {
-      const res = await crearUploadSession();
-      if (res && res.ok && res.sessionId) {
-        setSessionId(res.sessionId);
-      } else {
-        setError('No se pudo inicializar la sesión QR. Intenta de nuevo.');
-      }
-    } catch (err) {
-      console.error('Error al crear sesión QR:', err);
-      setError(err.response?.data?.message || 'Error de conexión al servidor al generar el código QR.');
-    } finally {
-      setLoading(false);
-    }
-  }, [clearTimers]);
-
-  // Manejar apertura y cierre del modal
-  useEffect(() => {
-    if (isOpen) {
-      startSession();
-    } else {
-      clearTimers();
-      setSessionId(null);
-      setError(null);
-      setIsExpired(false);
-    }
-    return () => {
-      clearTimers();
-    };
-  }, [isOpen, startSession, clearTimers]);
-
-  // Polling activo cuando existe sessionId
-  useEffect(() => {
-    if (!sessionId || !isOpen || isExpired) return;
-
-    // Timeout de 10 minutos
-    sessionTimeoutRef.current = setTimeout(() => {
-      clearTimers();
-      setIsExpired(true);
-    }, SESSION_TIMEOUT_MS);
-
-    pollTimerRef.current = setInterval(async () => {
-      try {
-        setPollCount((prev) => prev + 1);
-        const res = await getUploadSession(sessionId);
-
-        if (res && res.ok) {
-          if (res.estado === 'EXPIRADO') {
-            clearTimers();
-            setIsExpired(true);
-            return;
-          }
-
-          if (Array.isArray(res.fotos) && res.fotos.length > 0) {
-            clearTimers();
-            sileo.success({
-              title: '¡Fotos recibidas!',
-              description: `${res.fotos.length} fotografía(s) sincronizada(s) exitosamente desde el móvil.`
-            });
-            onPhotosReceived(res.fotos);
-            onClose();
-          }
-        }
-      } catch (err) {
-        console.warn('Error en ciclo de polling de fotos:', err.message);
-      }
-    }, POLLING_INTERVAL_MS);
-
-    return () => {
-      clearTimers();
-    };
-  }, [sessionId, isOpen, isExpired, clearTimers, onPhotosReceived, onClose]);
-
+  const queryParam = maxPhotos ? `?max=${maxPhotos}` : '';
   const targetUrl = sessionId
-    ? `${(domainBase || window.location.origin).replace(/\/$/, '')}/subir-fotos/${sessionId}`
+    ? `${(domainBase || window.location.origin).replace(/\/$/, '')}/subir-fotos/${sessionId}${queryParam}`
     : '';
 
   const handleCopyLink = async () => {
@@ -188,7 +89,7 @@ export const QrUploadModal = ({
     >
       <div className="px-4 sm:px-6 pt-2 pb-6 sm:pb-7 space-y-4 text-center">
         <p className="text-xs text-neutral-500 dark:text-neutral-400 font-inter">
-          Escanea el código con tu móvil para transferir las fotos.
+          Escanea el código con tu móvil para transferir {maxPhotos ? `hasta ${maxPhotos} fotografía${maxPhotos === 1 ? '' : 's'}` : 'las fotos'}.
         </p>
 
         {/* Contenedor central del QR */}
@@ -202,9 +103,11 @@ export const QrUploadModal = ({
             <div className="flex flex-col items-center justify-center gap-3 py-6 px-4 max-w-xs text-center">
               <AlertCircle size={32} className="text-red-500 dark:text-red-400" />
               <p className="text-xs text-red-600 dark:text-red-400 font-inter">{error}</p>
-              <Button size="sm" variant="secondary" icon={RefreshCw} onClick={startSession}>
-                Reintentar
-              </Button>
+              {onGenerateNew && (
+                <Button size="sm" variant="secondary" icon={RefreshCw} onClick={onGenerateNew}>
+                  Reintentar
+                </Button>
+              )}
             </div>
           ) : isExpired ? (
             <div className="flex flex-col items-center justify-center gap-3 py-6 px-4 max-w-xs text-center">
@@ -215,19 +118,21 @@ export const QrUploadModal = ({
               <p className="text-[11px] text-neutral-500">
                 Por seguridad, las sesiones caducan a los 10 minutos de inactividad.
               </p>
-              <Button
-                variant="primary"
-                size="sm"
-                icon={RefreshCw}
-                onClick={startSession}
-              >
-                Generar nuevo código
-              </Button>
+              {onGenerateNew && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={RefreshCw}
+                  onClick={onGenerateNew}
+                >
+                  Generar nuevo código
+                </Button>
+              )}
             </div>
           ) : targetUrl ? (
             <div className="space-y-4 flex flex-col items-center">
               {/* Contenedor limpio del Código QR */}
-              <div className="p-3.5 bg-white rounded-xl inline-flex items-center justify-center">
+              <div className="p-3.5 bg-white rounded-xl inline-flex items-center justify-center shadow-2xs">
                 <QRCodeSVG
                   value={targetUrl}
                   size={180}
@@ -257,7 +162,7 @@ export const QrUploadModal = ({
         </div>
 
         {/* Acciones de enlace alternativo centradas con SimpleButton */}
-        {targetUrl && !isExpired && !error && (
+        {targetUrl && !isExpired && !error && !loading && (
           <div className="flex justify-center items-center gap-2 mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80">
             <SimpleButton
               onClick={handleCopyLink}

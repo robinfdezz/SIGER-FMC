@@ -39,6 +39,19 @@ export const uploadFotosRecepcion = async (files) => {
 };
 
 /**
+ * Eliminar inmediatamente una fotografía temporal de Cloudinary
+ * @param {string} publicId - ID del asset en Cloudinary
+ * @param {string|null} sessionId - ID opcional de la sesión de carga
+ */
+export const eliminarFotoTemporal = async (publicId, sessionId = null) => {
+  if (!publicId) return null;
+  const response = await api.delete('/servicios/evidencia-temporal', {
+    data: { public_id: publicId, session_id: sessionId }
+  });
+  return response.data;
+};
+
+/**
  * Buscar orden por codigo de ticket (consulta publica autenticada / anti-bot condicional)
  * @param {string} codigo
  * @param {string|null} [turnstileToken=null]

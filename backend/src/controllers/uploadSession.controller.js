@@ -17,9 +17,11 @@ const ensureTableExists = async (pool) => {
         fotos JSONB NOT NULL DEFAULT '[]'::jsonb,
         estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
         expira_en TIMESTAMPTZ NOT NULL,
+        max_fotos INTEGER DEFAULT 5,
         created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE sesiones_carga_fotos ADD COLUMN IF NOT EXISTS max_fotos INTEGER DEFAULT 5;
       CREATE INDEX IF NOT EXISTS idx_sesiones_carga_session_id ON sesiones_carga_fotos (session_id);
       CREATE INDEX IF NOT EXISTS idx_sesiones_carga_estado_expira ON sesiones_carga_fotos (estado, expira_en);
     `);
@@ -42,12 +44,16 @@ const crearSesion = async (req, res) => {
     // Expiración a 15 minutos
     const expiraEn = new Date(Date.now() + 15 * 60 * 1000);
 
+    const rawMaxFotos = req.body?.maxFotosPermitidas ?? req.body?.max_fotos ?? req.body?.maxFotos;
+    const parsedMax = parseInt(rawMaxFotos, 10);
+    const maxFotos = !isNaN(parsedMax) && parsedMax > 0 ? Math.min(10, parsedMax) : 5;
+
     const insertQuery = `
-      INSERT INTO sesiones_carga_fotos (session_id, fotos, estado, expira_en)
-      VALUES ($1, '[]'::jsonb, 'PENDIENTE', $2)
-      RETURNING session_id, estado, expira_en, created_at
+      INSERT INTO sesiones_carga_fotos (session_id, fotos, estado, expira_en, max_fotos)
+      VALUES ($1, '[]'::jsonb, 'PENDIENTE', $2, $3)
+      RETURNING session_id, estado, expira_en, max_fotos, created_at
     `;
-    const result = await pool.query(insertQuery, [sessionId, expiraEn]);
+    const result = await pool.query(insertQuery, [sessionId, expiraEn, maxFotos]);
 
     // Disparar purga de huérfanos en segundo plano sin bloquear la respuesta
     purgarSesionesExpiradas().catch((err) => {
@@ -59,6 +65,7 @@ const crearSesion = async (req, res) => {
       message: 'Sesión de carga creada exitosamente.',
       data: result.rows[0],
       sessionId: result.rows[0].session_id,
+      maxFotos: result.rows[0].max_fotos,
       expira_en: result.rows[0].expira_en
     });
   } catch (error) {
@@ -88,7 +95,7 @@ const obtenerEstadoSesion = async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT id, session_id, fotos, estado, expira_en, created_at, updated_at
+      `SELECT id, session_id, fotos, estado, expira_en, max_fotos, created_at, updated_at
        FROM sesiones_carga_fotos
        WHERE session_id = $1`,
       [cleanSessionId]
@@ -104,6 +111,9 @@ const obtenerEstadoSesion = async (req, res) => {
     const session = result.rows[0];
     const ahora = new Date();
     const expiracion = new Date(session.expira_en);
+    const maxFotos = session.max_fotos || 5;
+    const fotosActuales = Array.isArray(session.fotos) ? session.fotos : [];
+    const cuposDisponibles = Math.max(0, maxFotos - fotosActuales.length);
 
     // Si expiró y no ha sido confirmada/utilizada en una orden
     if (ahora > expiracion && session.estado !== 'UTILIZADA' && session.estado !== 'CONFIRMADA') {
@@ -121,7 +131,9 @@ const obtenerEstadoSesion = async (req, res) => {
         ok: true,
         sessionId: session.session_id,
         estado: session.estado === 'PURGADA' ? 'PURGADA' : 'EXPIRADO',
-        fotos: session.fotos || [],
+        fotos: fotosActuales,
+        maxFotos,
+        cuposDisponibles,
         expira_en: session.expira_en,
         message: 'La sesión ha expirado. Genere un nuevo código QR.'
       });
@@ -131,7 +143,9 @@ const obtenerEstadoSesion = async (req, res) => {
       ok: true,
       sessionId: session.session_id,
       estado: session.estado,
-      fotos: session.fotos || [],
+      fotos: fotosActuales,
+      maxFotos,
+      cuposDisponibles,
       expira_en: session.expira_en,
       created_at: session.created_at
     });
@@ -146,7 +160,7 @@ const obtenerEstadoSesion = async (req, res) => {
 };
 
 /**
- * Procesa y sube las fotografías enviadas desde el dispositivo móvil.
+ * Recibe y procesa las fotografías subidas desde el móvil para una sesión activa.
  * POST /api/upload-session/:sessionId/subir
  */
 const subirFotosSesion = async (req, res) => {
@@ -162,7 +176,7 @@ const subirFotosSesion = async (req, res) => {
     }
 
     const sessionRes = await pool.query(
-      `SELECT id, session_id, fotos, estado, expira_en
+      `SELECT id, session_id, fotos, estado, expira_en, max_fotos
        FROM sesiones_carga_fotos
        WHERE session_id = $1`,
       [cleanSessionId]
@@ -174,12 +188,23 @@ const subirFotosSesion = async (req, res) => {
 
     const session = sessionRes.rows[0];
 
-    if (new Date() > new Date(session.expira_en)) {
-      await pool.query(
-        `UPDATE sesiones_carga_fotos SET estado = 'EXPIRADO', updated_at = NOW() WHERE id = $1`,
-        [session.id]
-      );
-      return res.status(400).json({
+    // 1. Validar que la sesión no haya finalizado o sido utilizada
+    if (['COMPLETADO', 'UTILIZADA', 'PURGADA'].includes(session.estado)) {
+      return res.status(409).json({
+        ok: false,
+        message: 'Esta sesión de carga ya ha sido finalizada o utilizada.'
+      });
+    }
+
+    // 2. Validar expiración de sesión
+    if (session.estado === 'EXPIRADO' || new Date() > new Date(session.expira_en)) {
+      if (session.estado !== 'EXPIRADO') {
+        await pool.query(
+          `UPDATE sesiones_carga_fotos SET estado = 'EXPIRADO', updated_at = NOW() WHERE id = $1`,
+          [session.id]
+        );
+      }
+      return res.status(410).json({
         ok: false,
         message: 'Esta sesión de carga ha expirado. Por favor solicite un nuevo código QR.'
       });
@@ -190,8 +215,16 @@ const subirFotosSesion = async (req, res) => {
       return res.status(400).json({ ok: false, message: 'No se recibieron archivos de imagen.' });
     }
 
-    if (files.length > 10) {
-      return res.status(400).json({ ok: false, message: 'Se permite subir hasta un máximo de 10 fotografías por tanda.' });
+    const currentFotos = Array.isArray(session.fotos) ? session.fotos : [];
+    const maxFotos = session.max_fotos || 5;
+
+    // 3. Validar límite acumulado de fotos de la orden
+    if (currentFotos.length + files.length > maxFotos) {
+      const disponibles = Math.max(0, maxFotos - currentFotos.length);
+      return res.status(400).json({
+        ok: false,
+        message: `Excede el cupo permitido para esta orden (${maxFotos} foto(s) en total). Puedes agregar un máximo de ${disponibles} fotografía(s) más.`
+      });
     }
 
     // Subida a Cloudinary reutilizando el pipeline stream WebP optimizado
@@ -223,7 +256,6 @@ const subirFotosSesion = async (req, res) => {
       }
     }
 
-    const currentFotos = Array.isArray(session.fotos) ? session.fotos : [];
     const totalFotos = [...currentFotos, ...uploaded];
 
     // Actualizar estado a COMPLETADO
@@ -277,46 +309,58 @@ const purgarSesionesExpiradas = async () => {
     `;
 
     const result = await pool.query(query);
-    if (!result.rows || result.rows.length === 0) {
-      return { purgadas: 0, fotosEliminadas: 0 };
-    }
-
     let totalFotosEliminadas = 0;
+    const sesionesPurgadas = result.rows ? result.rows.length : 0;
 
-    for (const session of result.rows) {
-      const fotos = Array.isArray(session.fotos) ? session.fotos : [];
-      for (const foto of fotos) {
-        const publicId = foto?.public_id;
-        // Solo destruir assets reales de Cloudinary, omitiendo contingencias locales data URI
-        if (publicId && typeof publicId === 'string' && !publicId.startsWith('local-')) {
-          try {
-            await deleteImageByPublicId(publicId);
-            totalFotosEliminadas++;
-          } catch (delErr) {
-            console.warn(`⚠️ Error al destruir asset huérfano ${publicId}:`, delErr.message);
+    if (result.rows && result.rows.length > 0) {
+      for (const session of result.rows) {
+        const fotos = Array.isArray(session.fotos) ? session.fotos : [];
+        for (const foto of fotos) {
+          const publicId = foto?.public_id;
+          // Solo destruir assets reales de Cloudinary, omitiendo contingencias locales data URI
+          if (publicId && typeof publicId === 'string' && !publicId.startsWith('local-')) {
+            try {
+              await deleteImageByPublicId(publicId);
+              totalFotosEliminadas++;
+            } catch (delErr) {
+              console.warn(`⚠️ Error al destruir asset huérfano ${publicId}:`, delErr.message);
+            }
           }
         }
+
+        // Marcar sesión como PURGADA vaciando el JSONB de fotos para liberar almacenamiento
+        await pool.query(
+          `UPDATE sesiones_carga_fotos
+           SET estado = 'PURGADA',
+               fotos = '[]'::jsonb,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [session.id]
+        );
       }
 
-      // Marcar sesión como PURGADA vaciando el JSONB de fotos para liberar almacenamiento
-      await pool.query(
-        `UPDATE sesiones_carga_fotos
-         SET estado = 'PURGADA',
-             fotos = '[]'::jsonb,
-             updated_at = NOW()
-         WHERE id = $1`,
-        [session.id]
-      );
+      console.log(`🧹 [Garbage Collector]: ${sesionesPurgadas} sesiones huérfanas purgadas (${totalFotosEliminadas} fotos eliminadas de Cloudinary).`);
     }
 
-    if (result.rows.length > 0) {
-      console.log(`🧹 [Garbage Collector]: ${result.rows.length} sesiones huérfanas purgadas (${totalFotosEliminadas} fotos eliminadas de Cloudinary).`);
+    // Limpieza de registros antiguos ya procesados (retención de 15 días)
+    const cleanupResult = await pool.query(
+      `DELETE FROM sesiones_carga_fotos 
+       WHERE estado IN ('PURGADA', 'UTILIZADA') 
+         AND created_at < NOW() - INTERVAL '15 days'`
+    );
+
+    if (cleanupResult.rowCount > 0) {
+      console.log(`🧹 [Garbage Collector]: ${cleanupResult.rowCount} registros históricos eliminados de sesiones_carga_fotos (>15 días).`);
     }
 
-    return { purgadas: result.rows.length, fotosEliminadas: totalFotosEliminadas };
+    return {
+      purgadas: sesionesPurgadas,
+      fotosEliminadas: totalFotosEliminadas,
+      registrosHistoricosEliminados: cleanupResult.rowCount || 0
+    };
   } catch (error) {
     console.error('❌ Error en purgarSesionesExpiradas:', error.message);
-    return { purgadas: 0, fotosEliminadas: 0 };
+    return { purgadas: 0, fotosEliminadas: 0, registrosHistoricosEliminados: 0 };
   }
 };
 
@@ -329,7 +373,7 @@ const ejecutarPurgaManual = async (req, res) => {
     const resultado = await purgarSesionesExpiradas();
     return res.status(200).json({
       ok: true,
-      message: `Purga completada: ${resultado.purgadas} sesión(es) procesada(s) y ${resultado.fotosEliminadas} archivo(s) huérfano(s) purgados de Cloudinary.`,
+      message: `Purga completada: ${resultado.purgadas} sesión(es) procesada(s), ${resultado.fotosEliminadas} archivo(s) huérfano(s) purgados y ${resultado.registrosHistoricosEliminados || 0} registro(s) histórico(s) depurado(s).`,
       data: resultado
     });
   } catch (error) {
@@ -337,6 +381,66 @@ const ejecutarPurgaManual = async (req, res) => {
     return res.status(500).json({
       ok: false,
       message: 'Error al ejecutar la purga de sesiones huérfanas.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * Elimina inmediatamente una fotografía temporal de Cloudinary y opcionalmente de sesiones_carga_fotos.
+ * DELETE /api/servicios/evidencia-temporal
+ * POST /api/upload-session/eliminar-foto
+ */
+const eliminarFotoTemporal = async (req, res) => {
+  try {
+    const { public_id, session_id } = req.body || {};
+    const cleanPublicId = String(public_id || req.query?.public_id || '').trim();
+    const cleanSessionId = String(session_id || req.query?.session_id || '').trim();
+
+    if (!cleanPublicId) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Identificador public_id de la fotografía es obligatorio.'
+      });
+    }
+
+    // 1. Destruir en Cloudinary si es un asset remoto real
+    let deleteResult = null;
+    if (!cleanPublicId.startsWith('local-')) {
+      deleteResult = await deleteImageByPublicId(cleanPublicId);
+    }
+
+    // 2. Si se proporcionó session_id, removerla del array jsonb en sesiones_carga_fotos
+    if (cleanSessionId) {
+      const pool = getPool();
+      await ensureTableExists(pool);
+      await pool.query(
+        `UPDATE sesiones_carga_fotos
+         SET fotos = COALESCE(
+           (
+             SELECT jsonb_agg(elem)
+             FROM jsonb_array_elements(fotos) elem
+             WHERE elem->>'public_id' != $1
+           ),
+           '[]'::jsonb
+         ),
+         updated_at = NOW()
+         WHERE session_id = $2`,
+        [cleanPublicId, cleanSessionId]
+      );
+    }
+
+    return res.status(200).json({
+      ok: true,
+      message: 'Fotografía eliminada de Cloudinary correctamente.',
+      public_id: cleanPublicId,
+      result: deleteResult
+    });
+  } catch (error) {
+    console.error('❌ Error en eliminarFotoTemporal:', error);
+    return res.status(500).json({
+      ok: false,
+      message: 'Error al eliminar la fotografía temporal.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -355,5 +459,6 @@ module.exports = {
   obtenerEstadoSesion,
   subirFotosSesion,
   purgarSesionesExpiradas,
-  ejecutarPurgaManual
+  ejecutarPurgaManual,
+  eliminarFotoTemporal
 };
