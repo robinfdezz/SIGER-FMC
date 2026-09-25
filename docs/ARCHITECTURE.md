@@ -41,8 +41,8 @@ SIGER-FMC está implementado bajo una arquitectura desacoplada de 3 capas:
 ```
 backend/
 ├── src/
-│   ├── config/              # Conexión a PostgreSQL (db.js) y Cloudinary (cloudinary.js)
-│   ├── controllers/         # Lógica por entidad (auth, servicios, clients, workers, configuracion, uploadSession)
+│   ├── config/              # db.js, cloudinary.js, email.js, emailTemplates.js
+│   ├── controllers/         # auth, servicios, clients, workers, configuracion, uploadSession, search, notifications
 │   ├── db/                  # Scripts DDL y semillas iniciales (init.sql)
 │   ├── middlewares/         # Autenticación (JWT), RBAC, upload (Multer) y anti-bot
 │   │   ├── authMiddleware.js
@@ -56,10 +56,14 @@ backend/
 │   │   ├── workers.routes.js
 │   │   ├── configuracion.routes.js
 │   │   ├── uploadSession.routes.js
+│   │   ├── search.routes.js
+│   │   ├── notifications.routes.js
 │   │   └── catalogos.routes.js
+│   ├── templates/email/     # Borradores HTML de plantillas Resend (cliente + interno)
+│   ├── utils/               # notifications.js (campanita + disparo de correo tipado)
 │   └── app.js               # Configuración central de Express, CORS y middlewares globales
 ├── server.js                # Punto de entrada y arranque del servidor HTTP
-├── package.json             # Dependencias del servidor (pg, express, jsonwebtoken, bcryptjs, multer)
+├── package.json             # Dependencias (pg, express, jsonwebtoken, bcryptjs, multer, resend)
 ├── .env                     # Variables de entorno privadas (ignorado por Git)
 └── .env.example             # Plantilla pública de variables requeridas
 ```
@@ -106,7 +110,9 @@ frontend/
 │   │   │   ├── TallerCard.jsx           # Tarjeta de orden en banco de trabajo
 │   │   │   └── AnimatedTabs.jsx         # Selector animado de fases operativas
 │   │   ├── DashboardLayout.jsx  # Shell principal (Header + Sidebar + Menú móvil)
-│   │   ├── Navbar.jsx           # Header superior de 100% de ancho
+│   │   ├── Navbar.jsx           # Header superior: búsqueda global + campanita + perfil
+│   │   ├── GlobalSearch.jsx     # Autocompletado predictivo (órdenes / clientes / equipos)
+│   │   ├── NotificationBell.jsx # Campanita in-app (badge, panel, marcar leídas)
 │   │   ├── Sidebar.jsx          # Barra lateral con 3 modos (expanded, hover, collapsed)
 │   │   ├── ProtectedRoute.jsx   # Guarda de rutas privadas
 │   │   └── ThemeToggle.jsx      # Alternancia animada de tema claro/oscuro
@@ -115,7 +121,7 @@ frontend/
 │   │   └── ThemeContext.jsx     # Manejo del tema (Light por defecto / Dark)
 │   ├── pages/               # Vistas principales del sistema
 │   │   ├── Login/               # LoginPage.jsx (Formulario institucional con Turnstile)
-│   │   ├── Dashboard/           # DashboardPage.jsx (Métricas, resumen y accesos)
+│   │   ├── Dashboard/           # DashboardPage.jsx (KPIs reales vía /servicios/dashboard)
 │   │   ├── ServiciosPage.jsx    # Listado general de órdenes con filtros y paginación
 │   │   ├── NuevaOrdenPage.jsx   # Flujo por etapas (Stepper) de recepción
 │   │   ├── BancoTrabajoPage.jsx # Tablero operativo Kanban y modo tabla
@@ -124,7 +130,7 @@ frontend/
 │   │   ├── ConfigurationPage.jsx# Panel de configuración matriz, sedes y formatos
 │   │   ├── EstadoOrdenPage.jsx  # Seguimiento público de orden con react-loading-skeleton
 │   │   └── UploadMobilePage.jsx # Captura fotográfica móvil vía QR
-│   ├── services/            # Clientes de red y configuración HTTP (api.js, servicios, etc.)
+│   ├── services/            # Clientes HTTP (api.js, servicios, search, notifications, etc.)
 │   ├── hooks/               # Custom hooks reutilizables
 │   ├── utils/               # Utilidades de impresión, formato y printStyles
 │   ├── App.jsx              # Configuración de React Router y providers globales
@@ -664,3 +670,47 @@ Para agilizar la recepción de equipos en mostrador y talleres sin requerir cám
 2. **Asignación Obligatoria:** No se permite realizar transiciones de estado desde `RECIBIDO` a fases operativas (`EN_DIAGNOSTICO`, `EN_REPARACION`, etc.) sin al menos un técnico asignado en `tecnicos_asignados`.
 3. **Bloqueo de Desasignación Única:** Si un servicio ya inició operaciones y cuenta con un solo técnico asignado, se prohíbe su desasignación hasta que se incorpore otro técnico responsable.
 4. **Exclusión Estricta de Secretaría:** Los trabajadores con rol `Secretaria` no pueden ser asignados como técnicos de taller ni tienen visible la acción de autoasignación.
+
+---
+
+## 8. Subsistema de Alertas: Campanita In-App y Correo (Resend)
+
+SIGER-FMC separa deliberadamente las alertas operativas internas (campanita) de los correos transaccionales, para evitar saturación del buzón del personal.
+
+### 8.1 Flujo de Emisión
+```
+ Evento de taller (crear / estado / incidencia / asignar / entregar)
+                              │
+                              ▼
+              createNotifications()  [utils/notifications.js]
+                              │
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+     INSERT notificaciones              ¿tipo ∈ {ASIGNACION,
+     (campanita por usuario)             ORDEN_FINALIZADA}?
+                                              │ sí
+                                              ▼
+                                     notifyUsersByEmail()
+                                     → Resend (plantilla tipada)
+```
+Los correos al **cliente** se invocan directamente desde `servicios.controller.js` (`emailClienteRecibido`, `emailClienteCancelado`, `emailClienteEntregado`, `emailClienteRecibo`) y no pasan por la tabla `notificaciones`.
+
+### 8.2 Destinatarios por Evento
+| Evento | Campanita | Correo |
+| :--- | :--- | :--- |
+| Nueva orden / Urgente | SuperAdmin + Admin + Secretaría (sede) | Cliente: recibido |
+| Asignación | Técnico asignado | Técnico |
+| Cambio de estado | Técnicos asignados + staff sede | — |
+| Incidencia / hallazgo | Staff sede | — |
+| Entrega / finalización | Técnicos + staff sede | Técnico; Cliente: entregado + recibo |
+| Cancelación | — | Cliente: cancelado |
+
+### 8.3 Variables de Entorno
+- `RESEND_API_KEY` — si está ausente, la campanita sigue funcionando; no se envían correos.
+- `RESEND_FROM_EMAIL` — remitente verificado (sandbox: `onboarding@resend.dev`).
+- `RESEND_TEST_TO` — en desarrollo redirige todos los destinatarios al buzón de prueba (útil con dominio no verificado).
+
+### 8.4 Frontend
+- `NotificationBell.jsx`: badge, panel desplegable, marcar leída / todas; polling 15 s + refresh on focus; requests sin caché.
+- `GlobalSearch.jsx`: búsqueda predictiva en la misma cabecera (`Navbar.jsx`).
+- `DashboardPage.jsx`: consume `GET /api/servicios/dashboard` con datos reales de la sede.

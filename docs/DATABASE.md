@@ -152,7 +152,7 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | Campo | Tipo | Nulo | Descripción |
 | :--- | :--- | :--- | :--- |
 | `id` | SERIAL / INT | NO | Llave Primaria (PK) |
-| `codigo_ticket` | VARCHAR(20) | NO | Código único del ticket (Único) |
+| `codigo_ticket` | VARCHAR(35) | NO | Código único del ticket (prefijo de sucursal + código, Único) |
 | `sucursal_id` | INT | NO | FK -> `datos_sucursales(id)` ON DELETE RESTRICT |
 | `categoria_id` | INT | NO | FK -> `categorias_dispositivos(id)` ON DELETE RESTRICT |
 | `cliente_id` | INT | SÍ | FK -> `clientes(id)` ON UPDATE CASCADE ON DELETE SET NULL |
@@ -191,7 +191,7 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 | `observaciones_entrega`| TEXT | SÍ | Notas finales y pruebas de conformidad al momento del despacho |
 | `motivo_cancelacion` | TEXT | SÍ | Motivo justificado de cancelación de la orden técnica |
 | `fecha_cancelacion`  | TIMESTAMPTZ | SÍ | Fecha y hora en que se canceló formalmente la orden |
-| `usuario_cancela_id` | INT | SÍ | FK -> `usuarios(id)` ON DELETE RESTRICT (Usuario que dio de baja la orden) |
+| `usuario_cancela_id` | INT | SÍ | FK -> `datos_trabajadores(id)` ON DELETE RESTRICT (Usuario que dio de baja la orden) |
 | `created_at` | TIMESTAMPTZ | SÍ | Timestamp de creación |
 | `updated_at` | TIMESTAMPTZ | SÍ | Timestamp de actualización |
 | `activo` | BOOLEAN | NO | Estado lógico (Default: TRUE) |
@@ -203,7 +203,7 @@ Configuración parametrizable de etiquetas térmicas adhesivas fijadas a los dis
 > - `chk_servicio_no_autoreferencia`: `CHECK (id != servicio_origen_id)`
 > - `fk_servicio_garantia_origen`: `FOREIGN KEY (servicio_origen_id) REFERENCES servicios_recepcion(id) ON UPDATE CASCADE ON DELETE RESTRICT`
 > - `fk_servicio_usuario_entrega`: `FOREIGN KEY (usuario_entrega_id) REFERENCES datos_trabajadores(id) ON DELETE RESTRICT`
-> - `fk_servicio_usuario_cancela`: `FOREIGN KEY (usuario_cancela_id) REFERENCES usuarios(id) ON DELETE RESTRICT`
+> - `fk_servicio_usuario_cancela`: `FOREIGN KEY (usuario_cancela_id) REFERENCES datos_trabajadores(id) ON DELETE RESTRICT`
 
 #### Columnas de Liquidación y Entrega de Equipos (`servicios_recepcion`)
 Para formalizar el cierre contable, la entrega física y la emisión de comprobantes de salida, la tabla gestiona los siguientes campos:
@@ -219,7 +219,7 @@ Para formalizar el cierre contable, la entrega física y la emisión de comproba
 Para dar soporte al flujo formal de cancelación de servicios técnicos que salen del taller sin solución o sin aprobación del cliente:
 1. `motivo_cancelacion` (`TEXT`): Justificación obligatoria de al menos 5 caracteres (ej. "Cliente no aprueba presupuesto de repuesto", "Equipo irreparable por sulfatación en placa").
 2. `fecha_cancelacion` (`TIMESTAMPTZ`): Timestamp exacto de la baja técnica.
-3. `usuario_cancela_id` (`INT`, FK -> `usuarios(id)`): Identificador del operador o técnico que procesó la cancelación.
+3. `usuario_cancela_id` (`INT`, FK -> `datos_trabajadores(id)`): Identificador del operador o técnico que procesó la cancelación.
 
 #### Esquema JSONB: `datos_acceso_equipo` (Credenciales y Seguridad del Equipo)
 Estructura persistida para resguardar el método de desbloqueo configurado en `DeviceSecurityPicker.jsx` y renderizado en comprobantes / stickers:
@@ -413,6 +413,40 @@ Almacena las sesiones temporales (originadas tanto por Código QR móvil como po
 
 ---
 
+### 14. Tabla de Notificaciones In-App (`notificaciones`)
+
+Centro de alertas de la cabecera administrativa (campanita). Persiste avisos operativos por usuario con control de lectura y enlace al módulo correspondiente. Los correos transaccionales (Resend) **no** se almacenan aquí: se disparan en paralelo según la política de tipos.
+
+| Campo | Tipo | Nulo | Descripción |
+| :--- | :--- | :--- | :--- |
+| `id` | SERIAL / INT | NO | Llave Primaria (PK) |
+| `usuario_id` | INT | NO | FK -> `datos_trabajadores(id)` ON DELETE CASCADE (destinatario) |
+| `tipo` | VARCHAR(50) | NO | Ver catálogo de tipos abajo |
+| `titulo` | VARCHAR(150) | NO | Título corto visible en la campanita |
+| `mensaje` | TEXT | SÍ | Detalle / contexto del evento |
+| `servicio_id` | INT | SÍ | FK -> `servicios_recepcion(id)` ON DELETE SET NULL |
+| `incidencia_id` | INT | SÍ | Referencia opcional a `incidencias_servicio` |
+| `enlace` | VARCHAR(255) | SÍ | Ruta frontend (ej. `/taller?ordenId=12`) |
+| `leida` | BOOLEAN | NO | Estado de lectura (Default: FALSE) |
+| `created_at` | TIMESTAMPTZ | NO | Timestamp de emisión |
+
+#### Catálogo de `tipo`
+| Tipo | Quién recibe (campanita) | Correo interno |
+| :--- | :--- | :--- |
+| `NUEVA_ORDEN` | SuperAdmin + Admin_Sucursal + Secretaria de la sede | No |
+| `PRIORIDAD_URGENTE` | Idem (órdenes con prioridad `urgente`) | No |
+| `ASIGNACION` | Técnico(s) asignado(s) | Sí (técnico) |
+| `CAMBIO_ESTADO` | Técnicos asignados + staff de la sede | No |
+| `INCIDENCIA` | Staff de la sede (hallazgo / costo adicional) | No |
+| `ORDEN_FINALIZADA` | Técnicos asignados + staff de la sede | Sí (solo técnico) |
+
+#### Reglas de destinatarios
+1. **Staff de sede** (`getBranchStaffIds`): roles `SuperAdmin` (todas las sedes), `Admin_Sucursal` y `Secretaria` con `sucursal_id` de la orden.
+2. **Exclusión del actor:** Secretaría y Técnico no se notifican a sí mismos cuando son el emisor del evento. **Admin_Sucursal** y **SuperAdmin** siempre reciben campanita.
+3. **Cliente:** no usa esta tabla; recibe correo vía Resend (recibido / cancelado / entregado + recibo).
+
+---
+
 ## 2. Índices Secundarios para Rendimiento
 
 - `idx_servicios_sucursal` -> `servicios_recepcion(sucursal_id)`
@@ -428,6 +462,8 @@ Almacena las sesiones temporales (originadas tanto por Código QR móvil como po
 - `idx_evidencias_usuario` -> `evidencias_fotograficas(usuario_id)`
 - `idx_sesiones_carga_session_id` -> `sesiones_carga_fotos(session_id)`
 - `idx_sesiones_carga_estado_expira` -> `sesiones_carga_fotos(estado, expira_en)`
+- `idx_notificaciones_usuario_leida` -> `notificaciones(usuario_id, leida, created_at DESC)`
+- `idx_notificaciones_servicio` -> `notificaciones(servicio_id)`
 
 ---
 

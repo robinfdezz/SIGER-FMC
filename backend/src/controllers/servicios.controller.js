@@ -3,6 +3,17 @@
 const { getPool } = require('../config/db');
 const { generateUniqueTicketCode } = require('../utils/ticketCodeGenerator');
 const { uploadImageBuffer } = require('../config/cloudinary');
+const {
+  createNotifications,
+  getBranchStaffIds,
+  getAssignedTechnicianIds
+} = require('../utils/notifications');
+const {
+  emailClienteRecibido,
+  emailClienteCancelado,
+  emailClienteEntregado,
+  emailClienteRecibo
+} = require('../config/email');
 
 // ============================================================
 // HELPERS PRIVADOS
@@ -219,7 +230,7 @@ const createServicio = async (req, res) => {
     var prioridadFinal = prioridades.includes(prioridad) ? prioridad : 'media';
 
     // Validación de fecha estimada de entrega (no puede ser pasada)
-    const rawFechaEstimada = fecha_entrega_estimada || fecha_estimada_entrega;
+    const rawFechaEstimada = fecha_entrega_estimada || req.body?.fecha_estimada_entrega;
     let sanitizedFechaEntrega = null;
     if (rawFechaEstimada && !isBlank(rawFechaEstimada)) {
       const valFecha = validateFechaEstimadaNoPasada(rawFechaEstimada);
@@ -431,6 +442,73 @@ const createServicio = async (req, res) => {
     }
 
     await client.query('COMMIT');
+
+    // Notificaciones operativas (no bloqueantes)
+    try {
+      const staffIds = await getBranchStaffIds(nuevaOrden.sucursal_id || finalSucursalId);
+      const enlaceOrden = `/taller?ordenId=${nuevaOrden.id}`;
+      const prioridadNorm = String(nuevaOrden.prioridad || prioridad || 'media').toLowerCase();
+      const equipoTxt = `${nuevaOrden.marca_equipo || ''} ${nuevaOrden.modelo_equipo || ''}`.trim();
+      const clienteTxt = nuevaOrden.nombre_cliente || sanitizedNombre || 'Cliente';
+      const notifyMeta = {
+        codigo_ticket: nuevaOrden.codigo_ticket,
+        cliente_nombre: clienteTxt,
+        equipo: equipoTxt,
+        prioridad: prioridadNorm,
+        falla_reportada: nuevaOrden.falla_reportada
+      };
+
+      await createNotifications({
+        usuarioIds: staffIds,
+        tipo: prioridadNorm === 'urgente' ? 'PRIORIDAD_URGENTE' : 'NUEVA_ORDEN',
+        titulo: prioridadNorm === 'urgente'
+          ? `Orden urgente ${nuevaOrden.codigo_ticket}`
+          : `Orden pendiente ${nuevaOrden.codigo_ticket}`,
+        mensaje: `${equipoTxt} — ${String(nuevaOrden.falla_reportada || '').slice(0, 120)}`.trim(),
+        servicioId: nuevaOrden.id,
+        enlace: enlaceOrden,
+        excludeUserId: usuario_recepcion_id,
+        sendMail: false,
+        meta: notifyMeta
+      });
+
+      if (cleanTecnicosIds.length > 0) {
+        await createNotifications({
+          usuarioIds: cleanTecnicosIds,
+          tipo: 'ASIGNACION',
+          titulo: `Te asignaron ${nuevaOrden.codigo_ticket}`,
+          mensaje: `Equipo: ${equipoTxt}`.trim(),
+          servicioId: nuevaOrden.id,
+          enlace: enlaceOrden,
+          excludeUserId: usuario_recepcion_id,
+          meta: notifyMeta
+        });
+      }
+
+      // Correo al cliente: equipo recibido
+      const correoCliente = sanitizedCorreo || nuevaOrden.correo_cliente || null;
+      if (correoCliente) {
+        let sucursalNombre = null;
+        try {
+          const sucRes = await pool.query(
+            'SELECT nombre_sucursal FROM datos_sucursales WHERE id = $1',
+            [nuevaOrden.sucursal_id || finalSucursalId]
+          );
+          sucursalNombre = sucRes.rows[0]?.nombre_sucursal || null;
+        } catch (_) { /* ignore */ }
+
+        emailClienteRecibido(correoCliente, {
+          cliente_nombre: clienteTxt,
+          codigo_ticket: nuevaOrden.codigo_ticket,
+          equipo: equipoTxt,
+          falla_reportada: nuevaOrden.falla_reportada,
+          sucursal: sucursalNombre,
+          fecha_entrega_estimada: nuevaOrden.fecha_entrega_estimada
+        }).catch((err) => console.warn('⚠️ Email cliente recibido:', err.message));
+      }
+    } catch (notifyErr) {
+      console.warn('⚠️ Notificaciones post-creación:', notifyErr.message);
+    }
 
     // ── 7. Marcado de Confirmación en sesiones_carga_fotos (evitar purga de huérfanos) ──
     try {
@@ -1677,6 +1755,29 @@ const updateServicioEstado = async (req, res) => {
 
     await client.query('COMMIT');
 
+    // Notificar cambio de fase de taller
+    try {
+      const [tecIds, staffIds] = await Promise.all([
+        getAssignedTechnicianIds(id),
+        getBranchStaffIds(ordenActual.sucursal_id)
+      ]);
+      const destinatarios = [...new Set([...tecIds, ...staffIds])];
+      await createNotifications({
+        usuarioIds: destinatarios,
+        tipo: 'CAMBIO_ESTADO',
+        titulo: `${ordenActual.codigo_ticket} → ${nuevoEstado.nombre_estado}`,
+        mensaje: notas
+          ? String(notas).slice(0, 200)
+          : `La orden cambió a "${nuevoEstado.nombre_estado}".`,
+        servicioId: id,
+        enlace: `/taller?ordenId=${id}`,
+        excludeUserId: usuarioId,
+        sendMail: false
+      });
+    } catch (notifyErr) {
+      console.warn('⚠️ Notificaciones post-cambio de estado:', notifyErr.message);
+    }
+
     // 6. Consultar orden actualizada completa con badge y técnicos
     const finalRes = await pool.query(
       `SELECT
@@ -1869,6 +1970,24 @@ const assignTecnicoServicio = async (req, res) => {
       'INSERT INTO tecnicos_asignados (servicio_id, tecnico_id, fecha_asignacion) VALUES ($1, $2, NOW())',
       [id, targetTecnicoId]
     );
+
+    try {
+      await createNotifications({
+        usuarioIds: [targetTecnicoId],
+        tipo: 'ASIGNACION',
+        titulo: `Te asignaron ${ordenInfo.codigo_ticket}`,
+        mensaje: `Has sido asignado como técnico responsable de la orden ${ordenInfo.codigo_ticket}.`,
+        servicioId: id,
+        enlace: `/taller?ordenId=${id}`,
+        excludeUserId: req.user?.id,
+        meta: {
+          codigo_ticket: ordenInfo.codigo_ticket,
+          prioridad: ordenInfo.prioridad || null
+        }
+      });
+    } catch (notifyErr) {
+      console.warn('⚠️ Notificación de asignación:', notifyErr.message);
+    }
 
     // Retornar lista completa actualizada de técnicos
     const listRes = await pool.query(
@@ -2263,6 +2382,29 @@ const createIncidenciaServicio = async (req, res) => {
 
     await client.query('COMMIT');
 
+    // Avisar a mostrador/admin cuando hay hallazgo o costo pendiente de aprobación
+    try {
+      if (costoFinal > 0 || String(tipo_incidencia).toLowerCase().includes('imprevisto') || String(tipo_incidencia).toLowerCase().includes('hallazgo')) {
+        const staffIds = await getBranchStaffIds(ordenActualInc.sucursal_id);
+        const costoTxt = costoFinal > 0
+          ? ` · Costo adicional RD$ ${costoFinal.toFixed(2)}${isAprobado ? '' : ' (pendiente de aprobación)'}`
+          : '';
+        await createNotifications({
+          usuarioIds: staffIds,
+          tipo: 'INCIDENCIA',
+          titulo: `Incidencia en ${ordenActualInc.codigo_ticket}`,
+          mensaje: `${tipo_incidencia}: ${String(descripcion).trim().slice(0, 140)}${costoTxt}`,
+          servicioId: id,
+          incidenciaId: nuevaIncidencia.id,
+          enlace: `/taller?ordenId=${id}`,
+          excludeUserId: usuarioId,
+          sendMail: false
+        });
+      }
+    } catch (notifyErr) {
+      console.warn('⚠️ Notificación de incidencia:', notifyErr.message);
+    }
+
     // Consultar el registro recién insertado con usuario y fotos
     const finalRes = await pool.query(
       `SELECT
@@ -2526,6 +2668,7 @@ const liquidarYEntregarServicio = async (req, res) => {
               sr.tiempo_garantia, sr.condiciones_garantia, sr.marca_equipo, sr.modelo_equipo,
               COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS cliente,
               sr.telefono_cliente,
+              COALESCE(sr.correo_cliente, c.correo) AS correo_cliente,
               es.codigo_estado, es.nombre_estado, es.orden_flujo
        FROM servicios_recepcion sr
        JOIN estados_servicio es ON es.id = sr.estado_actual_id
@@ -2742,6 +2885,95 @@ const liquidarYEntregarServicio = async (req, res) => {
 
     await client.query('COMMIT');
 
+    const equipoTxtEntrega = `${order.marca_equipo || ''} ${order.modelo_equipo || ''}`.trim();
+    const fechaEntrega = new Date().toLocaleString('es-DO', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+
+    // Técnico asignado: campanita + correo de finalización
+    try {
+      const [tecIds, staffIds] = await Promise.all([
+        getAssignedTechnicianIds(id),
+        getBranchStaffIds(order.sucursal_id)
+      ]);
+      const enlaceOrden = `/taller?ordenId=${id}`;
+      const metaFinal = {
+        codigo_ticket: order.codigo_ticket,
+        cliente_nombre: order.cliente,
+        equipo: equipoTxtEntrega,
+        fecha_entrega: fechaEntrega
+      };
+
+      if (tecIds.length > 0) {
+        await createNotifications({
+          usuarioIds: tecIds,
+          tipo: 'ORDEN_FINALIZADA',
+          titulo: `Finalizó ${order.codigo_ticket}`,
+          mensaje: `La orden ${order.codigo_ticket} fue entregada al cliente.`,
+          servicioId: id,
+          enlace: enlaceOrden,
+          excludeUserId: usuarioId,
+          meta: metaFinal
+        });
+      }
+
+      // Secretaría/admin: solo campanita (sin correo)
+      const staffOnly = staffIds.filter((sid) => !tecIds.includes(sid));
+      if (staffOnly.length > 0) {
+        await createNotifications({
+          usuarioIds: staffOnly,
+          tipo: 'ORDEN_FINALIZADA',
+          titulo: `Orden entregada ${order.codigo_ticket}`,
+          mensaje: `${equipoTxtEntrega || 'Equipo'} entregado a ${order.cliente || 'cliente'}.`,
+          servicioId: id,
+          enlace: enlaceOrden,
+          excludeUserId: usuarioId,
+          sendMail: false,
+          meta: metaFinal
+        });
+      }
+    } catch (notifyErr) {
+      console.warn('⚠️ Notificaciones post-entrega:', notifyErr.message);
+    }
+
+    // Correos al cliente: entrega + recibo digital
+    try {
+      const correoCliente = order.correo_cliente;
+      if (correoCliente) {
+        emailClienteEntregado(correoCliente, {
+          cliente_nombre: order.cliente,
+          codigo_ticket: order.codigo_ticket,
+          equipo: equipoTxtEntrega,
+          fecha_entrega: fechaEntrega,
+          metodo_pago: finalMetodoPago || 'Previo / Anticipo'
+        }).catch((err) => console.warn('⚠️ Email cliente entregado:', err.message));
+
+        const lineas = [
+          { concepto: 'Costo base / mano de obra', monto: costoBasePactado },
+          { concepto: 'Repuestos aprobados', monto: sumaRepuestosAprobados },
+          { concepto: 'Descuento', monto: -Math.abs(montoDescuento || 0) },
+          { concepto: `ITBIS (${tasaImpuestoFinal}%)`, monto: montoImpuestoFinal }
+        ].filter((l) => Number(l.monto) !== 0);
+
+        // Segundo correo: recibo (ligero delay para no saturar)
+        setTimeout(() => {
+          emailClienteRecibo(correoCliente, {
+            cliente_nombre: order.cliente,
+            codigo_ticket: order.codigo_ticket,
+            equipo: equipoTxtEntrega,
+            fecha_entrega: fechaEntrega,
+            metodo_pago: finalMetodoPago || 'Previo / Anticipo',
+            lineas,
+            total: finalMontoLiquidado > 0 ? finalMontoLiquidado : totalDefinitivo,
+            anticipo: montoAnticipo
+          }).catch((err) => console.warn('⚠️ Email recibo cliente:', err.message));
+        }, 1500);
+      }
+    } catch (mailErr) {
+      console.warn('⚠️ Correos post-entrega:', mailErr.message);
+    }
+
     return res.status(200).json({
       ok: true,
       success: true,
@@ -2839,9 +3071,13 @@ const cancelarServicio = async (req, res) => {
     // 1. Obtener la orden bloqueándola para actualización
     const orderRes = await client.query(
       `SELECT sr.id, sr.codigo_ticket, sr.sucursal_id, sr.estado_actual_id,
+              sr.marca_equipo, sr.modelo_equipo,
+              COALESCE(sr.nombre_cliente, NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''), c.nombre) AS cliente,
+              COALESCE(sr.correo_cliente, c.correo) AS correo_cliente,
               es.codigo_estado, es.nombre_estado, es.orden_flujo
        FROM servicios_recepcion sr
        JOIN estados_servicio es ON es.id = sr.estado_actual_id
+       LEFT JOIN clientes c ON c.id = sr.cliente_id
        WHERE sr.id = $1 AND sr.activo = TRUE
        FOR UPDATE OF sr`,
       [id]
@@ -2931,6 +3167,20 @@ const cancelarServicio = async (req, res) => {
     );
 
     await client.query('COMMIT');
+
+    // Correo al cliente: orden cancelada
+    try {
+      if (order.correo_cliente) {
+        emailClienteCancelado(order.correo_cliente, {
+          cliente_nombre: order.cliente,
+          codigo_ticket: order.codigo_ticket,
+          equipo: `${order.marca_equipo || ''} ${order.modelo_equipo || ''}`.trim(),
+          motivo_cancelacion: motivoLimpio
+        }).catch((err) => console.warn('⚠️ Email cliente cancelado:', err.message));
+      }
+    } catch (mailErr) {
+      console.warn('⚠️ Correo post-cancelación:', mailErr.message);
+    }
 
     return res.status(200).json({
       ok: true,
@@ -3353,12 +3603,320 @@ const updateServicio = async (req, res) => {
   }
 };
 
+// ============================================================
+// GET /api/servicios/dashboard — Resumen operativo del taller
+// ============================================================
+const getDashboardResumen = async (req, res) => {
+  try {
+    const pool = getPool();
+    const isSuperAdmin = isUserSuperAdmin(req.user);
+
+    let sucursalId = null;
+    if (!isSuperAdmin) {
+      sucursalId = req.user?.sucursal_id ? parseInt(req.user.sucursal_id, 10) : null;
+      if (!sucursalId) {
+        return res.status(403).json({
+          ok: false,
+          success: false,
+          message: 'Acceso denegado: El usuario no tiene una sucursal asignada.'
+        });
+      }
+    } else if (req.query.sucursal_id && req.query.sucursal_id !== 'all') {
+      sucursalId = parseInt(req.query.sucursal_id, 10);
+    }
+
+    const branchClause = sucursalId ? ' AND sr.sucursal_id = $1' : '';
+    const branchParams = sucursalId ? [sucursalId] : [];
+
+    const kpisPromise = pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE es.orden_flujo BETWEEN 1 AND 6)::int AS ordenes_abiertas,
+         COUNT(*) FILTER (
+           WHERE es.orden_flujo BETWEEN 1 AND 6
+             AND DATE(sr.created_at AT TIME ZONE 'America/Santo_Domingo') = (NOW() AT TIME ZONE 'America/Santo_Domingo')::date
+         )::int AS abiertas_hoy,
+         COUNT(*) FILTER (
+           WHERE es.orden_flujo BETWEEN 1 AND 6 AND sr.prioridad = 'urgente'
+         )::int AS urgentes,
+         COUNT(*) FILTER (
+           WHERE es.orden_flujo BETWEEN 1 AND 6
+             AND NOT EXISTS (
+               SELECT 1 FROM tecnicos_asignados ta WHERE ta.servicio_id = sr.id
+             )
+         )::int AS sin_tecnico,
+         COUNT(*) FILTER (
+           WHERE es.orden_flujo = 6 OR es.codigo_estado = 'LISTO_ENTREGA'
+         )::int AS listas_entrega
+       FROM servicios_recepcion sr
+       JOIN estados_servicio es ON es.id = sr.estado_actual_id
+       WHERE sr.activo = TRUE${branchClause}`,
+      branchParams
+    );
+
+    const ingresosPromise = pool.query(
+      `SELECT
+         COALESCE(SUM(sr.monto_liquidado) FILTER (
+           WHERE sr.fecha_entrega_real IS NOT NULL
+             AND DATE_TRUNC('month', sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')
+               = DATE_TRUNC('month', NOW() AT TIME ZONE 'America/Santo_Domingo')
+         ), 0)::numeric(12,2) AS liquidado_mes,
+         COALESCE(SUM(sr.monto_anticipo) FILTER (
+           WHERE DATE_TRUNC('month', sr.created_at AT TIME ZONE 'America/Santo_Domingo')
+               = DATE_TRUNC('month', NOW() AT TIME ZONE 'America/Santo_Domingo')
+             AND COALESCE(sr.monto_anticipo, 0) > 0
+         ), 0)::numeric(12,2) AS anticipos_mes
+       FROM servicios_recepcion sr
+       WHERE sr.activo = TRUE${branchClause}`,
+      branchParams
+    );
+
+    const sparklinePromise = pool.query(
+      `WITH dias AS (
+         SELECT generate_series(
+           ((NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '13 days'),
+           (NOW() AT TIME ZONE 'America/Santo_Domingo')::date,
+           INTERVAL '1 day'
+         )::date AS dia
+       )
+       SELECT
+         d.dia::text AS fecha,
+         COALESCE((
+           SELECT SUM(sr.monto_liquidado)
+           FROM servicios_recepcion sr
+           WHERE sr.activo = TRUE
+             AND sr.fecha_entrega_real IS NOT NULL
+             AND (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date = d.dia
+             ${sucursalId ? 'AND sr.sucursal_id = $1' : ''}
+         ), 0)::numeric(12,2) AS monto
+       FROM dias d
+       ORDER BY d.dia ASC`,
+      branchParams
+    );
+
+    const flujoPromise = pool.query(
+      `SELECT
+         es.id,
+         es.codigo_estado,
+         es.nombre_estado,
+         es.color_badge,
+         es.orden_flujo,
+         COUNT(sr.id)::int AS total
+       FROM estados_servicio es
+       LEFT JOIN servicios_recepcion sr
+         ON sr.estado_actual_id = es.id
+        AND sr.activo = TRUE
+        ${sucursalId ? 'AND sr.sucursal_id = $1' : ''}
+       WHERE es.orden_flujo BETWEEN 1 AND 6
+       GROUP BY es.id, es.codigo_estado, es.nombre_estado, es.color_badge, es.orden_flujo
+       ORDER BY es.orden_flujo ASC`,
+      branchParams
+    );
+
+    const seriePromise = pool.query(
+      `WITH dias AS (
+         SELECT generate_series(
+           ((NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '6 days'),
+           (NOW() AT TIME ZONE 'America/Santo_Domingo')::date,
+           INTERVAL '1 day'
+         )::date AS dia
+       )
+       SELECT
+         d.dia::text AS fecha,
+         COALESCE((
+           SELECT COUNT(*)::int
+           FROM servicios_recepcion sr
+           WHERE sr.activo = TRUE
+             AND (sr.created_at AT TIME ZONE 'America/Santo_Domingo')::date = d.dia
+             ${sucursalId ? 'AND sr.sucursal_id = $1' : ''}
+         ), 0) AS entradas,
+         COALESCE((
+           SELECT COUNT(*)::int
+           FROM servicios_recepcion sr
+           WHERE sr.activo = TRUE
+             AND sr.fecha_entrega_real IS NOT NULL
+             AND (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date = d.dia
+             ${sucursalId ? 'AND sr.sucursal_id = $1' : ''}
+         ), 0) AS entregas
+       FROM dias d
+       ORDER BY d.dia ASC`,
+      branchParams
+    );
+
+    const cargaPromise = pool.query(
+      `WITH abiertas AS (
+         SELECT sr.id
+         FROM servicios_recepcion sr
+         JOIN estados_servicio es ON es.id = sr.estado_actual_id
+         WHERE sr.activo = TRUE
+           AND es.orden_flujo BETWEEN 1 AND 6
+           ${sucursalId ? 'AND sr.sucursal_id = $1' : ''}
+       ),
+       carga_tecnicos AS (
+         SELECT
+           dt.id,
+           TRIM(CONCAT(dt.nombre, ' ', dt.apellido)) AS nombre,
+           dt.foto_perfil_url,
+           COUNT(DISTINCT ta.servicio_id)::int AS ordenes
+         FROM tecnicos_asignados ta
+         JOIN abiertas a ON a.id = ta.servicio_id
+         JOIN datos_trabajadores dt ON dt.id = ta.tecnico_id
+         WHERE dt.activo = TRUE
+         GROUP BY dt.id, dt.nombre, dt.apellido, dt.foto_perfil_url
+       ),
+       sin_asignar AS (
+         SELECT COUNT(*)::int AS ordenes
+         FROM abiertas a
+         WHERE NOT EXISTS (
+           SELECT 1 FROM tecnicos_asignados ta WHERE ta.servicio_id = a.id
+         )
+       )
+       SELECT id, nombre, foto_perfil_url, ordenes, FALSE AS es_sin_asignar
+       FROM carga_tecnicos
+       UNION ALL
+       SELECT NULL::int, 'Sin asignar', NULL::text, ordenes, TRUE
+       FROM sin_asignar
+       WHERE ordenes > 0
+       ORDER BY es_sin_asignar ASC, ordenes DESC, nombre ASC
+       LIMIT 8`,
+      branchParams
+    );
+
+    const actividadPromise = pool.query(
+      `SELECT
+         sr.id,
+         sr.codigo_ticket,
+         COALESCE(
+           sr.nombre_cliente,
+           NULLIF(TRIM(CONCAT(c.nombre, ' ', c.apellido)), ''),
+           c.nombre,
+           'Cliente'
+         ) AS cliente_nombre,
+         TRIM(CONCAT(sr.marca_equipo, ' ', sr.modelo_equipo)) AS equipo,
+         sr.prioridad,
+         es.codigo_estado,
+         es.nombre_estado,
+         es.color_badge,
+         es.orden_flujo,
+         COALESCE((
+           SELECT COUNT(*)::int
+           FROM tecnicos_asignados ta
+           WHERE ta.servicio_id = sr.id
+         ), 0) AS tecnicos_count,
+         COALESCE((
+           SELECT TRIM(CONCAT(dt.nombre, ' ', dt.apellido))
+           FROM tecnicos_asignados ta
+           JOIN datos_trabajadores dt ON dt.id = ta.tecnico_id
+           WHERE ta.servicio_id = sr.id
+           ORDER BY ta.id ASC
+           LIMIT 1
+         ), 'Sin asignar') AS tecnico_nombre,
+         sr.updated_at,
+         sr.created_at
+       FROM servicios_recepcion sr
+       JOIN estados_servicio es ON es.id = sr.estado_actual_id
+       LEFT JOIN clientes c ON c.id = sr.cliente_id
+       WHERE sr.activo = TRUE
+         AND es.orden_flujo BETWEEN 1 AND 6
+         ${sucursalId ? 'AND sr.sucursal_id = $1' : ''}
+       ORDER BY sr.updated_at DESC NULLS LAST, sr.created_at DESC
+       LIMIT 8`,
+      branchParams
+    );
+
+    const [
+      kpisRes,
+      ingresosRes,
+      sparklineRes,
+      flujoRes,
+      serieRes,
+      cargaRes,
+      actividadRes
+    ] = await Promise.all([
+      kpisPromise,
+      ingresosPromise,
+      sparklinePromise,
+      flujoPromise,
+      seriePromise,
+      cargaPromise,
+      actividadPromise
+    ]);
+
+    const kpis = kpisRes.rows[0] || {};
+    const liquidadoMes = parseFloat(ingresosRes.rows[0]?.liquidado_mes || 0);
+    const anticiposMes = parseFloat(ingresosRes.rows[0]?.anticipos_mes || 0);
+    const ingresosMes = Math.round((liquidadoMes + anticiposMes) * 100) / 100;
+
+    return res.status(200).json({
+      ok: true,
+      success: true,
+      data: {
+        kpis: {
+          ordenes_abiertas: kpis.ordenes_abiertas || 0,
+          abiertas_hoy: kpis.abiertas_hoy || 0,
+          urgentes: kpis.urgentes || 0,
+          sin_tecnico: kpis.sin_tecnico || 0,
+          listas_entrega: kpis.listas_entrega || 0,
+          ingresos_mes: ingresosMes,
+          ingresos_sparkline: (sparklineRes.rows || []).map((row) => ({
+            fecha: row.fecha,
+            monto: parseFloat(row.monto || 0)
+          }))
+        },
+        flujo: (flujoRes.rows || []).map((row) => ({
+          id: row.id,
+          codigo_estado: row.codigo_estado,
+          nombre_estado: row.nombre_estado,
+          color_badge: row.color_badge,
+          orden_flujo: row.orden_flujo,
+          total: row.total || 0
+        })),
+        serie_7d: (serieRes.rows || []).map((row) => ({
+          fecha: row.fecha,
+          entradas: row.entradas || 0,
+          entregas: row.entregas || 0
+        })),
+        carga_tecnicos: (cargaRes.rows || []).map((row) => ({
+          id: row.id,
+          nombre: row.nombre,
+          foto_perfil_url: row.foto_perfil_url,
+          ordenes: row.ordenes || 0,
+          es_sin_asignar: row.es_sin_asignar === true
+        })),
+        actividad_reciente: (actividadRes.rows || []).map((row) => ({
+          id: row.id,
+          codigo_ticket: row.codigo_ticket,
+          cliente_nombre: row.cliente_nombre,
+          equipo: row.equipo,
+          prioridad: row.prioridad,
+          codigo_estado: row.codigo_estado,
+          nombre_estado: row.nombre_estado,
+          color_badge: row.color_badge,
+          orden_flujo: row.orden_flujo,
+          tecnicos_count: row.tecnicos_count || 0,
+          tecnico_nombre: row.tecnico_nombre,
+          updated_at: row.updated_at,
+          created_at: row.created_at
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error en getDashboardResumen:', error);
+    return res.status(500).json({
+      ok: false,
+      success: false,
+      message: 'Error al obtener el resumen del dashboard.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 module.exports = {
   createServicio,
   getServicios,
   getServicioById,
   getServicioByTicket,
   getServiciosTaller,
+  getDashboardResumen,
   updateServicioEstado,
   updateServicio,
   assignTecnicoServicio,

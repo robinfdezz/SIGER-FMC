@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS servicios_recepcion (
     tasa_impuesto NUMERIC(5,2) NOT NULL DEFAULT 18.00,
     monto_impuesto NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     costo_final_confirmado NUMERIC(10,2) NOT NULL DEFAULT 0.00,
-    tiempo_garantia integer DEFAULT 30,
+    tiempo_garantia INTEGER NOT NULL DEFAULT 30,
     condiciones_garantia TEXT NULL,
     fecha_entrega_estimada DATE NULL,
     fecha_entrega_real TIMESTAMPTZ NULL,
@@ -166,7 +166,9 @@ CREATE TABLE IF NOT EXISTS servicios_recepcion (
     CONSTRAINT fk_servicio_usuario_entrega FOREIGN KEY (usuario_entrega_id) 
         REFERENCES datos_trabajadores(id) ON DELETE RESTRICT,
     CONSTRAINT fk_servicio_estado FOREIGN KEY (estado_actual_id) 
-        REFERENCES estados_servicio(id) ON DELETE RESTRICT
+        REFERENCES estados_servicio(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_servicio_usuario_cancela FOREIGN KEY (usuario_cancela_id) 
+        REFERENCES datos_trabajadores(id) ON DELETE RESTRICT
 );
 
 -- 9. Tabla de Técnicos Asignados
@@ -208,7 +210,7 @@ CREATE TABLE IF NOT EXISTS incidencias_servicio (
     aprobado_por_cliente BOOLEAN NOT NULL DEFAULT FALSE,
     fecha_registro TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
-    usuario_id INT NULL,
+    usuario_id INT NOT NULL,
     fecha_aprobacion TIMESTAMPTZ NULL,
     metodo_aprobacion VARCHAR(30) NULL,
     CONSTRAINT uq_incidencia_servicio UNIQUE (id, servicio_id),
@@ -231,7 +233,7 @@ CREATE TABLE IF NOT EXISTS evidencias_fotograficas (
     fecha_subida TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     public_id VARCHAR(150) NULL,
-    usuario_id INT NULL,
+    usuario_id INT NOT NULL,
     CONSTRAINT fk_evidencia_servicio FOREIGN KEY (servicio_id) 
         REFERENCES servicios_recepcion(id) ON DELETE CASCADE,
     CONSTRAINT fk_evidencia_incidencia_servicio FOREIGN KEY (incidencia_id, servicio_id) 
@@ -252,6 +254,24 @@ CREATE TABLE IF NOT EXISTS sesiones_carga_fotos (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 14. Tabla de Notificaciones In-App (Campanita / Alertas operativas)
+CREATE TABLE IF NOT EXISTS notificaciones (
+    id SERIAL PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    tipo VARCHAR(50) NOT NULL,
+    titulo VARCHAR(150) NOT NULL,
+    mensaje TEXT NULL,
+    servicio_id INT NULL,
+    incidencia_id INT NULL,
+    enlace VARCHAR(255) NULL,
+    leida BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_notificacion_usuario FOREIGN KEY (usuario_id)
+        REFERENCES datos_trabajadores(id) ON DELETE CASCADE,
+    CONSTRAINT fk_notificacion_servicio FOREIGN KEY (servicio_id)
+        REFERENCES servicios_recepcion(id) ON DELETE SET NULL
+);
+
 -- ============================================================================
 -- ÍNDICES SECUNDARIOS PARA RENDIMIENTO
 -- ============================================================================
@@ -269,6 +289,8 @@ CREATE INDEX IF NOT EXISTS idx_evidencias_servicio ON evidencias_fotograficas(se
 CREATE INDEX IF NOT EXISTS idx_evidencias_usuario ON evidencias_fotograficas(usuario_id);
 CREATE INDEX IF NOT EXISTS idx_sesiones_carga_session_id ON sesiones_carga_fotos(session_id);
 CREATE INDEX IF NOT EXISTS idx_sesiones_carga_estado_expira ON sesiones_carga_fotos(estado, expira_en);
+CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario_leida ON notificaciones(usuario_id, leida, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notificaciones_servicio ON notificaciones(servicio_id);
 
 -- ============================================================================
 -- DATOS SEMILLA BASE (CATÁLOGOS OBLIGATORIOS)
