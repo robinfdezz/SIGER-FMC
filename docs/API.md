@@ -1301,7 +1301,7 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
 
 ### 5.17 Validar y Consultar Datos para Emisión de Comprobante / Etiqueta
 - **Ruta:** `GET /api/servicios/:id/ticket-impresion`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`) + aislamiento de sucursal
 - **Descripción:** Endpoint especializado para validar la precondición de impresión antes de generar el comprobante térmico o la etiqueta de taller. Verifica que la orden exista y **bloquea la emisión para órdenes canceladas**, asegurando la integridad física y documental del taller.
 - **Parámetros URL:** `:id` (ID numérico o código de ticket).
 - **Respuesta Exitosa (`200 OK`):** Retorna los datos requeridos para la plantilla de impresión de comprobante o sticker.
@@ -1309,7 +1309,66 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
   - `400 Bad Request`: *"No se permite emitir comprobantes o etiquetas para órdenes canceladas"* (cuando `orden_flujo === 8` o `codigo_estado` incluye `CANCEL`).
   - `404 Not Found`: "Orden de servicio no encontrada."
 
----
+### 5.18 Resumen Operativo del Dashboard
+- **Ruta:** `GET /api/servicios/dashboard`
+- **Acceso:** Privado (JWT). `SuperAdmin` ve todas las sedes (filtro opcional `?sucursal_id=`); resto confinado a su `sucursal_id`.
+- **Query params:**
+  - `sucursal_id` (INT | `all`): Solo aplica a `SuperAdmin`.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "data": {
+      "kpis": {
+        "ordenes_abiertas": 12,
+        "abiertas_hoy": 3,
+        "urgentes": 1,
+        "sin_tecnico": 2,
+        "listas_entrega": 4,
+        "ingresos_mes": 45890.5,
+        "ingresos_sparkline": [{ "fecha": "2026-09-20", "monto": 3200 }]
+      },
+      "flujo": [
+        {
+          "id": 1,
+          "codigo_estado": "RECIBIDO",
+          "nombre_estado": "Recibido en Taller",
+          "color_badge": "#6B7280",
+          "orden_flujo": 1,
+          "total": 5
+        }
+      ],
+      "serie_7d": [{ "fecha": "2026-09-19", "entradas": 4, "entregas": 2 }],
+      "carga_tecnicos": [
+        {
+          "id": 4,
+          "nombre": "Técnico Ejemplo",
+          "foto_perfil_url": null,
+          "ordenes": 3,
+          "es_sin_asignar": false
+        }
+      ],
+      "actividad_reciente": [
+        {
+          "id": 101,
+          "codigo_ticket": "SFM-XXXX-YYYY",
+          "cliente_nombre": "Cliente Demo",
+          "equipo": "Samsung Galaxy A54",
+          "prioridad": "media",
+          "codigo_estado": "EN_REPARACION",
+          "nombre_estado": "En Proceso de Reparación",
+          "color_badge": "#8B5CF6",
+          "orden_flujo": 4,
+          "tecnicos_count": 1,
+          "tecnico_nombre": "Juan Técnico",
+          "updated_at": "2026-09-25T18:00:00.000Z",
+          "created_at": "2026-09-24T10:00:00.000Z"
+        }
+      ]
+    }
+  }
+  ```
 
 ---
 
@@ -1347,6 +1406,8 @@ Gestión integral de los usuarios y empleados del sistema con control de acceso 
     "foto_perfil_public_id": "siger-fmc/personal-fmc/abc123xyz"
   }
   ```
+
+> **Nota:** El detalle completo de CRUD de trabajadores se documenta también en el **§3**. Preferir §3 como fuente canónica; el bloque §6 histórico se conserva por compatibilidad.
 
 ---
 
@@ -1737,4 +1798,94 @@ Módulo administrativo para la parametrización de la empresa matriz y la gesti�
   }
   ```
 
+---
+
+## 8. Búsqueda Global (`/api/buscar`)
+
+### 8.1 Búsqueda Predictiva Unificada
+- **Ruta:** `GET /api/buscar`
+- **Acceso:** Privado (JWT). Aislamiento por sucursal salvo `SuperAdmin`.
+- **Query params:**
+  - `q` (STRING): mínimo 2 caracteres para devolver resultados; con menos de 2 retorna arrays vacíos.
+  - `sucursal_id` (INT | `all`): filtro opcional solo para `SuperAdmin`.
+- **Ámbitos de búsqueda:**
+  - **Órdenes** (máx. 8): `codigo_ticket`, falla, nombre de cliente.
+  - **Clientes** (máx. 6): nombre, cédula/RNC, teléfono, correo.
+  - **Equipos** (máx. 6): marca, modelo, IMEI/serie.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "data": {
+      "query": "SFM",
+      "ordenes": [],
+      "clientes": [],
+      "equipos": []
+    }
+  }
+  ```
+
+---
+
+## 9. Módulo de Notificaciones In-App (`/api/notificaciones`)
+
+Todas las respuestas de lectura incluyen cabeceras `Cache-Control: no-store` para evitar conteos obsoletos en el badge de la campanita.
+
+### 9.1 Listar Notificaciones del Usuario Autenticado
+- **Ruta:** `GET /api/notificaciones`
+- **Acceso:** Privado (JWT) — solo del `req.user.id`.
+- **Query params:**
+  - `limit` (INT, default 20, máx. 50)
+  - `unread=true` — filtra solo no leídas
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "data": [
+      {
+        "id": 42,
+        "tipo": "NUEVA_ORDEN",
+        "titulo": "Orden pendiente SFM-XXXX-YYYY",
+        "mensaje": "Samsung A54 — No enciende",
+        "servicio_id": 101,
+        "incidencia_id": null,
+        "enlace": "/taller?ordenId=101",
+        "leida": false,
+        "created_at": "2026-09-25T18:48:34.308Z",
+        "codigo_ticket": "SFM-XXXX-YYYY"
+      }
+    ],
+    "meta": { "no_leidas": 3, "total": 18 }
+  }
+  ```
+
+### 9.2 Conteo de No Leídas (Badge)
+- **Ruta:** `GET /api/notificaciones/conteo`
+- **Acceso:** Privado (JWT)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "no_leidas": 3
+  }
+  ```
+
+### 9.3 Marcar una Notificación como Leída
+- **Ruta:** `PATCH /api/notificaciones/:id/leer`
+- **Acceso:** Privado (JWT) — solo si `usuario_id` coincide.
+- **Errores:** `404` si no existe o no pertenece al usuario.
+
+### 9.4 Marcar Todas como Leídas
+- **Ruta:** `PATCH /api/notificaciones/leer-todas`
+- **Acceso:** Privado (JWT)
+- **Respuesta:** `{ "ok": true, "actualizadas": 5 }`
+
+### 9.5 Política de Emisión (referencia)
+Ver matriz completa en `DATABASE.md` §14 y `ARCHITECTURE.md` §8. Resumen:
+- **Campanita:** nueva orden, urgente, cambio de estado, incidencia, asignación, finalización.
+- **Correo interno (Resend):** solo `ASIGNACION` y `ORDEN_FINALIZADA` al técnico.
+- **Correo cliente:** recibido / cancelado / entregado + recibo (fuera de este módulo HTTP).
 

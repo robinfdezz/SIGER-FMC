@@ -12,6 +12,7 @@ const {
   getServicioById,
   getServicioByTicket,
   getServiciosTaller,
+  getDashboardResumen,
   updateServicioEstado,
   assignTecnicoServicio,
   removeTecnicoServicio,
@@ -34,6 +35,9 @@ router.use(authMiddleware);
 
 // GET /api/servicios/taller - Órdenes activas para el tablero Kanban de taller
 router.get('/taller', getServiciosTaller);
+
+// GET /api/servicios/dashboard - Resumen operativo (KPIs, flujo, serie, carga, actividad)
+router.get('/dashboard', getDashboardResumen);
 
 // GET /api/servicios?page=1&limit=20&sucursal_id=&estado_id=&q=
 router.get('/', getServicios);

@@ -8,6 +8,49 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-25
+
+### Added
+- **Dashboard Operativo con Datos Reales (`GET /api/servicios/dashboard` & `DashboardPage.jsx`):**
+  - Endpoint de resumen con aislamiento por sucursal (`SuperAdmin` omnicanal; resto confinado a su sede).
+  - KPIs: órdenes abiertas, abiertas hoy, urgentes, sin técnico, listas para entrega e ingresos del mes (liquidado + anticipos) con sparkline diario.
+  - Bloques: flujo por estado de taller, serie 7 días (entradas vs entregas), carga de técnicos y actividad reciente.
+  - UI reconstruida sobre datos del endpoint (sin mocks), anchos homologados `max-w-7xl`.
+- **Búsqueda Global Predictiva (`GET /api/buscar` & `GlobalSearch.jsx`):**
+  - Autocompletado en cabecera (`Navbar.jsx`) con debounce; mínimo 2 caracteres.
+  - Resultados segmentados: órdenes (hasta 8), clientes (hasta 6) y equipos (hasta 6), con deep-link a taller (`/taller?ordenId=`), clientes (`/clientes?clienteId=`) y ficha de orden.
+  - Aislamiento multi-sucursal idéntico al resto de la API; `SuperAdmin` puede filtrar por `sucursal_id`.
+- **Centro de Notificaciones In-App — Campanita (`/api/notificaciones` & `NotificationBell.jsx`):**
+  - Persistencia en tabla `notificaciones` (ver `DATABASE.md` §14).
+  - Endpoints: listado paginado, conteo de no leídas, marcar una / todas como leídas.
+  - Badge en cabecera con sondeo cada 15 s, refresco al enfocar la pestaña y cabeceras `Cache-Control: no-store` para evitar 304 obsoletos.
+  - Tipos: `NUEVA_ORDEN`, `PRIORIDAD_URGENTE`, `ASIGNACION`, `CAMBIO_ESTADO`, `INCIDENCIA`, `ORDEN_FINALIZADA`.
+- **Correo Transaccional vía Resend (`backend/src/config/email.js`, `emailTemplates.js`, `templates/email/`):**
+  - Integración opcional con `RESEND_API_KEY`, `RESEND_FROM_EMAIL` y `RESEND_TEST_TO` (redirección de pruebas en desarrollo / sandbox).
+  - Plantillas HTML de marca (#E11D48) para cliente e interno.
+  - **Cliente:** equipo recibido, cancelado, entregado y recibo digital (post-liquidación).
+  - **Interno (solo correo):** asignación de orden al técnico y orden finalizada/entregada al técnico asignado.
+- **Utilidad de Emisión de Alertas (`backend/src/utils/notifications.js`):**
+  - `createNotifications`, `getBranchStaffIds`, `getAssignedTechnicianIds`, `notifyUsersByEmail`.
+  - Staff de sede: `SuperAdmin` (todas las sedes) + `Admin_Sucursal` + `Secretaria` de la sucursal de la orden.
+  - `Admin_Sucursal` y `SuperAdmin` **siempre** reciben campanita (no se excluyen aunque sean el actor del evento).
+
+### Changed
+- **Política Anti-Spam de Correos Internos:**
+  - Nueva orden, prioridad urgente, cambio de estado e incidencia: **solo campanita** (sin correo).
+  - Correo interno restringido a `ASIGNACION` y `ORDEN_FINALIZADA`.
+  - Correos al cliente sin cambios de alcance (ciclo de vida completo).
+- **Hooks de Notificación en Ciclo de Orden (`servicios.controller.js`):**
+  - Creación → campanita a staff; si hay técnicos iniciales → campanita + correo de asignación; correo de recibido al cliente.
+  - Cambio de estado → campanita a técnicos asignados + staff.
+  - Asignación posterior → campanita + correo al técnico.
+  - Incidencia con costo/hallazgo → campanita a staff.
+  - Entrega → campanita (+ correo) a técnicos; campanita a staff; correos de entregado + recibo al cliente.
+  - Cancelación → correo de cancelado al cliente.
+
+### Documentation
+- Actualización coordinada de `API.md`, `ARCHITECTURE.md`, `DATABASE.md`, `PROJECT_CONTEXT.md`, `GUIDELINES.md` y `DOCUMENTACION_GENERAL.md` para reflejar dashboard, búsqueda global, campanita y Resend.
+
 ## [0.10.0] - 2026-09-20
 
 ### Added
