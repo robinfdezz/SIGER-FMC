@@ -47,16 +47,15 @@ SIGER-FMC/
 │   ├── vite.config.js        # Proxy a /api
 │   └── .env                  # Variables de entorno frontend
 │
-├── DIAGRAMAS_CASOS_DE_USO_Y_FLUJO.md # Especificación formal UML y flujos Mermaid (CU-01 a CU-18)
 └── docs/
     ├── DOCUMENTACION_GENERAL.md # Índice maestro y mapa documental del proyecto
     ├── ARCHITECTURE.md          # Arquitectura global, capas y pipeline de imágenes
     ├── API.md                   # Catálogo completo de endpoints REST y ejemplos
-    ├── DATABASE.md              # Diccionario de datos y modelo relacional PostgreSQL
-    ├── GUIDELINES.md            # Guía de estándares de desarrollo y UI/UX
-    ├── PROJECT_CONTEXT.md       # Visión, roles y reglas de negocio
-    ├── AI_RULES.md              # Reglas y restricciones de desarrollo para agentes AI
-    └── CHANGELOG.md             # Registro cronológico de cambios y versiones
+    ├── DATABASE.md                    # Diccionario de datos y modelo relacional PostgreSQL
+    ├── GUIDELINES.md                  # Guía de estándares de desarrollo y UI/UX
+    ├── PROJECT_CONTEXT.md             # Visión, roles y reglas de negocio
+    ├── AI_RULES.md                    # Reglas y restricciones de desarrollo para agentes AI
+    └── CHANGELOG.md                   # Registro cronológico de cambios y versiones
 ```
 
 ---

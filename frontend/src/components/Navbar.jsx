@@ -64,10 +64,6 @@ const Navbar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
             alt="SIGER-FMC"
             className="h-9 w-auto hidden dark:block"
           />
-          <div className="hidden md:block h-6 w-px bg-zinc-200 dark:bg-zinc-700" />
-          <span className="hidden md:inline text-sm font-semibold tracking-tight text-zinc-800 dark:text-zinc-100">
-            SIGER-FMC
-          </span>
         </div>
       </div>
 
@@ -84,7 +80,7 @@ const Navbar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
 
         <div className="flex items-center gap-3">
           <div className="relative shrink-0">
-            <div className="w-9 h-9 rounded-full bg-zinc-800 text-zinc-100 dark:bg-zinc-700 font-bold text-xs flex items-center justify-center border border-zinc-700 shadow-xs overflow-hidden relative">
+            <div className="w-9 h-9 rounded-xl bg-zinc-800 text-zinc-100 dark:bg-zinc-700 font-bold text-xs flex items-center justify-center border border-zinc-700 shadow-xs overflow-hidden relative">
               {user?.foto_perfil_url ? (
                 <img
                   src={user.foto_perfil_url}

@@ -141,3 +141,29 @@
     display: none !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────
+   ANIMACIÓN DE CAMPANA DE NOTIFICACIONES (PENDULAR / TIMBRE)
+   ───────────────────────────────────────────────────────── */
+@keyframes bell-ring {
+  0% { transform: rotate(0deg); }
+  12% { transform: rotate(14deg); }
+  24% { transform: rotate(-12deg); }
+  36% { transform: rotate(10deg); }
+  48% { transform: rotate(-8deg); }
+  60% { transform: rotate(6deg); }
+  72% { transform: rotate(-4deg); }
+  84% { transform: rotate(2deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.animate-bell-ring {
+  animation: bell-ring 1.25s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  transform-origin: top center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-bell-ring {
+    animation: none;
+  }
+}

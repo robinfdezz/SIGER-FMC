@@ -94,9 +94,32 @@ async function sendTemplatedEmail(to, built) {
   return result;
 }
 
+let cachedCompanyLogo = null;
+async function getCompanyLogo() {
+  if (cachedCompanyLogo) return cachedCompanyLogo;
+  if (process.env.COMPANY_LOGO_URL) {
+    cachedCompanyLogo = process.env.COMPANY_LOGO_URL;
+    return cachedCompanyLogo;
+  }
+  try {
+    const { getPool } = require('./db');
+    const pool = getPool();
+    const res = await pool.query('SELECT logo_url FROM datos_companhia ORDER BY id ASC LIMIT 1');
+    if (res.rows[0]?.logo_url) {
+      cachedCompanyLogo = res.rows[0].logo_url;
+      return cachedCompanyLogo;
+    }
+  } catch (_) { /* ignore */ }
+  return 'https://res.cloudinary.com/azldehf5/image/upload/v1788389024/siger-fmc/companhia/pn2urmsb7a4eioqbfphj.png';
+}
+
 /** Correos al cliente */
-async function emailClienteRecibido(to, data) {
-  return sendTemplatedEmail(to, templateClienteRecibido(data));
+async function emailClienteRecibido(to, data = {}) {
+  const payload = { ...data };
+  if (!payload.logo_url && !payload.logoUrl) {
+    payload.logo_url = await getCompanyLogo();
+  }
+  return sendTemplatedEmail(to, templateClienteRecibido(payload));
 }
 async function emailClienteCancelado(to, data) {
   return sendTemplatedEmail(to, templateClienteCancelado(data));
@@ -108,15 +131,15 @@ async function emailClienteRecibo(to, data) {
   return sendTemplatedEmail(to, templateClienteRecibo(data));
 }
 
-/** Correos internos (solo asignación y finalización) */
-async function emailInternoOrdenPendiente(to, data) {
-  return sendTemplatedEmail(to, templateInternoOrdenPendiente(data));
+/** Correos internos desactivados para eventos operativos de trabajadores */
+async function emailInternoOrdenPendiente() {
+  return { ok: true, skipped: 'Desactivado para eventos operativos de personal' };
 }
-async function emailInternoAsignacion(to, data) {
-  return sendTemplatedEmail(to, templateInternoAsignacion(data));
+async function emailInternoAsignacion() {
+  return { ok: true, skipped: 'Desactivado para eventos operativos de personal' };
 }
-async function emailInternoFinalizada(to, data) {
-  return sendTemplatedEmail(to, templateInternoFinalizada(data));
+async function emailInternoFinalizada() {
+  return { ok: true, skipped: 'Desactivado para eventos operativos de personal' };
 }
 
 module.exports = {

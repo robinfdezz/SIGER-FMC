@@ -17,7 +17,7 @@ A continuación se detalla la estructura y el propósito de cada documento en el
 | **Contexto del Proyecto** | [docs/PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) | Visión de negocio, roles, módulos (dashboard, alertas, correo) y reglas funcionales. |
 | **Reglas para Asistentes AI** | [docs/AI_RULES.md](./AI_RULES.md) | Restricciones estrictas de desarrollo, prohibiciones de comandos destructivos y lineamientos de codificación. |
 | **Casos de Uso y Diagramas de Flujo** | [DIAGRAMAS_CASOS_DE_USO_Y_FLUJO.md](../DIAGRAMAS_CASOS_DE_USO_Y_FLUJO.md) | Especificación formal UML y flujos Mermaid (CU-01 a CU-18), catálogo de actores RBAC, ciclo de vida de taller y comprobantes. |
-| **Registro de Cambios** | [docs/CHANGELOG.md](./CHANGELOG.md) | Historial cronológico de versiones y novedades (`[0.11.0]` dashboard, búsqueda, campanita, Resend). |
+| **Registro de Cambios** | [docs/CHANGELOG.md](./CHANGELOG.md) | Historial cronológico de versiones y novedades en desarrollo (`[Unreleased]`). |
 
 ---
 
