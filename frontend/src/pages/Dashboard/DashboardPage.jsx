@@ -4,18 +4,23 @@ import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
 import {
   AlertTriangle,
+  Building2,
   ClipboardList,
+  Clock,
   Home,
   PackageCheck,
   PlusCircle,
-  RefreshCw,
+  RotateCcw,
   UserX,
   Wrench
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import DashboardLayout from '../../components/DashboardLayout';
 import Badge from '../../components/common/Badge';
+import Select from '../../components/common/Select';
+import AnimatedIconButton from '../../components/common/AnimatedIconButton';
 import { getDashboardResumen } from '../../services/servicios.service';
+import { getSucursales } from '../../services/catalogs.service';
 
 const formatCurrency = (value) => {
   const amount = Number(value) || 0;
@@ -245,28 +250,67 @@ const DashboardPage = () => {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadDashboard = useCallback(async (silent = false) => {
+  const isSuperAdmin = user?.rol_nombre === 'SuperAdmin';
+  const roleName = String(user?.rol_nombre || '').toLowerCase();
+  const isTecnico = roleName.includes('tecnic') || Boolean(data?.kpis?.es_tecnico);
+  const canViewFinances = Boolean(data?.kpis?.can_view_finances ?? (!isTecnico && (isSuperAdmin || roleName.includes('admin'))));
+
+  const [sucursales, setSucursales] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('all');
+
+  // Cargar catálogo de sucursales para SuperAdmin
+  useEffect(() => {
+    if (isSuperAdmin) {
+      getSucursales()
+        .then((res) => {
+          if (res?.ok && Array.isArray(res.data)) {
+            setSucursales(res.data);
+          } else if (Array.isArray(res)) {
+            setSucursales(res);
+          }
+        })
+        .catch((err) => console.error('Error al cargar catálogo de sucursales:', err));
+    }
+  }, [isSuperAdmin]);
+
+  const loadDashboard = useCallback(async (silent = false, branchId = selectedBranch) => {
     try {
       if (silent) setRefreshing(true);
       else setLoading(true);
       setError(null);
 
-      const response = await getDashboardResumen();
+      const params = {};
+      if (isSuperAdmin && branchId && branchId !== 'all') {
+        params.sucursal_id = branchId;
+      }
+
+      const response = await getDashboardResumen(params);
       if (!response?.ok && !response?.success) {
         throw new Error(response?.message || 'No se pudo cargar el dashboard');
       }
       setData(response.data || null);
+      return true;
     } catch (err) {
       setError(err?.response?.data?.message || err.message || 'Error al cargar el resumen operativo');
+      return false;
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isSuperAdmin, selectedBranch]);
+
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
+
+  const handleRefresh = async () => {
+    const success = await loadDashboard(true, selectedBranch);
+    if (success) {
+      setRefreshSuccess(true);
+    }
+  };
 
   useEffect(() => {
-    loadDashboard();
-  }, [loadDashboard]);
+    loadDashboard(false, selectedBranch);
+  }, [selectedBranch]);
 
   const kpis = data?.kpis || {};
   const flujo = data?.flujo || [];
@@ -281,49 +325,87 @@ const DashboardPage = () => {
 
   const barColors = ['#3F3F46', '#3B82F6', '#F59E0B', '#F97316', '#38BDF8', '#EAB308'];
 
-  const branchLabel = user?.sucursal_nombre
-    ? `${user.sucursal_nombre}${user.sucursal_codigo ? ` · ${user.sucursal_codigo}` : ''}`
-    : 'Franyer Mobile Center';
+  const branchOptions = useMemo(() => [
+    {
+      id: 'all',
+      label: 'Todas las sucursales',
+      supportingText: 'Consolidado global',
+      icon: Building2
+    },
+    ...sucursales.map((suc) => ({
+      id: String(suc.id),
+      label: suc.nombre_sucursal || suc.nombre,
+      supportingText: suc.codigo_sucursal ? `Código: ${suc.codigo_sucursal}` : undefined,
+      icon: Building2
+    }))
+  ], [sucursales]);
 
-  const canCreateOrder = !String(user?.rol_nombre || '').toLowerCase().includes('tecnic');
+  const selectedBranchData = useMemo(() => {
+    if (!isSuperAdmin || selectedBranch === 'all') return null;
+    return sucursales.find((s) => String(s.id) === String(selectedBranch)) || null;
+  }, [isSuperAdmin, selectedBranch, sucursales]);
+
+  const branchLabel = useMemo(() => {
+    if (isSuperAdmin) {
+      if (selectedBranchData) {
+        return `${selectedBranchData.nombre_sucursal}${selectedBranchData.codigo_sucursal ? ` · ${selectedBranchData.codigo_sucursal}` : ''}`;
+      }
+      return 'Todas las sucursales · Vista global';
+    }
+    return user?.sucursal_nombre
+      ? `${user.sucursal_nombre}${user.sucursal_codigo ? ` · ${user.sucursal_codigo}` : ''}`
+      : 'Franyer Mobile Center';
+  }, [isSuperAdmin, selectedBranchData, user]);
+
+  const canCreateOrder = !roleName.includes('tecnic');
 
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-5 max-w-[1400px] mx-auto w-full">
-        {/* Banner */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-900 text-white p-5 sm:p-7 shadow-xl border border-zinc-800">
-          <div className="absolute top-0 right-0 -mt-10 -mr-8 w-72 h-72 bg-brand-600/25 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 right-24 w-40 h-40 bg-fuchsia-500/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-            <div className="space-y-2.5 min-w-0">
-              <div className="inline-flex items-center gap-2 text-xs font-medium text-zinc-300">
-                <Home className="w-3.5 h-3.5 text-brand-400" />
+        {/* Banner / Encabezado Homologado */}
+        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 sm:p-6 shadow-xs">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1.5 min-w-0">
+              <div className="inline-flex items-center gap-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                <Home className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
                 <span className="truncate">{branchLabel}</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 font-outfit">
                 ¡Bienvenido de nuevo, {user?.nombre || 'Usuario'}!
-              </h2>
-              <div className="flex flex-wrap items-center gap-2.5">
-                <p className="text-sm text-zinc-300">
+              </h1>
+              <div className="flex flex-wrap items-center gap-2.5 pt-0.5">
+                <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 font-inter">
                   Resumen operativo del taller — {formatTodayLabel()}
                 </p>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-400/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   Sistema online
                 </span>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => loadDashboard(true)}
-              disabled={refreshing || loading}
-              className="inline-flex items-center gap-2 self-start lg:self-auto px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-zinc-200 transition-colors disabled:opacity-60"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-              Actualizar
-            </button>
+            <div className="flex flex-wrap items-center gap-3 self-start lg:self-center">
+              {isSuperAdmin ? (
+                <div className="w-[190px] sm:w-[230px]">
+                  <Select
+                    value={selectedBranch}
+                    onChange={(val) => setSelectedBranch(String(val))}
+                    items={branchOptions}
+                    placeholder="Todas las sucursales"
+                  />
+                </div>
+              ) : null}
+
+              <AnimatedIconButton
+                icon={RotateCcw}
+                loading={refreshing}
+                success={refreshSuccess}
+                onSuccessEnd={() => setRefreshSuccess(false)}
+                onClick={handleRefresh}
+                title="Refrescar dashboard"
+                ariaLabel="Refrescar datos del dashboard"
+              />
+            </div>
           </div>
         </div>
 
@@ -332,7 +414,7 @@ const DashboardPage = () => {
             <span>{error}</span>
             <button
               type="button"
-              onClick={() => loadDashboard()}
+              onClick={() => loadDashboard(false, selectedBranch)}
               className="shrink-0 font-semibold underline underline-offset-2"
             >
               Reintentar
@@ -369,44 +451,93 @@ const DashboardPage = () => {
           <>
             {/* KPIs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3.5">
-              <KpiCard
-                title="Órdenes abiertas"
-                value={kpis.ordenes_abiertas ?? 0}
-                hint={kpis.abiertas_hoy > 0 ? `+${kpis.abiertas_hoy} hoy` : 'Sin ingresos hoy'}
-                icon={ClipboardList}
-                tone="blue"
-              />
-              <KpiCard
-                title="Urgentes"
-                value={kpis.urgentes ?? 0}
-                icon={AlertTriangle}
-                tone="red"
-              />
-              <KpiCard
-                title="Sin técnico"
-                value={kpis.sin_tecnico ?? 0}
-                icon={UserX}
-                tone="pink"
-              />
-              <KpiCard
-                title="Listas para entrega"
-                value={kpis.listas_entrega ?? 0}
-                icon={PackageCheck}
-                tone="green"
-              />
-              <div className="rounded-2xl bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border shadow-sm p-4 sm:p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Ingresos del mes</p>
-                    <p className="mt-2 text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-                      {formatCurrency(kpis.ingresos_mes)}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 flex justify-end">
-                  <Sparkline values={(kpis.ingresos_sparkline || []).map((item) => item.monto)} />
-                </div>
-              </div>
+              {isTecnico ? (
+                <>
+                  <KpiCard
+                    title="Mis órdenes asignadas"
+                    value={kpis.mis_ordenes_activas ?? 0}
+                    hint="Activas en tu bandeja"
+                    icon={Wrench}
+                    tone="blue"
+                  />
+                  <KpiCard
+                    title="Diagnósticos pendientes"
+                    value={kpis.mis_diagnosticos_pendientes ?? 0}
+                    hint="Por diagnosticar"
+                    icon={Clock}
+                    tone="brand"
+                  />
+                  <KpiCard
+                    title="Órdenes abiertas"
+                    value={kpis.ordenes_abiertas ?? 0}
+                    hint={kpis.abiertas_hoy > 0 ? `+${kpis.abiertas_hoy} hoy` : 'Total en taller'}
+                    icon={ClipboardList}
+                    tone="blue"
+                  />
+                  <KpiCard
+                    title="Urgentes"
+                    value={kpis.urgentes ?? 0}
+                    hint="Prioridad alta en taller"
+                    icon={AlertTriangle}
+                    tone="red"
+                  />
+                  <KpiCard
+                    title="Listas para entrega"
+                    value={kpis.listas_entrega ?? 0}
+                    hint="Equipos terminados"
+                    icon={PackageCheck}
+                    tone="green"
+                  />
+                </>
+              ) : (
+                <>
+                  <KpiCard
+                    title="Órdenes abiertas"
+                    value={kpis.ordenes_abiertas ?? 0}
+                    hint={kpis.abiertas_hoy > 0 ? `+${kpis.abiertas_hoy} hoy` : 'Sin ingresos hoy'}
+                    icon={ClipboardList}
+                    tone="blue"
+                  />
+                  <KpiCard
+                    title="Urgentes"
+                    value={kpis.urgentes ?? 0}
+                    icon={AlertTriangle}
+                    tone="red"
+                  />
+                  <KpiCard
+                    title="Sin técnico"
+                    value={kpis.sin_tecnico ?? 0}
+                    icon={UserX}
+                    tone="pink"
+                  />
+                  <KpiCard
+                    title="Listas para entrega"
+                    value={kpis.listas_entrega ?? 0}
+                    icon={PackageCheck}
+                    tone="green"
+                  />
+                  {canViewFinances ? (
+                    <div className="rounded-2xl bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border shadow-sm p-4 sm:p-5 flex flex-col justify-between">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Ingresos del mes</p>
+                          <p className="mt-2 text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+                            {formatCurrency(kpis.ingresos_mes)}
+                          </p>
+                          {kpis.ingresos_mes_anterior !== null && kpis.ingresos_mes_anterior !== undefined ? (
+                            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+                              vs. {formatCurrency(kpis.ingresos_mes_anterior)} mes ant.
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex justify-end">
+                        <Sparkline values={(kpis.ingresos_sparkline || []).map((item) => item.monto)} />
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
 
             {/* Flujo + Carga */}

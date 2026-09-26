@@ -27,8 +27,40 @@ function resolveUrl(enlace) {
   return `${clientUrl}${enlace.startsWith('/') ? '' : '/'}${enlace}`;
 }
 
-function statusBadge(label, bg, color) {
-  return `<span style="display:inline-block;padding:4px 10px;border-radius:999px;background:${bg};color:${color};font-size:11px;font-weight:700;letter-spacing:0.02em;">${escapeHtml(label)}</span>`;
+function formatPersonName(name) {
+  if (!name) return 'Cliente';
+  const str = String(name).trim();
+  if (!str) return 'Cliente';
+  if (str === str.toUpperCase() && str.length > 2) {
+    return str
+      .toLowerCase()
+      .split(/\s+/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  }
+  return str;
+}
+
+function formatEstimatedDate(val) {
+  if (!val) return null;
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return String(val);
+  try {
+    const formatted = d.toLocaleDateString('es-DO', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+  } catch (_) {
+    return String(val);
+  }
+}
+
+function statusBadge(label, bg, color, borderColor = null) {
+  const borderStyle = borderColor ? `border:1px solid ${borderColor};` : '';
+  return `<span style="display:inline-block;padding:5px 12px;border-radius:999px;background:${bg};color:${color};${borderStyle}font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;white-space:nowrap;line-height:1;">${escapeHtml(label)}</span>`;
 }
 
 /**
@@ -36,15 +68,39 @@ function statusBadge(label, bg, color) {
  */
 function wrapEmail({
   preheader = '',
-  eyebrow = 'Franyer Mobile Center',
+  eyebrow = 'FRANYER MOBILE CENTER',
+  logoUrl = null,
   title,
   badgeHtml = '',
   bodyHtml,
   ctaLabel = null,
   ctaUrl = null,
-  footerNote = 'Mensaje automático de SIGER-FMC. No responder a este correo.'
+  centerCta = true,
+  headerTheme = 'light',
+  footerNote = 'Notificación automática emitida por el sistema SIGER-FMC. Por favor no respondas directamente a este correo.'
 }) {
   const url = ctaUrl ? resolveUrl(ctaUrl) : null;
+  const isDarkHeader = headerTheme === 'dark';
+
+  const headerBg = isDarkHeader
+    ? 'background:linear-gradient(135deg,#18181b 0%,#27272a 60%,#3f3f46 100%);'
+    : 'background:#FFFFFF;border-bottom:1px solid #E2E8F0;';
+  const eyebrowColor = isDarkHeader ? '#A1A1AA' : '#64748B';
+  const logoMainColor = isDarkHeader ? '#0F172A' : '#0F172A';
+
+  const cleanLogoUrl = logoUrl && String(logoUrl).trim() !== '' ? String(logoUrl).trim() : null;
+
+  const brandingHtml = cleanLogoUrl
+    ? `<img src="${escapeHtml(cleanLogoUrl)}" alt="Logo" height="38" style="max-height: 40px; width: auto; display: block; border: 0; outline: none;" />`
+    : `
+      <p style="margin:0;font-size:11px;line-height:1.2;letter-spacing:0.1em;text-transform:uppercase;color:${eyebrowColor};font-weight:700;">
+        ${escapeHtml(eyebrow)}
+      </p>
+      <p style="margin:4px 0 0;font-size:22px;line-height:1.2;font-weight:800;color:${logoMainColor};letter-spacing:-0.03em;">
+        SIGER<span style="color:#DC2626;">-FMC</span>
+      </p>
+    `;
+
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -52,51 +108,69 @@ function wrapEmail({
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(title)}</title>
 </head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:'Segoe UI',Sora,Arial,sans-serif;color:#18181b;">
+<body style="margin:0;padding:0;background:#F1F5F9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0F172A;-webkit-font-smoothing:antialiased;">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f4f5;padding:28px 12px;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#F1F5F9;padding:32px 12px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:580px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e4e4e7;box-shadow:0 8px 30px rgba(0,0,0,0.06);">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:580px;background:#FFFFFF;border-radius:12px;overflow:hidden;border:1px solid #E2E8F0;box-shadow:0 10px 25px -5px rgba(0,0,0,0.05),0 8px 10px -6px rgba(0,0,0,0.03);">
+          <!-- Línea de acento superior corporativa -->
           <tr>
-            <td style="background:linear-gradient(135deg,#18181b 0%,#27272a 60%,#3f3f46 100%);padding:22px 24px;">
-              <table width="100%" cellspacing="0" cellpadding="0">
+            <td style="height:4px;background:linear-gradient(90deg,#DC2626 0%,#E11D48 100%);background-color:#DC2626;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+          <!-- Header / Cabecera -->
+          <tr>
+            <td style="${headerBg}padding:24px 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
-                  <td>
-                    <p style="margin:0;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#a1a1aa;font-weight:600;">${escapeHtml(eyebrow)}</p>
-                    <p style="margin:6px 0 0;font-size:20px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;">SIGER<span style="color:#fb7185;">-FMC</span></p>
+                  <td style="vertical-align:middle;">
+                    ${brandingHtml}
                   </td>
-                  <td align="right" style="vertical-align:middle;">
+                  <td align="right" style="vertical-align:middle;text-align:right;">
                     ${badgeHtml || ''}
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
+          <!-- Contenido Principal -->
           <tr>
-            <td style="height:3px;background:#e11d48;font-size:0;line-height:0;">&nbsp;</td>
-          </tr>
-          <tr>
-            <td style="padding:28px 24px 8px;">
-              <h1 style="margin:0 0 14px;font-size:22px;line-height:1.25;font-weight:800;color:#18181b;letter-spacing:-0.02em;">${escapeHtml(title)}</h1>
+            <td style="padding:28px 28px 12px;background:#FFFFFF;">
+              <h1 style="margin:0 0 16px;font-size:22px;line-height:1.25;font-weight:800;color:#0F172A;letter-spacing:-0.02em;">
+                ${escapeHtml(title)}
+              </h1>
               ${bodyHtml}
               ${url && ctaLabel ? `
-              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0 8px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:26px 0 14px;">
                 <tr>
-                  <td style="border-radius:12px;background:#e11d48;">
-                    <a href="${url}" style="display:inline-block;padding:12px 18px;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;">
-                      ${escapeHtml(ctaLabel)}
-                    </a>
+                  <td align="${centerCta ? 'center' : 'left'}" style="text-align:${centerCta ? 'center' : 'left'};">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="${centerCta ? 'margin:0 auto;' : ''}">
+                      <tr>
+                        <td align="center" style="border-radius:8px;background:linear-gradient(135deg,#DC2626 0%,#E11D48 100%);background-color:#DC2626;box-shadow:0 4px 14px rgba(220,38,38,0.25);">
+                          <a href="${url}" target="_blank" style="display:inline-block;padding:14px 28px;color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:700;letter-spacing:0.02em;border-radius:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+                            ${escapeHtml(ctaLabel)}
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
               </table>` : ''}
             </td>
           </tr>
+          <!-- Footer -->
           <tr>
-            <td style="padding:8px 24px 24px;">
-              <div style="border-top:1px solid #f4f4f5;padding-top:16px;">
-                <p style="margin:0;font-size:12px;line-height:1.5;color:#a1a1aa;">${escapeHtml(footerNote)}</p>
-                <p style="margin:8px 0 0;font-size:12px;color:#71717a;"><strong style="color:#3f3f46;">Franyer Mobile Center</strong> · Servicio técnico profesional</p>
+            <td style="padding:22px 28px 26px;background:#F8FAFC;border-top:1px solid #E2E8F0;">
+              <p style="margin:0 0 10px;font-size:12px;line-height:1.6;color:#64748B;">
+                ${escapeHtml(footerNote)}
+              </p>
+              <div style="border-top:1px solid #E2E8F0;padding-top:12px;margin-top:12px;">
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#64748B;">
+                  <strong style="color:#1E293B;">Franyer Mobile Center</strong> · Especialistas en reparación y servicio técnico integral de dispositivos móviles.
+                </p>
+                <p style="margin:4px 0 0;font-size:11.5px;line-height:1.5;color:#94A3B8;">
+                  ¿Dudas con tu servicio? Contáctanos a través de nuestros canales oficiales o visita tu sucursal más cercana.
+                </p>
               </div>
             </td>
           </tr>
@@ -108,26 +182,43 @@ function wrapEmail({
 </html>`;
 }
 
-function detailCard(rows = []) {
+function ticketInfoCard(rows = []) {
   const items = rows
     .filter((r) => r && r.value != null && String(r.value).trim() !== '')
-    .map(
-      (r) => `
+    .map((r, idx, arr) => {
+      const isLast = idx === arr.length - 1;
+      const borderBottom = isLast ? '' : 'border-bottom:1px solid #E2E8F0;';
+      const isTicket = r.isTicket || (r.label && String(r.label).toLowerCase().trim() === 'ticket');
+      const valueHtml = isTicket
+        ? `<span style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Courier New',monospace;font-size:13px;font-weight:700;color:#0F172A;">${escapeHtml(r.value)}</span>`
+        : `<span style="font-weight:600;color:#0F172A;">${escapeHtml(r.value)}</span>`;
+
+      return `
       <tr>
-        <td style="padding:8px 0;font-size:12px;color:#71717a;width:38%;vertical-align:top;">${escapeHtml(r.label)}</td>
-        <td style="padding:8px 0;font-size:13px;color:#18181b;font-weight:600;vertical-align:top;">${escapeHtml(r.value)}</td>
-      </tr>`
-    )
+        <td style="padding:11px 12px 11px 0;font-size:13px;color:#64748B;font-weight:500;width:38%;vertical-align:top;${borderBottom}">
+          ${escapeHtml(r.label)}
+        </td>
+        <td style="padding:11px 0 11px 12px;font-size:13px;vertical-align:top;${borderBottom}">
+          ${valueHtml}
+        </td>
+      </tr>`;
+    })
     .join('');
 
   return `
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:4px 0 8px;background:#fafafa;border:1px solid #f4f4f5;border-radius:12px;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:18px 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;border-collapse:separate;overflow:hidden;">
     <tr>
-      <td style="padding:14px 16px;">
-        <table width="100%" cellspacing="0" cellpadding="0">${items}</table>
+      <td style="padding:8px 18px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+          ${items}
+        </table>
       </td>
     </tr>
   </table>`;
+}
+
+function detailCard(rows = []) {
+  return ticketInfoCard(rows);
 }
 
 /** Cliente: equipo recibido */
@@ -136,28 +227,42 @@ function templateClienteRecibido(data = {}) {
     ? `/estado/${encodeURIComponent(data.codigo_ticket)}`
     : '/estado';
 
+  const clienteNombre = formatPersonName(data.cliente_nombre);
+  const equipoDesc = data.equipo || data.dispositivo || data.modelo || 'Dispositivo';
+  const fechaEstimada = formatEstimatedDate(data.fecha_entrega_estimada);
+  const logoUrl =
+    data.logo_url ||
+    data.logoUrl ||
+    process.env.COMPANY_LOGO_URL ||
+    'https://res.cloudinary.com/azldehf5/image/upload/v1788389024/siger-fmc/companhia/pn2urmsb7a4eioqbfphj.png';
+
+  const ticketRows = [
+    { label: 'Ticket', value: data.codigo_ticket || 'Pendiente', isTicket: true },
+    { label: 'Dispositivo / Modelo', value: equipoDesc },
+    { label: 'Falla Reportada', value: data.falla_reportada || 'Revisión y diagnóstico técnico' },
+    { label: 'Sucursal', value: data.sucursal || 'Sucursal Principal' },
+    ...(fechaEstimada ? [{ label: 'Fecha Estimada', value: fechaEstimada }] : [])
+  ];
+
   return {
-    subject: `Equipo recibido · ${data.codigo_ticket || 'Orden'}`,
+    subject: `Equipo recibido · ${data.codigo_ticket || 'SIGER-FMC'}`,
     html: wrapEmail({
-      preheader: `Recibimos tu ${data.equipo || 'equipo'} en taller. Ticket ${data.codigo_ticket || ''}`,
-      title: '¡Recibimos tu equipo!',
-      badgeHtml: statusBadge('Recibido', '#f4f4f5', '#52525b'),
-      ctaLabel: 'Seguir mi orden',
+      preheader: `Recibimos tu ${equipoDesc} en taller. Ticket ${data.codigo_ticket || ''}`,
+      eyebrow: 'FRANYER MOBILE CENTER',
+      logoUrl,
+      title: `¡Hola, ${clienteNombre}!`,
+      badgeHtml: `<span style="color:#64748B;font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;white-space:nowrap;line-height:1.2;">RECIBIDO EN TALLER</span>`,
+      ctaLabel: 'Rastrear Estado de mi Equipo →',
       ctaUrl: trackingUrl,
+      centerCta: true,
+      footerNote: 'Esta es una notificación automática generada por el sistema SIGER-FMC al registrar la recepción de tu equipo en taller.',
       bodyHtml: `
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#3f3f46;">
-          Hola <strong>${escapeHtml(data.cliente_nombre || 'cliente')}</strong>, confirmamos el ingreso de tu equipo en
-          <strong>Franyer Mobile Center</strong>. Nuestro equipo técnico iniciará el diagnóstico.
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#334155;">
+          Confirmamos el ingreso satisfactorio de tu equipo en <strong>Franyer Mobile Center</strong>. Nuestro departamento técnico ha registrado la orden e iniciará el protocolo de diagnóstico.
         </p>
-        ${detailCard([
-          { label: 'Ticket', value: data.codigo_ticket },
-          { label: 'Equipo', value: data.equipo },
-          { label: 'Falla reportada', value: data.falla_reportada },
-          { label: 'Sucursal', value: data.sucursal },
-          { label: 'Entrega estimada', value: data.fecha_entrega_estimada }
-        ])}
-        <p style="margin:12px 0 0;font-size:13px;line-height:1.55;color:#71717a;">
-          Guarda este correo. Con el código de ticket puedes consultar el estado en cualquier momento.
+        ${ticketInfoCard(ticketRows)}
+        <p style="margin:16px 0 0;font-size:13px;line-height:1.55;color:#64748B;">
+          Guarda este correo para consultar en todo momento el avance de la reparación, autorizar presupuestos o revisar detalles técnicos de tu servicio.
         </p>`
     })
   };
@@ -382,6 +487,9 @@ module.exports = {
   escapeHtml,
   formatMoney,
   wrapEmail,
+  ticketInfoCard,
+  detailCard,
+  statusBadge,
   templateClienteRecibido,
   templateClienteCancelado,
   templateClienteEntregado,

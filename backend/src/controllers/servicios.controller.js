@@ -481,6 +481,7 @@ const createServicio = async (req, res) => {
           servicioId: nuevaOrden.id,
           enlace: enlaceOrden,
           excludeUserId: usuario_recepcion_id,
+          sendMail: false,
           meta: notifyMeta
         });
       }
@@ -1980,6 +1981,7 @@ const assignTecnicoServicio = async (req, res) => {
         servicioId: id,
         enlace: `/taller?ordenId=${id}`,
         excludeUserId: req.user?.id,
+        sendMail: false,
         meta: {
           codigo_ticket: ordenInfo.codigo_ticket,
           prioridad: ordenInfo.prioridad || null
@@ -2488,7 +2490,7 @@ const updateAprobacionIncidencia = async (req, res) => {
 
     // Verificar que la orden exista y pertenezca a la sucursal autorizada
     let checkOrderQuery = `
-      SELECT sr.id, sr.sucursal_id, es.codigo_estado, es.orden_flujo
+      SELECT sr.id, sr.codigo_ticket, sr.sucursal_id, es.codigo_estado, es.orden_flujo
       FROM servicios_recepcion sr
       JOIN estados_servicio es ON es.id = sr.estado_actual_id
       WHERE sr.id = $1 AND sr.activo = TRUE
@@ -2612,6 +2614,35 @@ const updateAprobacionIncidencia = async (req, res) => {
       WHERE inc.id = $1`,
       [incidenciaId]
     );
+
+    // Notificar al/los técnico(s) asignados sobre la decisión del cliente/recepción
+    if (isExplicitApprove || isExplicitReject) {
+      try {
+        const tecIds = await getAssignedTechnicianIds(servicioId);
+        if (tecIds.length > 0) {
+          const estadoTxt = isAprobado ? 'aprobado' : 'rechazado';
+          const titulo = isAprobado ? 'Costo Adicional Aprobado' : 'Costo Adicional Rechazado';
+          const codigoTicket = ordenActualAprob.codigo_ticket || 'Orden';
+          await createNotifications({
+            usuarioIds: tecIds,
+            tipo: 'INCIDENCIA',
+            titulo,
+            mensaje: `El cliente/recepción ha ${estadoTxt} el presupuesto adicional para la orden ${codigoTicket}.`,
+            servicioId,
+            incidenciaId,
+            enlace: `/taller?ordenId=${servicioId}`,
+            excludeUserId: req.user?.id,
+            sendMail: false,
+            meta: {
+              codigo_ticket: codigoTicket,
+              aprobado: isAprobado
+            }
+          });
+        }
+      } catch (notifyErr) {
+        console.warn('⚠️ Notificación de aprobación/rechazo de incidencia:', notifyErr.message);
+      }
+    }
 
     return res.status(200).json({
       ok: true,
@@ -2914,6 +2945,7 @@ const liquidarYEntregarServicio = async (req, res) => {
           servicioId: id,
           enlace: enlaceOrden,
           excludeUserId: usuarioId,
+          sendMail: false,
           meta: metaFinal
         });
       }
@@ -3167,6 +3199,31 @@ const cancelarServicio = async (req, res) => {
     );
 
     await client.query('COMMIT');
+
+    // Notificación operativa a técnicos asignados y personal administrativo
+    try {
+      const [tecIds, staffIds] = await Promise.all([
+        getAssignedTechnicianIds(id),
+        getBranchStaffIds(order.sucursal_id)
+      ]);
+      const destinatarios = [...new Set([...tecIds, ...staffIds])];
+      await createNotifications({
+        usuarioIds: destinatarios,
+        tipo: 'ORDEN_CANCELADA',
+        titulo: `Orden Cancelada - ${order.codigo_ticket}`,
+        mensaje: `La orden ${order.codigo_ticket} ha sido cancelada. Motivo: ${motivoLimpio}.`,
+        servicioId: id,
+        enlace: `/taller?ordenId=${id}`,
+        excludeUserId: usuarioId,
+        sendMail: false,
+        meta: {
+          codigo_ticket: order.codigo_ticket,
+          motivo_cancelacion: motivoLimpio
+        }
+      });
+    } catch (notifyErr) {
+      console.warn('⚠️ Notificaciones post-cancelación:', notifyErr.message);
+    }
 
     // Correo al cliente: orden cancelada
     try {
@@ -3610,6 +3667,10 @@ const getDashboardResumen = async (req, res) => {
   try {
     const pool = getPool();
     const isSuperAdmin = isUserSuperAdmin(req.user);
+    const userRole = String(req.user?.rol_nombre || req.user?.rol || '').toLowerCase();
+    const isTecnico = userRole.includes('tecnic');
+    const canViewFinances = !isTecnico && (isSuperAdmin || userRole === 'admin_sucursal' || userRole.includes('admin'));
+    const userId = req.user?.id ? parseInt(req.user.id, 10) : null;
 
     let sucursalId = null;
     if (!isSuperAdmin) {
@@ -3622,12 +3683,16 @@ const getDashboardResumen = async (req, res) => {
         });
       }
     } else if (req.query.sucursal_id && req.query.sucursal_id !== 'all') {
-      sucursalId = parseInt(req.query.sucursal_id, 10);
+      const parsedId = parseInt(req.query.sucursal_id, 10);
+      if (Number.isInteger(parsedId) && parsedId > 0) {
+        sucursalId = parsedId;
+      }
     }
 
     const branchClause = sucursalId ? ' AND sr.sucursal_id = $1' : '';
     const branchParams = sucursalId ? [sucursalId] : [];
 
+    // 1. KPIs Generales de Taller
     const kpisPromise = pool.query(
       `SELECT
          COUNT(*) FILTER (WHERE es.orden_flujo BETWEEN 1 AND 6)::int AS ordenes_abiertas,
@@ -3653,46 +3718,83 @@ const getDashboardResumen = async (req, res) => {
       branchParams
     );
 
-    const ingresosPromise = pool.query(
-      `SELECT
-         COALESCE(SUM(sr.monto_liquidado) FILTER (
-           WHERE sr.fecha_entrega_real IS NOT NULL
-             AND DATE_TRUNC('month', sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')
-               = DATE_TRUNC('month', NOW() AT TIME ZONE 'America/Santo_Domingo')
-         ), 0)::numeric(12,2) AS liquidado_mes,
-         COALESCE(SUM(sr.monto_anticipo) FILTER (
-           WHERE DATE_TRUNC('month', sr.created_at AT TIME ZONE 'America/Santo_Domingo')
-               = DATE_TRUNC('month', NOW() AT TIME ZONE 'America/Santo_Domingo')
-             AND COALESCE(sr.monto_anticipo, 0) > 0
-         ), 0)::numeric(12,2) AS anticipos_mes
-       FROM servicios_recepcion sr
-       WHERE sr.activo = TRUE${branchClause}`,
-      branchParams
-    );
-
-    const sparklinePromise = pool.query(
-      `WITH dias AS (
-         SELECT generate_series(
-           ((NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '13 days'),
-           (NOW() AT TIME ZONE 'America/Santo_Domingo')::date,
-           INTERVAL '1 day'
-         )::date AS dia
-       )
-       SELECT
-         d.dia::text AS fecha,
-         COALESCE((
-           SELECT SUM(sr.monto_liquidado)
+    // 2. Métricas Financieras (Accesibles exclusivamente para SuperAdmin y Admin_Sucursal)
+    const ingresosPromise = !canViewFinances
+      ? Promise.resolve({ rows: [{ liquidado_mes: 0, anticipos_mes: 0, liquidado_mes_anterior: 0, anticipos_mes_anterior: 0 }] })
+      : pool.query(
+          `SELECT
+             COALESCE(SUM(sr.monto_liquidado) FILTER (
+               WHERE sr.fecha_entrega_real IS NOT NULL
+                 AND DATE_TRUNC('month', sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')
+                   = DATE_TRUNC('month', NOW() AT TIME ZONE 'America/Santo_Domingo')
+             ), 0)::numeric(12,2) AS liquidado_mes,
+             COALESCE(SUM(sr.monto_anticipo) FILTER (
+               WHERE DATE_TRUNC('month', sr.created_at AT TIME ZONE 'America/Santo_Domingo')
+                   = DATE_TRUNC('month', NOW() AT TIME ZONE 'America/Santo_Domingo')
+                 AND COALESCE(sr.monto_anticipo, 0) > 0
+             ), 0)::numeric(12,2) AS anticipos_mes,
+             COALESCE(SUM(sr.monto_liquidado) FILTER (
+               WHERE sr.fecha_entrega_real IS NOT NULL
+                 AND DATE_TRUNC('month', sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')
+                   = DATE_TRUNC('month', (NOW() AT TIME ZONE 'America/Santo_Domingo') - INTERVAL '1 month')
+             ), 0)::numeric(12,2) AS liquidado_mes_anterior,
+             COALESCE(SUM(sr.monto_anticipo) FILTER (
+               WHERE DATE_TRUNC('month', sr.created_at AT TIME ZONE 'America/Santo_Domingo')
+                   = DATE_TRUNC('month', (NOW() AT TIME ZONE 'America/Santo_Domingo') - INTERVAL '1 month')
+                 AND COALESCE(sr.monto_anticipo, 0) > 0
+             ), 0)::numeric(12,2) AS anticipos_mes_anterior
            FROM servicios_recepcion sr
-           WHERE sr.activo = TRUE
-             AND sr.fecha_entrega_real IS NOT NULL
-             AND (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date = d.dia
-             ${sucursalId ? 'AND sr.sucursal_id = $1' : ''}
-         ), 0)::numeric(12,2) AS monto
-       FROM dias d
-       ORDER BY d.dia ASC`,
-      branchParams
-    );
+           WHERE sr.activo = TRUE${branchClause}`,
+          branchParams
+        );
 
+    // 3. Sparkline de Ingresos 14 días (Optimizado con LEFT JOIN sin subqueries correlacionadas)
+    const sparklinePromise = !canViewFinances
+      ? Promise.resolve({ rows: [] })
+      : pool.query(
+          `WITH dias AS (
+             SELECT generate_series(
+               ((NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '13 days'),
+               (NOW() AT TIME ZONE 'America/Santo_Domingo')::date,
+               INTERVAL '1 day'
+             )::date AS dia
+           ),
+           liquidaciones AS (
+             SELECT
+               (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date AS dia,
+               SUM(sr.monto_liquidado) AS monto
+             FROM servicios_recepcion sr
+             WHERE sr.activo = TRUE
+               AND sr.fecha_entrega_real IS NOT NULL
+               AND sr.fecha_entrega_real >= (NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '13 days'
+               ${branchClause}
+             GROUP BY (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date
+           )
+           SELECT
+             d.dia::text AS fecha,
+             COALESCE(l.monto, 0)::numeric(12,2) AS monto
+           FROM dias d
+           LEFT JOIN liquidaciones l ON l.dia = d.dia
+           ORDER BY d.dia ASC`,
+          branchParams
+        );
+
+    // 4. Métricas Personales del Técnico (Solo si es Técnico)
+    const tecnicoPersonalPromise = isTecnico && userId
+      ? pool.query(
+          `SELECT
+             COUNT(DISTINCT sr.id) FILTER (WHERE es.orden_flujo BETWEEN 1 AND 6)::int AS mis_ordenes_activas,
+             COUNT(DISTINCT sr.id) FILTER (WHERE es.orden_flujo = 1 OR es.codigo_estado = 'RECIBIDO')::int AS mis_diagnosticos_pendientes
+           FROM servicios_recepcion sr
+           JOIN tecnicos_asignados ta ON ta.servicio_id = sr.id
+           JOIN estados_servicio es ON es.id = sr.estado_actual_id
+           WHERE sr.activo = TRUE
+             AND ta.tecnico_id = $1`,
+          [userId]
+        )
+      : Promise.resolve({ rows: [{ mis_ordenes_activas: 0, mis_diagnosticos_pendientes: 0 }] });
+
+    // 5. Flujo por Estado del Taller
     const flujoPromise = pool.query(
       `SELECT
          es.id,
@@ -3712,6 +3814,7 @@ const getDashboardResumen = async (req, res) => {
       branchParams
     );
 
+    // 6. Tendencia Temporal 7 días Entradas vs Entregas (Optimizado con agregaciones CTE)
     const seriePromise = pool.query(
       `WITH dias AS (
          SELECT generate_series(
@@ -3719,29 +3822,40 @@ const getDashboardResumen = async (req, res) => {
            (NOW() AT TIME ZONE 'America/Santo_Domingo')::date,
            INTERVAL '1 day'
          )::date AS dia
+       ),
+       entradas_agg AS (
+         SELECT
+           (sr.created_at AT TIME ZONE 'America/Santo_Domingo')::date AS dia,
+           COUNT(*)::int AS entradas
+         FROM servicios_recepcion sr
+         WHERE sr.activo = TRUE
+           AND sr.created_at >= (NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '6 days'
+           ${branchClause}
+         GROUP BY (sr.created_at AT TIME ZONE 'America/Santo_Domingo')::date
+       ),
+       entregas_agg AS (
+         SELECT
+           (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date AS dia,
+           COUNT(*)::int AS entregas
+         FROM servicios_recepcion sr
+         WHERE sr.activo = TRUE
+           AND sr.fecha_entrega_real IS NOT NULL
+           AND sr.fecha_entrega_real >= (NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '6 days'
+           ${branchClause}
+         GROUP BY (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date
        )
        SELECT
          d.dia::text AS fecha,
-         COALESCE((
-           SELECT COUNT(*)::int
-           FROM servicios_recepcion sr
-           WHERE sr.activo = TRUE
-             AND (sr.created_at AT TIME ZONE 'America/Santo_Domingo')::date = d.dia
-             ${sucursalId ? 'AND sr.sucursal_id = $1' : ''}
-         ), 0) AS entradas,
-         COALESCE((
-           SELECT COUNT(*)::int
-           FROM servicios_recepcion sr
-           WHERE sr.activo = TRUE
-             AND sr.fecha_entrega_real IS NOT NULL
-             AND (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date = d.dia
-             ${sucursalId ? 'AND sr.sucursal_id = $1' : ''}
-         ), 0) AS entregas
+         COALESCE(ea.entradas, 0) AS entradas,
+         COALESCE(eg.entregas, 0) AS entregas
        FROM dias d
+       LEFT JOIN entradas_agg ea ON ea.dia = d.dia
+       LEFT JOIN entregas_agg eg ON eg.dia = d.dia
        ORDER BY d.dia ASC`,
       branchParams
     );
 
+    // 7. Carga de Trabajo por Técnico
     const cargaPromise = pool.query(
       `WITH abiertas AS (
          SELECT sr.id
@@ -3781,6 +3895,7 @@ const getDashboardResumen = async (req, res) => {
       branchParams
     );
 
+    // 8. Actividad Reciente (Últimas órdenes en flujo)
     const actividadPromise = pool.query(
       `SELECT
          sr.id,
@@ -3827,6 +3942,7 @@ const getDashboardResumen = async (req, res) => {
       kpisRes,
       ingresosRes,
       sparklineRes,
+      tecnicoPersonalRes,
       flujoRes,
       serieRes,
       cargaRes,
@@ -3835,6 +3951,7 @@ const getDashboardResumen = async (req, res) => {
       kpisPromise,
       ingresosPromise,
       sparklinePromise,
+      tecnicoPersonalPromise,
       flujoPromise,
       seriePromise,
       cargaPromise,
@@ -3842,26 +3959,49 @@ const getDashboardResumen = async (req, res) => {
     ]);
 
     const kpis = kpisRes.rows[0] || {};
+    const tecPersonal = tecnicoPersonalRes.rows[0] || {};
     const liquidadoMes = parseFloat(ingresosRes.rows[0]?.liquidado_mes || 0);
     const anticiposMes = parseFloat(ingresosRes.rows[0]?.anticipos_mes || 0);
-    const ingresosMes = Math.round((liquidadoMes + anticiposMes) * 100) / 100;
+    const liquidadoMesAnt = parseFloat(ingresosRes.rows[0]?.liquidado_mes_anterior || 0);
+    const anticiposMesAnt = parseFloat(ingresosRes.rows[0]?.anticipos_mes_anterior || 0);
+
+    const ingresosMes = canViewFinances ? Math.round((liquidadoMes + anticiposMes) * 100) / 100 : null;
+    const ingresosMesAnterior = canViewFinances ? Math.round((liquidadoMesAnt + anticiposMesAnt) * 100) / 100 : null;
+
+    const kpisPayload = {
+      ordenes_abiertas: kpis.ordenes_abiertas || 0,
+      abiertas_hoy: kpis.abiertas_hoy || 0,
+      urgentes: kpis.urgentes || 0,
+      sin_tecnico: kpis.sin_tecnico || 0,
+      listas_entrega: kpis.listas_entrega || 0,
+      es_tecnico: isTecnico,
+      can_view_finances: canViewFinances
+    };
+
+    if (isTecnico) {
+      kpisPayload.mis_ordenes_activas = tecPersonal.mis_ordenes_activas || 0;
+      kpisPayload.mis_diagnosticos_pendientes = tecPersonal.mis_diagnosticos_pendientes || 0;
+      kpisPayload.ingresos_mes = null;
+      kpisPayload.ingresos_mes_anterior = null;
+      kpisPayload.ingresos_sparkline = [];
+    } else if (canViewFinances) {
+      kpisPayload.ingresos_mes = ingresosMes;
+      kpisPayload.ingresos_mes_anterior = ingresosMesAnterior;
+      kpisPayload.ingresos_sparkline = (sparklineRes.rows || []).map((row) => ({
+        fecha: row.fecha,
+        monto: parseFloat(row.monto || 0)
+      }));
+    } else {
+      kpisPayload.ingresos_mes = null;
+      kpisPayload.ingresos_mes_anterior = null;
+      kpisPayload.ingresos_sparkline = [];
+    }
 
     return res.status(200).json({
       ok: true,
       success: true,
       data: {
-        kpis: {
-          ordenes_abiertas: kpis.ordenes_abiertas || 0,
-          abiertas_hoy: kpis.abiertas_hoy || 0,
-          urgentes: kpis.urgentes || 0,
-          sin_tecnico: kpis.sin_tecnico || 0,
-          listas_entrega: kpis.listas_entrega || 0,
-          ingresos_mes: ingresosMes,
-          ingresos_sparkline: (sparklineRes.rows || []).map((row) => ({
-            fecha: row.fecha,
-            monto: parseFloat(row.monto || 0)
-          }))
-        },
+        kpis: kpisPayload,
         flujo: (flujoRes.rows || []).map((row) => ({
           id: row.id,
           codigo_estado: row.codigo_estado,

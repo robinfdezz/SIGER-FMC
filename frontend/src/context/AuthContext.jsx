@@ -122,6 +122,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('siger_user');
         sessionStorage.removeItem('siger_token');
         sessionStorage.removeItem('siger_user');
+        sessionStorage.removeItem('siger_notif_last_unread');
 
         if (rememberMe) {
           localStorage.setItem('siger_token', receivedToken);
@@ -157,6 +158,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('siger_user');
     sessionStorage.removeItem('siger_token');
     sessionStorage.removeItem('siger_user');
+    sessionStorage.removeItem('siger_notif_last_unread');
   };
 
   const clearError = () => setError(null);

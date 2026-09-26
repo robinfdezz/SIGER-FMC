@@ -21,6 +21,16 @@ import { ChevronDown, Check, HelpCircle } from 'lucide-react';
  * @param {string} [props.buttonClassName] - Clases CSS adicionales para el botón disparador
  * @param {string} [props.menuClassName] - Clases CSS adicionales para el dropdown menú
  */
+const renderSelectIcon = (icon, isCompact = false) => {
+  if (!icon) return null;
+  if (React.isValidElement(icon)) return icon;
+  if (typeof icon === 'function' || (typeof icon === 'object' && icon?.$$typeof)) {
+    const IconComp = icon;
+    return <IconComp size={isCompact ? 13 : 16} />;
+  }
+  return null;
+};
+
 export const Select = ({
   label,
   hint,
@@ -171,11 +181,7 @@ export const Select = ({
               {/* Icono si existe */}
               {selectedItem.icon && (
                 <span className="shrink-0 text-neutral-500 dark:text-neutral-400">
-                  {typeof selectedItem.icon === 'function' ? (
-                    <selectedItem.icon size={16} />
-                  ) : (
-                    selectedItem.icon
-                  )}
+                  {renderSelectIcon(selectedItem.icon, isCompact)}
                 </span>
               )}
 
@@ -254,11 +260,7 @@ export const Select = ({
                             : 'text-neutral-400 dark:text-neutral-500'
                         }`}
                       >
-                        {typeof item.icon === 'function' ? (
-                          <item.icon size={16} />
-                        ) : (
-                          item.icon
-                        )}
+                        {renderSelectIcon(item.icon, isCompact)}
                       </span>
                     )}
 

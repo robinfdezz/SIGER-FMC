@@ -1,19 +1,12 @@
 'use strict';
 
 const { getPool } = require('../config/db');
-const {
-  emailInternoAsignacion,
-  emailInternoFinalizada
-} = require('../config/email');
-
-/** Únicos tipos internos que disparan correo (el resto solo campanita). */
-const INTERNAL_EMAIL_TYPES = new Set(['ASIGNACION', 'ORDEN_FINALIZADA']);
-
-/** Roles que siempre reciben campanita, aunque sean el actor del evento. */
+// Correos transaccionales a personal desactivados: se gestionan exclusivamente notificaciones in-app
 const ALWAYS_NOTIFY_ROLES = new Set(['superadmin', 'admin_sucursal']);
 
 /**
- * Crea notificaciones in-app. Correo interno solo en ASIGNACION y ORDEN_FINALIZADA.
+ * Crea notificaciones in-app en la tabla `notificaciones`.
+ * Exclusivamente alertas en campana / interfaz web.
  * Admin_Sucursal y SuperAdmin siempre se notifican (no se excluyen por ser el actor).
  */
 async function createNotifications({
@@ -24,9 +17,7 @@ async function createNotifications({
   servicioId = null,
   incidenciaId = null,
   enlace = null,
-  excludeUserId = null,
-  sendMail,
-  meta = {}
+  excludeUserId = null
 }) {
   try {
     const pool = getPool();
@@ -58,7 +49,6 @@ async function createNotifications({
 
     if (!ids.length) return [];
 
-    const tipoNorm = String(tipo).toUpperCase();
     const inserted = [];
 
     for (const usuarioId of ids) {
@@ -80,80 +70,10 @@ async function createNotifications({
       if (res.rows[0]) inserted.push(res.rows[0]);
     }
 
-    const shouldMail =
-      sendMail !== false &&
-      INTERNAL_EMAIL_TYPES.has(tipoNorm) &&
-      Boolean(process.env.RESEND_API_KEY) &&
-      inserted.length > 0;
-
-    if (shouldMail) {
-      notifyUsersByEmail(ids, {
-        tipo: tipoNorm,
-        titulo,
-        mensaje,
-        enlace,
-        servicioId,
-        meta
-      }).catch(() => {});
-    }
-
     return inserted;
   } catch (error) {
     console.warn('⚠️ No se pudieron crear notificaciones:', error.message);
     return [];
-  }
-}
-
-async function notifyUsersByEmail(usuarioIds, payload) {
-  try {
-    const pool = getPool();
-    const res = await pool.query(
-      `SELECT id, correo, nombre, apellido
-       FROM datos_trabajadores
-       WHERE id = ANY($1::int[])
-         AND activo = TRUE
-         AND correo IS NOT NULL
-         AND TRIM(correo) <> ''`,
-      [usuarioIds]
-    );
-
-    const tipo = String(payload.tipo || '').toUpperCase();
-    if (!INTERNAL_EMAIL_TYPES.has(tipo)) return;
-
-    const meta = payload.meta || {};
-
-    await Promise.all(
-      res.rows.map(async (user) => {
-        const common = {
-          usuario_nombre: `${user.nombre || ''} ${user.apellido || ''}`.trim(),
-          codigo_ticket: meta.codigo_ticket,
-          cliente_nombre: meta.cliente_nombre,
-          equipo: meta.equipo,
-          prioridad: meta.prioridad,
-          falla_reportada: meta.falla_reportada || payload.mensaje,
-          enlace: payload.enlace,
-          servicio_id: payload.servicioId,
-          titulo: payload.titulo,
-          mensaje: payload.mensaje,
-          fecha_entrega: meta.fecha_entrega
-        };
-
-        let result;
-        if (tipo === 'ASIGNACION') {
-          result = await emailInternoAsignacion(user.correo, common);
-        } else if (tipo === 'ORDEN_FINALIZADA') {
-          result = await emailInternoFinalizada(user.correo, common);
-        } else {
-          return;
-        }
-
-        if (!result.ok) {
-          console.warn(`⚠️ Email no enviado a ${user.correo}: ${result.error}`);
-        }
-      })
-    );
-  } catch (error) {
-    console.warn('⚠️ notifyUsersByEmail:', error.message);
   }
 }
 
@@ -203,9 +123,15 @@ async function getAssignedTechnicianIds(servicioId) {
   }
 }
 
+/** Desactivado para eventos operativos internos */
+async function notifyUsersByEmail() {
+  return [];
+}
+
 module.exports = {
   createNotifications,
   getBranchStaffIds,
   getAssignedTechnicianIds,
   notifyUsersByEmail
 };
+
