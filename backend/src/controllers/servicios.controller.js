@@ -1477,7 +1477,23 @@ const getServiciosTaller = async (req, res) => {
           WHERE ta.servicio_id = sr.id
           ORDER BY ta.id ASC
           LIMIT 1
-        ), 'Sin asignar') AS tecnico_nombre,
+          ), 'Sin asignar') AS tecnico_nombre,
+          (
+            SELECT dt.foto_perfil_url
+            FROM tecnicos_asignados ta
+            JOIN datos_trabajadores dt ON dt.id = ta.tecnico_id
+            WHERE ta.servicio_id = sr.id
+            ORDER BY ta.id ASC
+            LIMIT 1
+          ) AS tecnico_foto_url,
+          (
+            SELECT dt.foto_perfil_url
+            FROM tecnicos_asignados ta
+            JOIN datos_trabajadores dt ON dt.id = ta.tecnico_id
+            WHERE ta.servicio_id = sr.id
+            ORDER BY ta.id ASC
+            LIMIT 1
+          ) AS tecnico_foto_url,
         COALESCE((
           SELECT ta.tecnico_id
           FROM tecnicos_asignados ta
@@ -3814,11 +3830,11 @@ const getDashboardResumen = async (req, res) => {
       branchParams
     );
 
-    // 6. Tendencia Temporal 7 días Entradas vs Entregas (Optimizado con agregaciones CTE)
+    // 6. Tendencia Temporal 30 días Entradas vs Entregas (Optimizado con agregaciones CTE)
     const seriePromise = pool.query(
       `WITH dias AS (
          SELECT generate_series(
-           ((NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '6 days'),
+           ((NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '29 days'),
            (NOW() AT TIME ZONE 'America/Santo_Domingo')::date,
            INTERVAL '1 day'
          )::date AS dia
@@ -3829,7 +3845,7 @@ const getDashboardResumen = async (req, res) => {
            COUNT(*)::int AS entradas
          FROM servicios_recepcion sr
          WHERE sr.activo = TRUE
-           AND sr.created_at >= (NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '6 days'
+           AND sr.created_at >= (NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '29 days'
            ${branchClause}
          GROUP BY (sr.created_at AT TIME ZONE 'America/Santo_Domingo')::date
        ),
@@ -3840,7 +3856,7 @@ const getDashboardResumen = async (req, res) => {
          FROM servicios_recepcion sr
          WHERE sr.activo = TRUE
            AND sr.fecha_entrega_real IS NOT NULL
-           AND sr.fecha_entrega_real >= (NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '6 days'
+           AND sr.fecha_entrega_real >= (NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '29 days'
            ${branchClause}
          GROUP BY (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date
        )
@@ -3925,6 +3941,14 @@ const getDashboardResumen = async (req, res) => {
            ORDER BY ta.id ASC
            LIMIT 1
          ), 'Sin asignar') AS tecnico_nombre,
+         (
+           SELECT dt.foto_perfil_url
+           FROM tecnicos_asignados ta
+           JOIN datos_trabajadores dt ON dt.id = ta.tecnico_id
+           WHERE ta.servicio_id = sr.id
+           ORDER BY ta.id ASC
+           LIMIT 1
+         ) AS tecnico_foto_url,
          sr.updated_at,
          sr.created_at
        FROM servicios_recepcion sr
@@ -4010,7 +4034,17 @@ const getDashboardResumen = async (req, res) => {
           orden_flujo: row.orden_flujo,
           total: row.total || 0
         })),
-        serie_7d: (serieRes.rows || []).map((row) => ({
+        serie_7d: (serieRes.rows || []).slice(-7).map((row) => ({
+          fecha: row.fecha,
+          entradas: row.entradas || 0,
+          entregas: row.entregas || 0
+        })),
+        serie_30d: (serieRes.rows || []).map((row) => ({
+          fecha: row.fecha,
+          entradas: row.entradas || 0,
+          entregas: row.entregas || 0
+        })),
+        serie_dias: (serieRes.rows || []).map((row) => ({
           fecha: row.fecha,
           entradas: row.entradas || 0,
           entregas: row.entregas || 0
@@ -4034,6 +4068,7 @@ const getDashboardResumen = async (req, res) => {
           orden_flujo: row.orden_flujo,
           tecnicos_count: row.tecnicos_count || 0,
           tecnico_nombre: row.tecnico_nombre,
+          tecnico_foto_url: row.tecnico_foto_url,
           updated_at: row.updated_at,
           created_at: row.created_at
         }))
