@@ -711,6 +711,6 @@ Los correos al **cliente** se invocan directamente desde `servicios.controller.j
 - `RESEND_TEST_TO` — en desarrollo redirige todos los destinatarios al buzón de prueba (útil con dominio no verificado).
 
 ### 8.4 Frontend
-- `NotificationBell.jsx`: badge, panel desplegable, marcar leída / todas; polling 15 s + refresh on focus; requests sin caché.
+- `NotificationBell.jsx`: badge con alertas auditivas sintetizadas (Web Audio API), animación de campana, panel desplegable extendido, persistencia en sessionStorage y marcar leída / todas; polling 15 s + refresh on focus; requests sin caché.
 - `GlobalSearch.jsx`: búsqueda predictiva en la misma cabecera (`Navbar.jsx`).
-- `DashboardPage.jsx`: consume `GET /api/servicios/dashboard` con datos reales de la sede.
+- `DashboardPage.jsx`: consume `GET /api/servicios/dashboard` con datos reales de la sede, KPIs segmentados por rol, gráfica de dona de categorías de dispositivos (`DeviceCategoryDonut`) y actividad reciente con avatares de técnicos.

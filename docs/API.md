@@ -1326,8 +1326,11 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
         "urgentes": 1,
         "sin_tecnico": 2,
         "listas_entrega": 4,
-        "ingresos_mes": 45890.5,
-        "ingresos_sparkline": [{ "fecha": "2026-09-20", "monto": 3200 }]
+        "es_tecnico": false,
+        "can_view_finances": true,
+        "ingresos_mes": 45890.50,
+        "ingresos_mes_anterior": 38400.00,
+        "ingresos_sparkline": [{ "fecha": "2026-09-20", "monto": 3200.00 }]
       },
       "flujo": [
         {
@@ -1340,15 +1343,25 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
         }
       ],
       "serie_7d": [{ "fecha": "2026-09-19", "entradas": 4, "entregas": 2 }],
+      "serie_30d": [{ "fecha": "2026-09-19", "entradas": 4, "entregas": 2 }],
+      "serie_dias": [{ "fecha": "2026-09-19", "entradas": 4, "entregas": 2 }],
       "carga_tecnicos": [
         {
           "id": 4,
           "nombre": "Técnico Ejemplo",
-          "foto_perfil_url": null,
+          "foto_perfil_url": "https://res.cloudinary.com/.../avatar.webp",
           "ordenes": 3,
           "es_sin_asignar": false
         }
       ],
+      "distribucion_categorias": {
+        "total_mes": 14,
+        "items": [
+          { "id": 1, "categoria": "Smartphone", "total": 6, "porcentaje": 42.9 },
+          { "id": 2, "categoria": "Laptop", "total": 4, "porcentaje": 28.6 },
+          { "id": 3, "categoria": "Tablet / iPad", "total": 2, "porcentaje": 14.3 }
+        ]
+      },
       "actividad_reciente": [
         {
           "id": 101,
@@ -1362,6 +1375,7 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
           "orden_flujo": 4,
           "tecnicos_count": 1,
           "tecnico_nombre": "Juan Técnico",
+          "tecnico_foto_url": "https://res.cloudinary.com/.../avatar.webp",
           "updated_at": "2026-09-25T18:00:00.000Z",
           "created_at": "2026-09-24T10:00:00.000Z"
         }

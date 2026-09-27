@@ -3962,6 +3962,25 @@ const getDashboardResumen = async (req, res) => {
       branchParams
     );
 
+    // 9. Distribución de Órdenes por Categoría de Dispositivo (Mes actual)
+    const categoriasPromise = pool.query(
+      `SELECT
+         cd.id,
+         cd.nombre_categoria AS categoria,
+         COUNT(sr.id)::int AS total
+       FROM categorias_dispositivos cd
+       LEFT JOIN servicios_recepcion sr
+         ON sr.categoria_id = cd.id
+        AND sr.activo = TRUE
+        AND DATE_TRUNC('month', sr.created_at AT TIME ZONE 'America/Santo_Domingo')
+            = DATE_TRUNC('month', NOW() AT TIME ZONE 'America/Santo_Domingo')
+        ${branchClause}
+       WHERE cd.activo = TRUE
+       GROUP BY cd.id, cd.nombre_categoria
+       ORDER BY total DESC, cd.nombre_categoria ASC`,
+      branchParams
+    );
+
     const [
       kpisRes,
       ingresosRes,
@@ -3970,7 +3989,8 @@ const getDashboardResumen = async (req, res) => {
       flujoRes,
       serieRes,
       cargaRes,
-      actividadRes
+      actividadRes,
+      categoriasRes
     ] = await Promise.all([
       kpisPromise,
       ingresosPromise,
@@ -3979,7 +3999,8 @@ const getDashboardResumen = async (req, res) => {
       flujoPromise,
       seriePromise,
       cargaPromise,
-      actividadPromise
+      actividadPromise,
+      categoriasPromise
     ]);
 
     const kpis = kpisRes.rows[0] || {};
@@ -4021,6 +4042,20 @@ const getDashboardResumen = async (req, res) => {
       kpisPayload.ingresos_sparkline = [];
     }
 
+    const totalTrabajosMes = (categoriasRes.rows || []).reduce((acc, row) => acc + (Number(row.total) || 0), 0);
+    const categoriasPayload = (categoriasRes.rows || []).map((row) => {
+      const count = Number(row.total) || 0;
+      const porcentaje = totalTrabajosMes > 0
+        ? Math.round((count / totalTrabajosMes) * 1000) / 10
+        : 0;
+      return {
+        id: row.id,
+        categoria: row.categoria,
+        total: count,
+        porcentaje
+      };
+    });
+
     return res.status(200).json({
       ok: true,
       success: true,
@@ -4056,6 +4091,10 @@ const getDashboardResumen = async (req, res) => {
           ordenes: row.ordenes || 0,
           es_sin_asignar: row.es_sin_asignar === true
         })),
+        distribucion_categorias: {
+          total_mes: totalTrabajosMes,
+          items: categoriasPayload
+        },
         actividad_reciente: (actividadRes.rows || []).map((row) => ({
           id: row.id,
           codigo_ticket: row.codigo_ticket,
