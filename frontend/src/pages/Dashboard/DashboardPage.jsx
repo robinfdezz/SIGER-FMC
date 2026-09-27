@@ -9,30 +9,38 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Building2,
-  CheckCircle2,
   ChevronRight,
   ChevronsDown,
   ChevronsUp,
   ClipboardCheck,
   ClipboardList,
   Clock,
+  Contact,
   DollarSign,
   Equal,
   Flame,
+  Gamepad2,
   Home,
+  Laptop,
+  Layers,
   Package,
   PackageCheck,
-  PlusCircle,
+  Plus,
   RotateCcw,
   Search,
+  Smartphone,
   Sparkles,
+  Tablet,
+  Ticket,
   Users,
   UserX,
+  Watch,
   Wrench,
   XCircle,
   Zap
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import DashboardLayout from '../../components/DashboardLayout';
 import Badge from '../../components/common/Badge';
 import Select from '../../components/common/Select';
@@ -67,11 +75,11 @@ const getCargaSaturationConfig = (porcentaje, isSinAsignar) => {
   };
 };
 
-const formatCurrency = (value) => {
+const formatCurrency = (value, decimals = 2) => {
   const amount = Number(value) || 0;
   return amount.toLocaleString('es-DO', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
   });
 };
 
@@ -465,7 +473,7 @@ const TrendChart = ({ serie = [] }) => {
 
   const width = chartWidth;
   const height = 190;
-  const padding = { top: 20, right: 16, bottom: 30, left: 32 };
+  const padding = { top: 20, right: 28, bottom: 30, left: 32 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
@@ -513,14 +521,14 @@ const TrendChart = ({ serie = [] }) => {
             size="sm"
           />
 
-          {/* Leyenda con iconos representativos */}
+          {/* Leyenda con iconos representativos homologados de flujo */}
           <div className="flex items-center gap-3.5 text-xs font-medium text-neutral-600 dark:text-neutral-300">
             <span className="inline-flex items-center gap-1.5">
               <ArrowDownLeft className="w-4 h-4 text-rose-500 shrink-0" />
               <span>Entradas</span>
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <ArrowUpRight className="w-4 h-4 text-emerald-500 shrink-0" />
               <span>Entregas</span>
             </span>
           </div>
@@ -534,7 +542,7 @@ const TrendChart = ({ serie = [] }) => {
           <div
             className="absolute pointer-events-none transition-all duration-150 z-20"
             style={{
-              left: `${tooltipLeftPercent}%`,
+              left: `${Math.min(85, Math.max(15, tooltipLeftPercent))}%`,
               top: '15px',
               transform: 'translate(-50%, 0)'
             }}
@@ -555,7 +563,7 @@ const TrendChart = ({ serie = [] }) => {
                 </div>
                 <div className="flex items-center justify-between gap-4 text-neutral-600 dark:text-neutral-300">
                   <span className="flex items-center gap-1.5 font-medium">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                     Entregas:
                   </span>
                   <span className="font-bold text-neutral-900 dark:text-neutral-100 tabular-nums">
@@ -686,6 +694,9 @@ const TrendChart = ({ serie = [] }) => {
             const stepX = displaySerie.length > 1 ? chartW / (displaySerie.length - 1) : chartW;
             const x = padding.left + index * stepX;
             const isHovered = hoveredIndex === index;
+            const isFirst = index === 0;
+            const isLast = index === displaySerie.length - 1;
+            const isSingle = displaySerie.length <= 1;
 
             // Evitar solapamiento cuando hay 14 o 30 días
             const shouldShowLabel =
@@ -697,12 +708,16 @@ const TrendChart = ({ serie = [] }) => {
 
             if (!shouldShowLabel) return null;
 
+            // Ajuste de anclaje y margen de seguridad para evitar desbordes en los extremos
+            const textAnchor = isSingle ? 'middle' : isLast ? 'end' : (isFirst ? 'start' : 'middle');
+            const labelX = isSingle ? x : isLast ? Math.min(x + 12, width - 6) : (isFirst ? Math.max(x - 12, 6) : x);
+
             return (
               <text
                 key={item.fecha || index}
-                x={x}
+                x={labelX}
                 y={height - 8}
-                textAnchor="middle"
+                textAnchor={textAnchor}
                 className={`text-[11px] transition-colors font-medium ${isHovered
                     ? 'fill-neutral-900 dark:fill-neutral-100 font-bold'
                     : 'fill-neutral-400 dark:fill-neutral-500'
@@ -734,6 +749,377 @@ const TrendChart = ({ serie = [] }) => {
           })}
         </svg>
       </div>
+    </div>
+  );
+};
+
+const CATEGORY_ICONS = {
+  'Smartphone': Smartphone,
+  'Tablet / iPad': Tablet,
+  'Laptop': Laptop,
+  'Consola de Videojuegos': Gamepad2,
+  'Smartwatch': Watch,
+  'Otros': Package
+};
+
+const getCategoryIcon = (catName) => {
+  if (CATEGORY_ICONS[catName]) return CATEGORY_ICONS[catName];
+  const lower = (catName || '').toLowerCase();
+  if (lower.includes('phone') || lower.includes('cel') || lower.includes('tel')) return Smartphone;
+  if (lower.includes('lap') || lower.includes('pc') || lower.includes('compu')) return Laptop;
+  if (lower.includes('tab') || lower.includes('ipad')) return Tablet;
+  if (lower.includes('cons') || lower.includes('juego') || lower.includes('play')) return Gamepad2;
+  if (lower.includes('watch') || lower.includes('reloj')) return Watch;
+  return Package;
+};
+
+// Paleta corporativa institucional:
+// Categoría líder / predominante del mes: Rojo institucional FMC
+const BRAND_RED_LIGHT = '#DC2626'; // Rojo 600 corporativo
+const BRAND_RED_DARK = '#EF4444';  // Rojo 500 para alto contraste en modo oscuro
+
+// Categorías secundarias: Escala refinada de Slate / Neutros elegantes
+const SLATE_SCALE_LIGHT = [
+  '#334155', // Slate 700 - alta presencia visual
+  '#475569', // Slate 600
+  '#64748B', // Slate 500
+  '#94A3B8', // Slate 400
+  '#CBD5E1', // Slate 300
+  '#E2E8F0'  // Slate 200
+];
+
+const SLATE_SCALE_DARK = [
+  '#E2E8F0', // Slate 200 - nítido sobre fondo oscuro
+  '#CBD5E1', // Slate 300
+  '#94A3B8', // Slate 400
+  '#64748B', // Slate 500
+  '#475569', // Slate 600
+  '#334155'  // Slate 700
+];
+
+const DeviceCategoryDonut = ({ data = {}, className = '', mostrarDetalle = false }) => {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [tooltip, setTooltip] = useState(null);
+  const containerRef = useRef(null);
+
+  let isDark = false;
+  try {
+    const themeContext = useTheme();
+    isDark = Boolean(themeContext?.isDark);
+  } catch {
+    if (typeof document !== 'undefined') {
+      isDark = document.documentElement.classList.contains('dark');
+    }
+  }
+
+  const total_mes = Number(data?.total_mes) || 0;
+  const rawItems = Array.isArray(data?.items) ? data.items : [];
+
+  const items = useMemo(() => {
+    return rawItems;
+  }, [rawItems]);
+
+  const activeSegments = useMemo(() => {
+    return items.filter((item) => (Number(item.total) || 0) > 0);
+  }, [items]);
+
+  // Filtrado inteligente: sólo categorías con al menos 1 trabajo para la leyenda
+  const legendItems = useMemo(() => {
+    return items
+      .map((item, idx) => ({ ...item, originalIndex: idx }))
+      .filter((item) => (Number(item.total) || 0) > 0);
+  }, [items]);
+
+  // Ordenar items para determinar la categoría líder y el orden jerárquico de colores
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0));
+  }, [items]);
+
+  const maxTotal = sortedItems.length > 0 ? (Number(sortedItems[0].total) || 0) : 0;
+
+  const getItemColor = useCallback((item) => {
+    if (!item) return isDark ? '#94A3B8' : '#64748B';
+
+    const rank = sortedItems.findIndex(
+      (s) => (s.id && item.id && s.id === item.id) || s.categoria === item.categoria
+    );
+
+    // Categoría predominante (con mayor volumen en el mes) -> Rojo corporativo
+    if (rank === 0 && maxTotal > 0) {
+      return isDark ? BRAND_RED_DARK : BRAND_RED_LIGHT;
+    }
+
+    // Categorías secundarias -> Escala degradada de slate/neutros
+    const secondaryIdx = Math.max(0, rank <= 0 ? 0 : rank - 1);
+    const scale = isDark ? SLATE_SCALE_DARK : SLATE_SCALE_LIGHT;
+    return scale[secondaryIdx % scale.length];
+  }, [sortedItems, maxTotal, isDark]);
+
+  const cx = 110;
+  const cy = 110;
+  const R = 74;
+  const C = 2 * Math.PI * R; // ~464.95
+
+  const segmentsData = useMemo(() => {
+    if (total_mes === 0 || activeSegments.length === 0) return [];
+
+    let accumulatedFraction = 0;
+    const isSingle = activeSegments.length === 1;
+
+    return activeSegments.map((item, idx) => {
+      const fraction = (Number(item.total) || 0) / total_mes;
+      const segmentPx = fraction * C;
+
+      const gapPx = isSingle ? 0 : Math.min(22, Math.max(14, segmentPx * 0.25));
+      const effectivePx = isSingle ? C : Math.max(1, segmentPx - gapPx);
+      const offsetPx = isSingle ? 0 : -(accumulatedFraction * C + gapPx / 2);
+
+      accumulatedFraction += fraction;
+
+      const color = getItemColor(item);
+
+      return {
+        ...item,
+        color,
+        effectivePx,
+        offsetPx,
+        originalIndex: items.findIndex((orig) => (orig.id && orig.id === item.id) || orig.categoria === item.categoria)
+      };
+    });
+  }, [activeSegments, total_mes, C, items, getItemColor]);
+
+  const hoveredItem = hoveredIndex !== null && items[hoveredIndex] ? items[hoveredIndex] : null;
+  const hoveredColor = hoveredItem ? getItemColor(hoveredItem) : (isDark ? BRAND_RED_DARK : BRAND_RED_LIGHT);
+  const HoveredIcon = hoveredItem ? getCategoryIcon(hoveredItem.categoria) : Package;
+
+  const handleMouseMove = (e, item, color) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    setTooltip({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      item,
+      color
+    });
+  };
+
+  return (
+    <div className={`rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5 flex flex-col ${mostrarDetalle ? 'justify-between' : ''} ${className}`}>
+      {/* Encabezado limpio */}
+      <div className="mb-2 sm:mb-3">
+        <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-50 font-outfit">
+          Categorías de Dispositivos
+        </h3>
+        <p className="text-[11px] text-neutral-400 dark:text-neutral-500 font-inter">
+          Distribución de trabajos realizados este mes
+        </p>
+      </div>
+
+      {/* Donut SVG Interactivo (Centrado vertical y horizontalmente cuando no hay detalle) */}
+      <div
+        ref={containerRef}
+        className={`relative flex items-center justify-center select-none ${
+          mostrarDetalle ? 'my-2' : 'flex-1 my-auto py-4 sm:py-6'
+        }`}
+        onMouseLeave={() => {
+          setHoveredIndex(null);
+          setTooltip(null);
+        }}
+      >
+        {/* Tooltip flotante interactivo */}
+        {tooltip && (() => {
+          const TooltipIcon = getCategoryIcon(tooltip.item.categoria);
+          const count = Number(tooltip.item.total) || 0;
+          const labelTrabajo = count === 1 ? 'trabajo' : 'trabajos';
+
+          return (
+            <div
+              className="absolute pointer-events-none z-30 transition-all duration-75"
+              style={{
+                left: `${tooltip.x}px`,
+                top: `${tooltip.y}px`,
+                transform: 'translate(-50%, -100%)'
+              }}
+            >
+              <div className="bg-white/95 dark:bg-[#18181B]/95 backdrop-blur-md border border-neutral-200/90 dark:border-neutral-800 rounded-xl shadow-xl px-3 py-2 min-w-[140px] whitespace-nowrap text-xs -mt-2 animate-in fade-in zoom-in-95 duration-75">
+                <div className="flex items-center gap-1.5 font-semibold text-neutral-900 dark:text-neutral-100">
+                  <TooltipIcon
+                    className="w-3.5 h-3.5 shrink-0"
+                    style={{ color: tooltip.color }}
+                  />
+                  <span>{tooltip.item.categoria}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs mt-1">
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-100 tabular-nums">
+                    {tooltip.item.total} {labelTrabajo}
+                  </span>
+                  <span className="text-neutral-400 dark:text-neutral-600 font-normal">·</span>
+                  <span className="font-medium text-neutral-500 dark:text-neutral-400 text-xs tabular-nums">
+                    {tooltip.item.porcentaje}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        <svg
+          viewBox="0 0 220 220"
+          className={`${
+            mostrarDetalle
+              ? 'w-48 h-48 sm:w-52 sm:h-52'
+              : 'w-56 h-56 sm:w-64 sm:h-64'
+          } overflow-visible transition-all duration-300`}
+          role="img"
+          aria-label="Distribución por categoría de dispositivos"
+        >
+          {/* Pista circular de fondo */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={R}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={14}
+            className="text-neutral-100 dark:text-neutral-800/60"
+          />
+
+          {/* Segmentos de la Dona con extremos redondeados */}
+          {total_mes === 0 ? (
+            <circle
+              cx={cx}
+              cy={cy}
+              r={R}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={14}
+              className="text-neutral-200 dark:text-neutral-800"
+              strokeDasharray="4 6"
+            />
+          ) : (
+            segmentsData.map((seg, idx) => {
+              const isHovered = hoveredIndex === seg.originalIndex;
+              return (
+                <circle
+                  key={`donut-seg-${seg.id || seg.categoria || idx}`}
+                  cx={cx}
+                  cy={cy}
+                  r={R}
+                  fill="none"
+                  stroke={seg.color}
+                  strokeWidth={isHovered ? 18 : 14}
+                  strokeDasharray={`${seg.effectivePx} ${C - seg.effectivePx}`}
+                  strokeDashoffset={seg.offsetPx}
+                  strokeLinecap="round"
+                  transform={`rotate(-90 ${cx} ${cy})`}
+                  className="transition-all duration-200 cursor-pointer"
+                  style={{
+                    opacity: hoveredIndex !== null && !isHovered ? 0.35 : 1,
+                    filter: isHovered ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.20))' : 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    setHoveredIndex(seg.originalIndex);
+                    handleMouseMove(e, seg, seg.color);
+                  }}
+                  onMouseMove={(e) => {
+                    handleMouseMove(e, seg, seg.color);
+                  }}
+                  onMouseLeave={() => {
+                    setHoveredIndex(null);
+                    setTooltip(null);
+                  }}
+                />
+              );
+            })
+          )}
+        </svg>
+
+        {/* Centro de la Dona (Dinámico con Hover) */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center p-4">
+          {hoveredItem ? (
+            <div className="flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-150">
+              <span
+                className={`font-extrabold font-outfit tracking-tight leading-none tabular-nums ${
+                  mostrarDetalle ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-3xl'
+                }`}
+                style={{ color: hoveredColor }}
+              >
+                {hoveredItem.porcentaje}%
+              </span>
+              <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200 mt-1 flex items-center justify-center gap-1.5 max-w-[130px] font-outfit truncate">
+                <HoveredIcon className="w-3.5 h-3.5 shrink-0" style={{ color: hoveredColor }} />
+                <span className="truncate">{hoveredItem.categoria}</span>
+              </span>
+              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium tabular-nums font-mono mt-0.5">
+                {hoveredItem.total} {hoveredItem.total === 1 ? 'orden' : 'órdenes'}
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center transition-all duration-200">
+              <span className={`font-extrabold text-neutral-900 dark:text-neutral-50 font-outfit tracking-tight leading-none tabular-nums ${
+                mostrarDetalle ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl'
+              }`}>
+                {total_mes}
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mt-1 font-inter">
+                {total_mes === 1 ? 'Trabajo' : 'Trabajos'}
+              </span>
+              <span className="text-[11px] text-neutral-400 dark:text-neutral-500 font-medium">
+                Este mes
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Leyenda Inferior (solo si mostrarDetalle === true y hay categorías con órdenes) */}
+      {mostrarDetalle && legendItems.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800/80">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+            {legendItems.map((item, idx) => {
+              const CatIcon = getCategoryIcon(item.categoria);
+              const color = getItemColor(item);
+              const isHovered = hoveredIndex === item.originalIndex;
+
+              return (
+                <button
+                  key={`cat-legend-${item.id || item.categoria || idx}`}
+                  type="button"
+                  onMouseEnter={() => setHoveredIndex(item.originalIndex)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  className={`flex items-center justify-between gap-2 p-1.5 sm:p-2 rounded-xl border transition-all text-left cursor-pointer ${
+                    isHovered
+                      ? 'border-neutral-300 dark:border-neutral-700 bg-neutral-100/70 dark:bg-neutral-800/70 shadow-2xs'
+                      : 'border-transparent hover:bg-neutral-50 dark:hover:bg-neutral-900/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <CatIcon
+                      className="w-3.5 h-3.5 shrink-0 transition-transform"
+                      style={{
+                        color: color,
+                        transform: isHovered ? 'scale(1.15)' : 'scale(1)'
+                      }}
+                    />
+                    <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300 truncate" title={item.categoria}>
+                      {item.categoria}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 text-xs">
+                    <span className="font-semibold text-neutral-800 dark:text-neutral-100 tabular-nums font-mono">
+                      {item.total}
+                    </span>
+                    <span className="text-neutral-400 dark:text-neutral-600 font-normal">·</span>
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400 font-normal tabular-nums">
+                      {item.porcentaje}%
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1182,7 +1568,7 @@ const DashboardPage = () => {
                     className="w-full flex-1 group text-left rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 hover:bg-neutral-100/90 dark:hover:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-between cursor-pointer"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <PlusCircle className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
+                      <Plus className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
                       <div className="min-w-0">
                         <p className="text-xs font-bold leading-tight truncate">Nueva Orden</p>
                         <p className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">Recepción de equipo</p>
@@ -1213,7 +1599,7 @@ const DashboardPage = () => {
                   className="w-full flex-1 group text-left rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 hover:bg-neutral-100/90 dark:hover:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-between cursor-pointer"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <Users className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
+                    <Contact className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
                     <div className="min-w-0">
                       <p className="text-xs font-bold leading-tight truncate">Clientes</p>
                       <p className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">Directorio y contactos</p>
@@ -1228,7 +1614,7 @@ const DashboardPage = () => {
                   className="w-full flex-1 group text-left rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 hover:bg-neutral-100/90 dark:hover:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-between cursor-pointer"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <ClipboardList className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
+                    <Ticket className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
                     <div className="min-w-0">
                       <p className="text-xs font-bold leading-tight truncate">Consultar Órdenes</p>
                       <p className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">Búsqueda y filtros</p>
@@ -1243,7 +1629,8 @@ const DashboardPage = () => {
 
         {loading ? (
           <SkeletonTheme baseColor="#E4E4E7" highlightColor="#F4F4F5">
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            {/* Flujo + Carga */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3.5">
               <div className="xl:col-span-2 rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 p-5">
                 <Skeleton height={18} width={160} />
                 <Skeleton height={180} className="mt-4" />
@@ -1257,19 +1644,28 @@ const DashboardPage = () => {
                 </div>
               </div>
             </div>
-            <div className="w-full rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 p-5">
-              <Skeleton height={20} width={180} />
-              <div className="mt-4 space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} height={40} />
-                ))}
+
+            {/* Categorías (Izquierda 1/3) + Actividad Reciente (Derecha 2/3) */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3.5">
+              <div className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 p-5">
+                <Skeleton height={18} width={160} />
+                <div className="mt-4 flex items-center justify-center">
+                  <Skeleton circle height={170} width={170} />
+                </div>
+              </div>
+              <div className="xl:col-span-2 rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 p-5">
+                <Skeleton height={20} width={180} />
+                <div className="mt-4 space-y-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} height={40} />
+                  ))}
+                </div>
               </div>
             </div>
           </SkeletonTheme>
         ) : (
           <>
-
-            {/* Flujo + Carga */}
+            {/* Flujo + Carga (Disposición Original) */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-3.5">
               {/* Pipeline / Flujo del taller */}
               <div className="xl:col-span-2 rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5">
@@ -1494,9 +1890,14 @@ const DashboardPage = () => {
               </div>
             </div>
 
-            {/* Actividad Reciente (Full Width) */}
-            <div className="w-full rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs overflow-hidden flex flex-col">
-              <div>
+            {/* Fila: Categorías de Dispositivos (Izquierda) + Actividad Reciente (Derecha) */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3.5 items-stretch">
+              {/* Categorías de Dispositivos (Lado Izquierdo) */}
+              <DeviceCategoryDonut data={data?.distribucion_categorias} className="h-full" mostrarDetalle={false} />
+
+              {/* Actividad Reciente (Lado Derecho) */}
+              <div className="xl:col-span-2 rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs overflow-hidden flex flex-col justify-between">
+                <div>
                 <div className="px-4 sm:px-5 py-4 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-50 font-outfit">
@@ -1604,8 +2005,8 @@ const DashboardPage = () => {
                               </td>
                               <td className="px-4 sm:px-5 py-3.5 text-right whitespace-nowrap">
                                 {hasTecnico ? (
-                                  <div className="inline-flex items-center justify-end gap-2 text-right">
-                                    <div className="w-7 h-7 rounded-xl bg-zinc-800 text-zinc-100 dark:bg-zinc-700 border border-zinc-700 dark:border-zinc-600 font-bold text-[10px] flex items-center justify-center shrink-0 shadow-2xs overflow-hidden relative">
+                                  <div className="inline-flex items-center justify-end gap-2 text-left">
+                                    <div className="w-7 h-7 rounded-xl bg-zinc-800 text-zinc-100 dark:bg-zinc-700 border border-zinc-700 dark:border-zinc-600 font-bold text-[10px] flex items-center justify-center shrink-0 overflow-hidden relative">
                                       {orden.tecnico_foto_url ? (
                                         <img
                                           src={orden.tecnico_foto_url}
@@ -1622,20 +2023,22 @@ const DashboardPage = () => {
                                         {getInitials(orden.tecnico_nombre)}
                                       </span>
                                     </div>
-                                    <span
-                                      className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate max-w-[120px]"
-                                      title={orden.tecnico_nombre}
-                                    >
-                                      {shortTechName(orden.tecnico_nombre)}
-                                    </span>
-                                    {orden.tecnicos_count > 1 ? (
+                                    <div className="flex flex-col items-start min-w-0">
                                       <span
-                                        className="text-[10px] font-bold text-neutral-500 bg-neutral-100 dark:bg-neutral-800 rounded-full px-1.5 py-0.5"
-                                        title={`${orden.tecnicos_count} técnicos asignados`}
+                                        className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate max-w-[120px] leading-tight"
+                                        title={orden.tecnico_nombre}
                                       >
-                                        +{orden.tecnicos_count - 1}
+                                        {shortTechName(orden.tecnico_nombre)}
                                       </span>
-                                    ) : null}
+                                      {orden.tecnicos_count > 1 ? (
+                                        <span
+                                          className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mt-0.5 leading-tight"
+                                          title={`${orden.tecnicos_count} técnicos asignados`}
+                                        >
+                                          +{orden.tecnicos_count - 1} más
+                                        </span>
+                                      ) : null}
+                                    </div>
                                   </div>
                                 ) : (
                                   <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-medium bg-neutral-100 dark:bg-neutral-800/80 text-neutral-500 dark:text-neutral-400 border border-neutral-200/70 dark:border-neutral-700/60">
@@ -1653,7 +2056,8 @@ const DashboardPage = () => {
                 </div>
               </div>
             </div>
-          </>
+          </div>
+        </>
         )}
       </div>
     </DashboardLayout>

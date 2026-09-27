@@ -6,7 +6,46 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [Unreleased]
+## [Unreleased] - 2026-09-26
+
+### Added
+- **Distribución de Órdenes por Categoría de Dispositivos (`distribucion_categorias` & `DeviceCategoryDonut`):**
+  - **Backend (`GET /api/servicios/dashboard`):** Nueva agregación mensual agrupada por `categorias_dispositivos` que contabiliza el volumen de equipos recibidos en el mes en curso (`total_mes`) y calcula el porcentaje relativo de cada categoría con aislamiento multi-sucursal.
+  - **Frontend (`DashboardPage.jsx`):** Componente interactivo de gráfica de dona (`DeviceCategoryDonut`) con estética Mono Rounded Donut en SVG y extremos redondeados (`strokeLinecap="round"`).
+  - **Identidad Corporativa y Paleta Monocromática:** Asignación dinámica del rojo institucional FMC (`#DC2626` en modo claro / `#EF4444` en modo oscuro) a la categoría predominante del mes, mientras que las categorías secundarias se distribuyen armónicamente en una escala elegante de Slate (`#334155` a `#E2E8F0`).
+  - **Iconografía y Tooltip Flotante:** Sustitución de puntos de color por iconos vectoriales de Lucide (`Smartphone`, `Laptop`, `Tablet`, `Gamepad2`, `Watch`, `Package`) a juego en segmentos, centro dinámico y leyenda. Tooltip interactivo con formato fluido de una sola línea (`N trabajos · X%`), padding balanceado y sin paréntesis.
+  - **Control Modular (`mostrarDetalle = false`):** Prop para activar o suprimir la leyenda inferior; en modo minimalista (`false`), la dona escala a `w-56 h-56 sm:w-64 sm:h-64` y se centra vertical y horizontalmente dentro de la tarjeta; en modo detallado (`true`), la leyenda filtra automáticamente categorías sin órdenes (`total > 0`).
+  - **Cabecera Limpia:** Removido badge redundante de conteo total en la cabecera del recuadro para centrar la atención en el título descriptivo y el centro dinámico de la dona.
+
+- **Segmentación del Dashboard por Rol Técnico vs Administrativo:**
+  - **Métricas Dedicadas para Técnicos:** Cuando el usuario autenticado posee rol `Tecnico`, el backend oculta los montos financieros (`ingresos_mes`, `ingresos_sparkline`) y expone métricas operativas personales: `mis_ordenes_activas` y `mis_diagnosticos_pendientes`.
+  - **Soporte de Foto de Perfil en Actividad Reciente:** La consulta de órdenes recientes ahora incluye `tecnico_foto_url`, renderizando el avatar fotográfico del técnico asignado con fallback de iniciales en caso de no poseer imagen.
+
+- **Optimización de Series Temporales (7d, 14d, 30d):**
+  - Reescritura de la consulta `serie_dias` en el backend utilizando CTEs (`entradas_agg`, `entregas_agg`) para generar las series completas de 7, 14 y 30 días en una sola pasada de consulta.
+
+- **Mejoras Sensoriales en Notificaciones In-App (`NotificationBell.jsx`):**
+  - Implementación de audio de alerta generado mediante Web Audio API (`AudioContext`, onda senoidal con decaimiento armónico) sin dependencias de archivos de audio externos.
+  - Alerta flotante vía toast (`Sileo`) y animación de campana oscilante (`animate-bell-ring`) activada exclusivamente ante incrementos reales de notificaciones no leídas.
+  - Persistencia de conteo en `sessionStorage` para suprimir alertas falsas en cambios de pestaña o navegación interna.
+  - Panel flotante ensanchado (`w-[26rem] sm:w-[28rem] md:w-[30rem]`) con iconos atenuados para notificaciones previamente leídas.
+
+### Changed
+- **Alineación Visual y Distribución del Dashboard (`DashboardPage.jsx`):**
+  - Reubicación del botón de refresco (`RotateCcw` / `AnimatedIconButton`) desde la tarjeta de bienvenida a la cabecera de **Acciones Rápidas** (`Zap`).
+  - Nivelación de tarjetas superiores mediante `items-stretch` para eliminar espacios blancos.
+  - Corrección de corte de texto en el eje horizontal de la gráfica de tendencia "Entradas vs Entregas" (`TrendChart`) y homologación del icono de entregas a flecha diagonal verde (`ArrowUpRight`).
+  - Reorganización de columnas en la tabla de Actividad Reciente: el indicador de múltiples técnicos (`+N más`) se apila verticalmente debajo del nombre del técnico responsable, prescindiendo del borde pill para un look más limpio.
+  - Distribución general equilibrada:
+    - Fila 2: Flujo del taller (2 columnas) + Carga de trabajo por técnico (1 columna).
+    - Fila 3: Categorías de Dispositivos (1 columna, izquierda) + Actividad reciente (2 columnas, derecha).
+  - Sincronización del skeleton loader para reproducir exactamente la misma cuadrícula.
+- **Formateo Monetario:**
+  - `formatCurrency` en el Dashboard actualizado para desplegar de forma estándar 2 decimales (`minimumFractionDigits: 2`, `maximumFractionDigits: 2`), asegurando cifras consistentes en RD$ para ingresos del mes y comparativas.
+- **Búsqueda Global (`GlobalSearch.jsx`):**
+  - Homologación de etiquetas con componentes `Badge` estilizados e iconos contextuales para tickets, clientes y dispositivos identificados (`getDeviceIcon`).
+- **Plantillas de Correo Transaccional (`emailTemplates.js`):**
+  - Refinamiento de estilos en plantillas de cliente: logotipo institucional, ficha estructurada con `ticketInfoCard` y jerarquía tipográfica depurada.
 
 ## [0.11.0] - 2026-09-25
 
