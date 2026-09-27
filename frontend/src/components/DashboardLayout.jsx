@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
+import { isRoleAuthorized } from './ProtectedRoute';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import useGlobalShortcuts from '../hooks/useGlobalShortcuts';
 import { MorphIcon } from 'morphicons/react';
 import { Sun, Moon } from 'lucide';
 import {
@@ -13,14 +15,14 @@ import {
   Image as ImageIcon,
   Users,
   Settings,
-  Store,
   LogOut,
   ChevronRight,
   ShieldCheck,
   Shield,
   ClipboardList,
   User,
-  Contact
+  Contact,
+  BarChart3
 } from 'lucide-react';
 
 const getRoleConfig = (rolNombre) => {
@@ -39,9 +41,10 @@ const getRoleConfig = (rolNombre) => {
 };
 
 const MENU_ITEMS = [
-  { id: 'dashboard', name: 'Inicio / Dashboard', path: '/dashboard', icon: LayoutDashboard },
+  { id: 'dashboard', name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { id: 'tickets', name: 'Órdenes de Servicio', path: '/tickets', icon: Ticket },
   { id: 'taller', name: 'Banco de Trabajo', path: '/taller', icon: Wrench },
+  { id: 'reportes', name: 'Informes', path: '/reportes', icon: BarChart3, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
   { id: 'divider-ops', isDivider: true },
   { id: 'clientes', name: 'Clientes', path: '/clientes', icon: Contact },
   { id: 'trabajadores', name: 'Usuarios', path: '/trabajadores', icon: Users, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
@@ -49,6 +52,7 @@ const MENU_ITEMS = [
 ];
 
 const DashboardLayout = ({ children }) => {
+  useGlobalShortcuts();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -58,7 +62,7 @@ const DashboardLayout = ({ children }) => {
     return MENU_ITEMS.filter((item) => {
       if (item.isDivider) return true;
       if (!item.allowedRoles) return true;
-      return item.allowedRoles.includes(user?.rol_nombre);
+      return isRoleAuthorized(user, item.allowedRoles);
     });
   }, [user]);
 
@@ -101,20 +105,7 @@ const DashboardLayout = ({ children }) => {
           : 'opacity-0 pointer-events-none -translate-y-4'
           }`}
       >
-        <div className="space-y-6">
-          {/* Badge de Sucursal Móvil */}
-          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-zinc-100 dark:bg-dark-card border border-zinc-200 dark:border-dark-border text-sm font-medium text-zinc-800 dark:text-zinc-200 shadow-2xs">
-            <Store className="w-5 h-5 text-red-500 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="font-semibold text-zinc-900 dark:text-zinc-100">
-                {user?.sucursal_nombre || 'Franyer Mobile Center - SFM'}
-              </p>
-              <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
-                {user?.sucursal_codigo || 'MATRIZ'}
-              </span>
-            </div>
-          </div>
-
+        <div>
           {/* Lista de Navegación Móvil */}
           <nav className="space-y-1.5">
             {filteredMenuItems.map((item) => {

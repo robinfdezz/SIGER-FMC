@@ -75,10 +75,10 @@ const Modal = ({
           customHeader ? (
             customHeader
           ) : (
-            <div className={`p-4 sm:p-5 pb-3 sm:pb-4 shrink-0 border-b border-neutral-100 dark:border-neutral-800/80 flex items-start justify-between gap-3 bg-neutral-50/50 dark:bg-neutral-900/40 ${headerClassName}`}>
-              <div className="flex items-start gap-3 min-w-0 pr-2">
+            <div className={`p-4 sm:p-5 pb-3 sm:pb-4 shrink-0 border-b border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between gap-3 bg-neutral-50/50 dark:bg-neutral-900/40 ${headerClassName}`}>
+              <div className="flex items-center gap-3 min-w-0 pr-2">
                 {icon && (
-                  <div className="shrink-0 mt-0.5">
+                  <div className="shrink-0 flex items-center justify-center">
                     {icon}
                   </div>
                 )}

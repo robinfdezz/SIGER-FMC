@@ -121,6 +121,20 @@ export const EstadoOrdenPage = () => {
     return () => { isMounted = false; };
   }, []);
 
+  // Blindaje de tecla Escape para el visor de fotos
+  useEffect(() => {
+    if (!activePhoto) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        setActivePhoto(null);
+      }
+    };
+    window.addEventListener('keydown', handleEsc, true);
+    return () => window.removeEventListener('keydown', handleEsc, true);
+  }, [activePhoto]);
+
   const fetchTicket = useCallback(async (codeToFetch, token = null) => {
     if (!codeToFetch) return;
     setLoading(true);
@@ -521,6 +535,18 @@ export const EstadoOrdenPage = () => {
                 Seguimiento en tiempo real y avances técnicos del dispositivo.
               </p>
             </div>
+          ) : loading && inputCode ? (
+            <div className="max-w-xl mx-auto space-y-1.5 mb-6 px-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold font-outfit text-neutral-900 dark:text-white tracking-tight">
+                Consultando el ticket:
+                <span className="block font-mono text-red-600 dark:text-red-500 mt-1 sm:mt-1.5 text-xl sm:text-2xl md:text-3xl font-black break-all animate-pulse">
+                  #{inputCode}
+                </span>
+              </h1>
+              <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 font-inter leading-relaxed">
+                Seguimiento en tiempo real y avances técnicos del dispositivo.
+              </p>
+            </div>
           ) : (
             <div className="max-w-xl mx-auto space-y-2 mb-6 px-1">
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold font-outfit text-neutral-900 dark:text-white tracking-tight">
@@ -598,20 +624,22 @@ export const EstadoOrdenPage = () => {
           >
             <div className="space-y-6 pb-12 animate-fade-in select-none">
               {/* Réplica 1:1 del Stepper horizontal */}
-              <div className="w-full my-6 sm:my-8 overflow-x-auto no-scrollbar pb-3 pt-1 px-1">
+              <div className="w-full my-6 sm:my-8 overflow-x-auto no-scrollbar pb-3 pt-1 px-1 select-none">
                 <div className="min-w-[540px] sm:min-w-0 w-full flex items-start justify-between relative">
                   {[1, 2, 3, 4, 5].map((stepIdx, idx) => (
                     <React.Fragment key={stepIdx}>
                       <div className="flex flex-col items-center text-center relative z-10" style={{ flex: 1 }}>
-                        {/* Círculo del paso */}
+                        {/* Círculo del paso: 40px en móvil, 44px en sm */}
                         <div className="flex items-center justify-center">
-                          <Skeleton circle width={42} height={42} />
+                          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden flex items-center justify-center">
+                            <Skeleton circle width="100%" height="100%" />
+                          </div>
                         </div>
-                        {/* Título y subtítulo */}
-                        <div className="mt-2.5 px-1 max-w-[110px] sm:max-w-[140px] w-full flex flex-col items-center space-y-1">
-                          <Skeleton width={70} height={14} />
-                          <div className="hidden sm:block w-full">
-                            <Skeleton width={50} height={10} />
+                        {/* Título y subtítulo centrado */}
+                        <div className="mt-2.5 px-1 max-w-[110px] sm:max-w-[140px] w-full flex flex-col items-center">
+                          <Skeleton width={idx % 2 === 0 ? 70 : 85} height={14} className="rounded-md" />
+                          <div className="hidden sm:block mt-1">
+                            <Skeleton width={56} height={10} className="rounded-sm" />
                           </div>
                         </div>
                       </div>
@@ -636,29 +664,35 @@ export const EstadoOrdenPage = () => {
                       <Skeleton circle width={18} height={18} />
                       <Skeleton width={150} height={18} />
                     </div>
-                    <Skeleton width={60} height={20} borderRadius="9999px" />
                   </div>
 
-                  <div className="space-y-3.5">
+                  <div className="space-y-3.5 font-inter">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <div>
-                        <Skeleton width={80} height={12} className="mb-1" />
+                        <span className="block mb-1">
+                          <Skeleton width={85} height={12} />
+                        </span>
                         <Skeleton width={140} height={18} />
                       </div>
                       <div>
-                        <Skeleton width={100} height={12} className="mb-1" />
-                        <Skeleton width={120} height={18} />
+                        <span className="block mb-1">
+                          <Skeleton width={105} height={12} />
+                        </span>
+                        <Skeleton width={125} height={18} />
                       </div>
                     </div>
 
-                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-2">
+                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1">
                       <Skeleton width={160} height={12} />
-                      <Skeleton width="90%" height={16} />
+                      <Skeleton width="90%" height={18} />
                     </div>
 
-                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-2">
-                      <Skeleton width={130} height={12} />
-                      <Skeleton width="75%" height={16} />
+                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <Skeleton circle width={13} height={13} />
+                        <Skeleton width={130} height={12} />
+                      </div>
+                      <Skeleton width="65%" height={18} />
                     </div>
                   </div>
                 </div>
@@ -670,29 +704,38 @@ export const EstadoOrdenPage = () => {
                     <Skeleton width={140} height={18} />
                   </div>
 
-                  <div className="space-y-3.5">
+                  <div className="space-y-3.5 font-inter">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <div>
-                        <Skeleton width={90} height={12} className="mb-1" />
-                        <Skeleton width={110} height={18} />
+                        <span className="block mb-1">
+                          <Skeleton width={90} height={12} />
+                        </span>
+                        <Skeleton width={100} height={18} />
                       </div>
                       <div>
-                        <Skeleton width={110} height={12} className="mb-1" />
-                        <Skeleton width={130} height={18} />
+                        <span className="block mb-1">
+                          <Skeleton width={110} height={12} />
+                        </span>
+                        <Skeleton width={125} height={18} />
                       </div>
                     </div>
 
-                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-2">
-                      <Skeleton width={120} height={12} />
-                      <div className="flex gap-2">
-                        <Skeleton width={130} height={26} borderRadius="0.5rem" />
-                        <Skeleton width={110} height={26} borderRadius="0.5rem" />
+                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Skeleton circle width={13} height={13} />
+                        <Skeleton width={110} height={12} />
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        <Skeleton width={140} height={26} borderRadius="0.5rem" />
                       </div>
                     </div>
 
-                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-2">
-                      <Skeleton width={140} height={12} />
-                      <Skeleton width={160} height={16} />
+                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <Skeleton circle width={13} height={13} />
+                        <Skeleton width={120} height={12} />
+                      </div>
+                      <Skeleton width={160} height={18} />
                     </div>
                   </div>
                 </div>
@@ -704,44 +747,69 @@ export const EstadoOrdenPage = () => {
                       <Skeleton circle width={18} height={18} />
                       <Skeleton width={160} height={18} />
                     </div>
-                    <Skeleton width={150} height={14} />
+                    <Skeleton width={170} height={14} />
                   </div>
 
-                  {/* Grid de items del checklist */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
-                    {Array.from({ length: 10 }).map((_, itemIdx) => (
-                      <div
-                        key={itemIdx}
-                        className="p-3 rounded-xl border border-neutral-200/60 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-900/40 flex flex-col items-center justify-center gap-2"
-                      >
-                        <Skeleton circle width={22} height={22} />
-                        <Skeleton width={65} height={12} />
-                        <Skeleton width={50} height={16} borderRadius="9999px" />
-                      </div>
-                    ))}
+                  <div className="space-y-4">
+                    {/* Flex wrap con badges que calca exactamente los 11 items del checklist */}
+                    <div className="flex flex-wrap gap-2 justify-center py-1">
+                      {[100, 140, 85, 125, 135, 130, 145, 95, 120, 140, 150].map((badgeWidth, bIdx) => (
+                        <Skeleton
+                          key={bIdx}
+                          width={badgeWidth}
+                          height={28}
+                          borderRadius="0.5rem"
+                        />
+                      ))}
+                    </div>
+
+                    {/* Resumen inferior de contadores */}
+                    <div className="flex flex-wrap items-center justify-center gap-4 mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                      <Skeleton width={110} height={14} />
+                      <Skeleton width={70} height={14} />
+                      <Skeleton width={90} height={14} />
+                    </div>
                   </div>
                 </div>
 
-                {/* Tarjeta 4: Historial de Avance */}
-                <div className="md:col-span-2 p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
-                    <Skeleton width={150} height={18} />
-                    <Skeleton width={80} height={14} />
-                  </div>
-
-                  <div className="space-y-4 pl-3">
-                    {[1, 2, 3].map((entryIdx) => (
-                      <div key={entryIdx} className="flex items-start gap-3">
-                        <Skeleton circle width={12} height={12} className="mt-1.5" />
-                        <div className="flex-1 space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <Skeleton width={140} height={16} />
-                            <Skeleton width={90} height={12} />
-                          </div>
-                          <Skeleton width="80%" height={14} />
-                        </div>
+                {/* Tarjeta 4: Historial de Avance en Taller (Línea de Tiempo Pública) */}
+                <div className="md:col-span-2">
+                  <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-800 p-5 bg-white dark:bg-[#18181b] shadow-xs space-y-4">
+                    <div className="flex items-center justify-between pb-1 border-b border-neutral-100 dark:border-neutral-800/80">
+                      <div className="flex items-center gap-1.5">
+                        <Skeleton circle width={14} height={14} />
+                        <Skeleton width={140} height={14} />
                       </div>
-                    ))}
+                      <Skeleton width={24} height={14} borderRadius="0.375rem" />
+                    </div>
+
+                    <div className="pt-2 pl-6 relative space-y-6">
+                      {[1, 2, 3].map((entryIdx, idx) => (
+                        <div key={entryIdx} className="relative space-y-1.5">
+                          {/* Línea vertical discontinua */}
+                          {idx < 2 && (
+                            <div className="absolute -left-[19px] top-3 -bottom-6 w-0 border-l-2 border-dashed border-neutral-200 dark:border-neutral-800" />
+                          )}
+
+                          {/* Nodo circular hueco */}
+                          <div className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full border-2 border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#18181b]" />
+
+                          {/* Fila de título y fecha */}
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <Skeleton circle width={14} height={14} />
+                              <Skeleton width={130} height={16} />
+                            </div>
+                            <Skeleton width={120} height={12} />
+                          </div>
+
+                          {/* Mensaje descriptivo o nota */}
+                          <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200/50 dark:border-neutral-800/60">
+                            <Skeleton width={idx === 0 ? '85%' : '60%'} height={14} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

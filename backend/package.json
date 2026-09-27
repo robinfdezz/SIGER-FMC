@@ -1,6 +1,6 @@
 {
   "name": "siger-fmc-backend",
-  "version": "0.10.0",
+  "version": "1.0.0",
   "description": "Backend API para SIGER-FMC - Taller de Servicio Técnico y Reparación",
   "main": "server.js",
   "scripts": {

@@ -348,8 +348,8 @@ const NotificationBell = () => {
       </button>
 
       {open ? (
-        <div className="absolute right-0 mt-2.5 w-[26rem] sm:w-[28rem] md:w-[30rem] max-w-[calc(100vw-2rem)] rounded-2xl bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border shadow-xl z-50 overflow-hidden">
-          <div className="px-4 py-3 border-b border-zinc-100 dark:border-dark-border flex items-center justify-between gap-2">
+        <div className="fixed inset-x-4 top-16 mx-auto w-auto max-w-sm sm:max-w-md sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:left-auto sm:translate-x-0 sm:mt-2.5 sm:w-[28rem] md:w-[30rem] rounded-2xl bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border shadow-xl z-50 overflow-hidden max-h-[80vh] flex flex-col">
+          <div className="px-4 py-3 border-b border-zinc-100 dark:border-dark-border flex items-center justify-between gap-2 shrink-0">
             <div>
               <p className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Notificaciones</p>
               <p className="text-[11px] text-zinc-500">
@@ -369,7 +369,7 @@ const NotificationBell = () => {
             ) : null}
           </div>
 
-          <div className="max-h-[22rem] overflow-y-auto">
+          <div className="overflow-y-auto max-h-[calc(80vh-4.5rem)] sm:max-h-[22rem]">
             {loading ? (
               <div className="flex items-center justify-center gap-2 py-12 text-sm text-zinc-500">
                 <Loader2 className="w-4 h-4 animate-spin" />
