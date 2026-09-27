@@ -10,6 +10,7 @@ import PostCreacionModal from '../components/servicios/PostCreacionModal';
 import Button from '../components/common/Button';
 import Select from '../components/common/Select';
 import DatePicker, { getTodayString } from '../components/common/DatePicker';
+import SimpleButton from '../components/common/SimpleButton';
 import InlineConfirmButton from '../components/common/InlineConfirmButton';
 import { getCategorias, createServicio, validarGarantiaTicket } from '../services/servicios.service';
 import { getWorkers } from '../services/workers.service';
@@ -735,6 +736,33 @@ export const NuevaOrdenPage = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleBeforeSubmitConfirm = () => {
+    const errsStep1 = validateStep(1);
+    const errsStep2 = validateStep(2);
+    const errsStep4 = validateStep(4);
+    const allErrors = { ...errsStep1, ...errsStep2, ...errsStep4 };
+
+    if (Object.keys(allErrors).length > 0) {
+      setErrors(allErrors);
+      if (errsStep1.servicio_origen_codigo || errsStep1.categoria_id || errsStep1.marca_equipo || errsStep1.modelo_equipo || errsStep1.nombre_cliente_libre) {
+        setCurrentStep(1);
+      } else if (errsStep2.falla_reportada) {
+        setCurrentStep(2);
+      } else if (errsStep4.costo_previsto || errsStep4.fecha_entrega_estimada) {
+        setCurrentStep(4);
+        if (errsStep4.fecha_entrega_estimada) {
+          sileo.warning({
+            title: 'Fecha inválida',
+            description: errsStep4.fecha_entrega_estimada
+          });
+        }
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async () => {
     const errsStep1 = validateStep(1);
     const errsStep2 = validateStep(2);
@@ -894,16 +922,15 @@ export const NuevaOrdenPage = () => {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                 Borrador guardado
               </span>
-              <InlineConfirmButton
-                text="Limpiar borrador"
-                confirmText="¿Descartar borrador?"
+              <SimpleButton
                 icon={RotateCcw}
-                variant="card"
+                variant="danger"
                 size="sm"
-                className="!w-auto h-8 px-3 text-xs bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-900/50 shadow-2xs cursor-pointer"
-                confirmClassName="!w-auto h-8 px-2.5 text-xs bg-white dark:bg-neutral-900 border border-red-200 dark:border-red-900/60 shadow-2xs"
-                onConfirm={handleClearDraft}
-              />
+                onClick={handleClearDraft}
+                title="Descartar borrador y restablecer formulario"
+              >
+                Limpiar borrador
+              </SimpleButton>
             </div>
           )}
         </div>
@@ -1640,18 +1667,18 @@ export const NuevaOrdenPage = () => {
                 Siguiente
               </Button>
             ) : (
-              <Button
-                type="button"
+              <InlineConfirmButton
                 variant="primary"
                 size="md"
+                text="Crear Orden de Servicio"
+                confirmText="¿Crear orden?"
                 icon={ClipboardList}
-                onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || Boolean(form.es_garantia && !isGarantiaValida)}
                 isLoading={isSubmitting}
+                onBeforeConfirm={handleBeforeSubmitConfirm}
+                onConfirm={handleSubmit}
                 className="min-w-[200px]"
-              >
-                {isSubmitting ? 'Registrando...' : 'Crear Orden de Servicio'}
-              </Button>
+              />
             )}
           </div>
         </div>

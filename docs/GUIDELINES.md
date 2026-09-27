@@ -8,8 +8,8 @@
 
 ## 2. Stack Tecnológico
 
-* **Frontend:** React.js (Vite), React Router v6, Tailwind CSS, Lucide React (Íconos), Morphicons (Iconos animados interactivos), Axios.
-* **Backend:** Node.js, Express.js.
+* **Frontend:** React.js (Vite), React Router v6, Tailwind CSS, Lucide React (Íconos), Morphicons (Iconos animados interactivos), Axios, Sileo (toasts).
+* **Backend:** Node.js, Express.js, Resend (correo transaccional opcional).
 * **Base de Datos:** PostgreSQL (driver `pg` con Connection Pool, base de datos `siger_fmc_db`).
 * **Autenticación:** JSON Web Tokens (JWT) + Hashing de contraseñas con `bcryptjs` (salt rounds = 10).
 * **Multimedia:** Cloudinary con compresión previa en el cliente (`browser-image-compression`).
@@ -27,14 +27,15 @@
 
 backend/
 ├── src/
-│   ├── config/          # db.js (PostgreSQL pool), cloudinary.js
-│   ├── controllers/     # Controladores por entidad (auth, tickets, incidencias, etc.)
+│   ├── config/          # db.js, cloudinary.js, email.js, emailTemplates.js
+│   ├── controllers/     # auth, servicios, clients, workers, search, notifications, …
 │   ├── middlewares/     # authMiddleware.js (JWT), roleMiddleware.js, upload.js (Multer)
-│   ├── routes/          # auth.routes.js, tickets.routes.js, catalogos.routes.js, public.routes.js
-│   ├── services/        # Lógica de negocio reutilizable
+│   ├── routes/          # Incluye search.routes.js y notifications.routes.js
+│   ├── templates/email/ # Borradores HTML de plantillas Resend
+│   ├── utils/           # notifications.js (campanita + correo tipado)
 │   └── app.js           # Configuración de Express y middlewares globales
 ├── server.js            # Punto de entrada / arranque del servidor
-└── .env                 # Variables de entorno
+└── .env                 # Variables de entorno (incl. RESEND_*)
 
 
 
@@ -45,16 +46,16 @@ backend/
 frontend/
 ├── src/
 │   ├── assets/          # Logos, imágenes estáticas
-│   ├── components/      # Componentes reutilizables (Navbar, Sidebar, Badges, Modales, Tables)
+│   ├── components/      # Navbar, GlobalSearch, NotificationBell, Sidebar, Badges, Modales, Tables
 │   ├── context/         # AuthContext.jsx (sesión y permisos globales)
 │   ├── hooks/           # Custom hooks (useAuth, useTickets, useFetch)
 │   ├── pages/           # Vistas principales
 │   │   ├── Login/
-│   │   ├── Dashboard/
+│   │   ├── Dashboard/   # DashboardPage.jsx con KPIs reales
 │   │   ├── Tickets/     # Listado, Crear Ticket, Detalle de Ticket
 │   │   ├── Admin/       # Gestión de usuarios, sucursales y reportes
 │   │   └── Tracking/    # Consulta pública por código de ticket
-│   ├── services/        # Instancia de Axios y llamadas a la API
+│   ├── services/        # Axios + search.service / notifications.service / …
 │   ├── utils/           # Formateadores de fecha, moneda (DOP), constantes
 │   ├── App.jsx          # Enrutador principal con rutas protegidas
 │   └── main.jsx
@@ -82,7 +83,10 @@ frontend/
 
 ### Reglas de Interfaz y Convenciones Visuales
 * **Diseño Responsive:** Optimizado para tablets y móviles (uso de técnicos en banco de trabajo).
-* **Feedback Visual:** Spinners en peticiones asíncronas, toasts de notificación para acciones exitosas/fallidas.
+* **Feedback Visual:** Spinners en peticiones asíncronas, toasts de notificación (`sileo`) para acciones exitosas/fallidas.
+* **Cabecera operativa (`Navbar.jsx`):**
+  - **Búsqueda global (`GlobalSearch.jsx`):** Autocompletado con debounce (≥2 caracteres); resultados en órdenes / clientes / equipos; deep-links a taller y clientes.
+  - **Campanita (`NotificationBell.jsx`):** Badge de no leídas, panel desplegable, marcar una/todas; sondeo cada 15 s y al enfocar la pestaña. No sustituye los toasts de acción inmediata.
 * **Fotos de Perfil:** Si el usuario no tiene `foto_perfil_url`, mostrar un avatar con sus iniciales.
 * **Atenuación en Modo Solo Lectura:** Bloques y formularios no editables por restricciones de rol (RBAC) aplican la directriz uniforme `opacity-50 select-none pointer-events-none` junto a un banner explicativo conciso.
 * **Tablas de Gestión con Paginación Universal:**

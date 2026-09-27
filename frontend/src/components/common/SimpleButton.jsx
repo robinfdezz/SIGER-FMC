@@ -21,6 +21,7 @@ export const SimpleButton = ({
   children,
   icon: Icon,
   iconClassName = '',
+  iconPosition = 'left',
   onClick,
   disabled = false,
   variant = 'default',
@@ -42,10 +43,10 @@ export const SimpleButton = ({
 
   // La variante define el color del icono, manteniendo el texto normal
   const iconVariantStyles = {
-    default: '',
+    default: 'text-red-600 dark:text-red-500',
     ghost: '',
     success: 'text-emerald-600 dark:text-emerald-400',
-    danger: 'text-rose-600 dark:text-rose-400'
+    danger: 'text-red-600 dark:text-red-500'
   };
 
   const appliedSize = sizeStyles[size] || sizeStyles.sm;
@@ -61,7 +62,7 @@ export const SimpleButton = ({
       className={`${baseStyles} ${appliedSize} ${className}`}
       {...rest}
     >
-      {Icon && (
+      {Icon && iconPosition === 'left' && (
         <Icon
           size={size === 'xs' ? 12 : 13}
           className={`shrink-0 ${appliedIconColor}`}
@@ -69,6 +70,13 @@ export const SimpleButton = ({
         />
       )}
       {children && <span>{children}</span>}
+      {Icon && iconPosition === 'right' && (
+        <Icon
+          size={size === 'xs' ? 12 : 13}
+          className={`shrink-0 ${appliedIconColor}`}
+          aria-hidden="true"
+        />
+      )}
     </button>
   );
 };

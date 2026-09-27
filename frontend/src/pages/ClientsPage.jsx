@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import ClientModal from '../components/clients/ClientModal';
 import ClienteDetalleModal from '../components/clients/ClienteDetalleModal';
@@ -9,7 +10,7 @@ import Pagination from '../components/common/Pagination';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
 import AnimatedIconButton from '../components/common/AnimatedIconButton';
 import { useAuth } from '../context/AuthContext';
-import { getClients, toggleClientStatus } from '../services/clients.service';
+import { getClients, getClientById, toggleClientStatus } from '../services/clients.service';
 import { sileo } from 'sileo';
 import { RotateCcw } from 'lucide';
 import {
@@ -33,6 +34,7 @@ import {
 
 export const ClientsPage = () => {
   const { user: currentUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const userRole = currentUser?.rol_nombre;
 
   // Permisos RBAC
@@ -259,6 +261,36 @@ export const ClientsPage = () => {
     setSelectedClienteView(client);
     setIsViewModalOpen(true);
   };
+
+  // Deep-link desde búsqueda global: /clientes?clienteId=
+  useEffect(() => {
+    const clienteId = searchParams.get('clienteId');
+    if (!clienteId) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getClientById(clienteId);
+        const client = res?.data || res?.cliente || res;
+        if (!cancelled && client?.id) {
+          setSelectedClienteView(client);
+          setIsViewModalOpen(true);
+        }
+      } catch (err) {
+        console.warn('No se pudo abrir el cliente desde la URL:', err?.message);
+      } finally {
+        if (!cancelled) {
+          const next = new URLSearchParams(searchParams);
+          next.delete('clienteId');
+          setSearchParams(next, { replace: true });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, setSearchParams]);
 
   // Manejo de alternado de estado lógico
   const handleOpenConfirmToggle = (client) => {

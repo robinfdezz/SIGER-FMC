@@ -49,12 +49,12 @@ Especificación técnica de endpoints, parámetros, autenticación y contratos d
 
 La arquitectura de seguridad de SIGER-FMC implementa control de acceso basado en roles (RBAC) combinado con aislamiento de datos por sucursal (`requireBranchAccess`):
 
-| Rol | Alcance de Datos (Sucursal) | Órdenes de Servicio (`/servicios`) | Personal (`/trabajadores`) | Configuración (`/configuracion`) | Clientes (`/clientes`) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **`SuperAdmin`** | **Omnicanal Global** (ve todas las sedes) | Control total (Crear, Listar, Detalle, Modificar) | CRUD Total y gestión de avatares | Edición global de Empresa y Sucursales | CRUD Total |
-| **`Admin_Sucursal`** | **Sede Asignada Fija** (`sucursal_id`) | Control total en su sucursal (Crear, Listar, Detalle) | CRUD de Técnicos/Secretarias de su sede | Edición exclusiva de su sucursal asignada | CRUD Total |
-| **`Secretaria`** | **Sede Asignada Fija** (`sucursal_id`) | Control operativo (Crear órdenes, Listar, Detalle, Imprimir) | **Lectura** (`GET /`, `GET /:id`) de personal de su sede | **Lectura** (`GET`) de Empresa y Sucursales | CRUD de Clientes |
-| **`Tecnico`** | **Sede Asignada Fija** (`sucursal_id`) | **SOLO LECTURA** (`GET /`, `GET /:id`). **Bloqueo 403** en creación | **Lectura** (`GET /`, `GET /:id`) de personal de su sede | Sin acceso (`403 Forbidden`) | Lectura (`GET`) |
+| Rol | Alcance de Datos (Sucursal) | Órdenes de Servicio (`/servicios`) | Personal (`/trabajadores`) | Configuración (`/configuracion`) | Clientes (`/clientes`) | Informes y Reportes (`/reportes`) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **`SuperAdmin`** | **Omnicanal Global** (ve todas las sedes) | Control total (Crear, Listar, Detalle, Modificar) | CRUD Total y gestión de avatares | Edición global de Empresa y Sucursales | CRUD Total | Acceso total omnicanal (todas las sedes o selector) |
+| **`Admin_Sucursal`** | **Sede Asignada Fija** (`sucursal_id`) | Control total en su sucursal (Crear, Listar, Detalle) | CRUD de Técnicos/Secretarias de su sede | Edición exclusiva de su sucursal asignada | CRUD Total | Acceso analítico exclusivo de su sucursal |
+| **`Secretaria`** | **Sede Asignada Fija** (`sucursal_id`) | Control operativo (Crear órdenes, Listar, Detalle, Imprimir) | **Lectura** (`GET /`, `GET /:id`) de personal de su sede | **Lectura** (`GET`) de Empresa y Sucursales | CRUD de Clientes | Sin acceso (`403 Forbidden`) |
+| **`Tecnico`** | **Sede Asignada Fija** (`sucursal_id`) | **SOLO LECTURA** (`GET /`, `GET /:id`). **Bloqueo 403** en creación | **Lectura** (`GET /`, `GET /:id`) de personal de su sede | Sin acceso (`403 Forbidden`) | Lectura (`GET`) | Sin acceso (`403 Forbidden`) |
 
 #### Políticas Estrictas de Seguridad:
 1. **`SuperAdmin`:** Acceso omnicanal y selección global de sucursales en filtros y creaciones.
@@ -1301,7 +1301,7 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
 
 ### 5.17 Validar y Consultar Datos para Emisión de Comprobante / Etiqueta
 - **Ruta:** `GET /api/servicios/:id/ticket-impresion`
-- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`)
+- **Acceso:** Privado (`SuperAdmin`, `Admin_Sucursal`, `Secretaria`, `Tecnico`) + aislamiento de sucursal
 - **Descripción:** Endpoint especializado para validar la precondición de impresión antes de generar el comprobante térmico o la etiqueta de taller. Verifica que la orden exista y **bloquea la emisión para órdenes canceladas**, asegurando la integridad física y documental del taller.
 - **Parámetros URL:** `:id` (ID numérico o código de ticket).
 - **Respuesta Exitosa (`200 OK`):** Retorna los datos requeridos para la plantilla de impresión de comprobante o sticker.
@@ -1309,7 +1309,80 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
   - `400 Bad Request`: *"No se permite emitir comprobantes o etiquetas para órdenes canceladas"* (cuando `orden_flujo === 8` o `codigo_estado` incluye `CANCEL`).
   - `404 Not Found`: "Orden de servicio no encontrada."
 
----
+### 5.18 Resumen Operativo del Dashboard
+- **Ruta:** `GET /api/servicios/dashboard`
+- **Acceso:** Privado (JWT). `SuperAdmin` ve todas las sedes (filtro opcional `?sucursal_id=`); resto confinado a su `sucursal_id`.
+- **Query params:**
+  - `sucursal_id` (INT | `all`): Solo aplica a `SuperAdmin`.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "data": {
+      "kpis": {
+        "ordenes_abiertas": 12,
+        "abiertas_hoy": 3,
+        "urgentes": 1,
+        "sin_tecnico": 2,
+        "listas_entrega": 4,
+        "es_tecnico": false,
+        "can_view_finances": true,
+        "ingresos_mes": 45890.50,
+        "ingresos_mes_anterior": 38400.00,
+        "ingresos_sparkline": [{ "fecha": "2026-09-20", "monto": 3200.00 }]
+      },
+      "flujo": [
+        {
+          "id": 1,
+          "codigo_estado": "RECIBIDO",
+          "nombre_estado": "Recibido en Taller",
+          "color_badge": "#6B7280",
+          "orden_flujo": 1,
+          "total": 5
+        }
+      ],
+      "serie_7d": [{ "fecha": "2026-09-19", "entradas": 4, "entregas": 2 }],
+      "serie_30d": [{ "fecha": "2026-09-19", "entradas": 4, "entregas": 2 }],
+      "serie_dias": [{ "fecha": "2026-09-19", "entradas": 4, "entregas": 2 }],
+      "carga_tecnicos": [
+        {
+          "id": 4,
+          "nombre": "Técnico Ejemplo",
+          "foto_perfil_url": "https://res.cloudinary.com/.../avatar.webp",
+          "ordenes": 3,
+          "es_sin_asignar": false
+        }
+      ],
+      "distribucion_categorias": {
+        "total_mes": 14,
+        "items": [
+          { "id": 1, "categoria": "Smartphone", "total": 6, "porcentaje": 42.9 },
+          { "id": 2, "categoria": "Laptop", "total": 4, "porcentaje": 28.6 },
+          { "id": 3, "categoria": "Tablet / iPad", "total": 2, "porcentaje": 14.3 }
+        ]
+      },
+      "actividad_reciente": [
+        {
+          "id": 101,
+          "codigo_ticket": "SFM-XXXX-YYYY",
+          "cliente_nombre": "Cliente Demo",
+          "equipo": "Samsung Galaxy A54",
+          "prioridad": "media",
+          "codigo_estado": "EN_REPARACION",
+          "nombre_estado": "En Proceso de Reparación",
+          "color_badge": "#8B5CF6",
+          "orden_flujo": 4,
+          "tecnicos_count": 1,
+          "tecnico_nombre": "Juan Técnico",
+          "tecnico_foto_url": "https://res.cloudinary.com/.../avatar.webp",
+          "updated_at": "2026-09-25T18:00:00.000Z",
+          "created_at": "2026-09-24T10:00:00.000Z"
+        }
+      ]
+    }
+  }
+  ```
 
 ---
 
@@ -1347,6 +1420,8 @@ Gestión integral de los usuarios y empleados del sistema con control de acceso 
     "foto_perfil_public_id": "siger-fmc/personal-fmc/abc123xyz"
   }
   ```
+
+> **Nota:** El detalle completo de CRUD de trabajadores se documenta también en el **§3**. Preferir §3 como fuente canónica; el bloque §6 histórico se conserva por compatibilidad.
 
 ---
 
@@ -1736,5 +1811,260 @@ Módulo administrativo para la parametrización de la empresa matriz y la gesti�
     }
   }
   ```
+
+---
+
+## 8. Búsqueda Global (`/api/buscar`)
+
+### 8.1 Búsqueda Predictiva Unificada
+- **Ruta:** `GET /api/buscar`
+- **Acceso:** Privado (JWT). Aislamiento por sucursal salvo `SuperAdmin`.
+- **Query params:**
+  - `q` (STRING): mínimo 2 caracteres para devolver resultados; con menos de 2 retorna arrays vacíos.
+  - `sucursal_id` (INT | `all`): filtro opcional solo para `SuperAdmin`.
+- **Ámbitos de búsqueda:**
+  - **Órdenes** (máx. 8): `codigo_ticket`, falla, nombre de cliente.
+  - **Clientes** (máx. 6): nombre, cédula/RNC, teléfono, correo.
+  - **Equipos** (máx. 6): marca, modelo, IMEI/serie.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "data": {
+      "query": "SFM",
+      "ordenes": [],
+      "clientes": [],
+      "equipos": []
+    }
+  }
+  ```
+
+---
+
+## 9. Módulo de Notificaciones In-App (`/api/notificaciones`)
+
+Todas las respuestas de lectura incluyen cabeceras `Cache-Control: no-store` para evitar conteos obsoletos en el badge de la campanita.
+
+### 9.1 Listar Notificaciones del Usuario Autenticado
+- **Ruta:** `GET /api/notificaciones`
+- **Acceso:** Privado (JWT) — solo del `req.user.id`.
+- **Query params:**
+  - `limit` (INT, default 20, máx. 50)
+  - `unread=true` — filtra solo no leídas
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "data": [
+      {
+        "id": 42,
+        "tipo": "NUEVA_ORDEN",
+        "titulo": "Orden pendiente SFM-XXXX-YYYY",
+        "mensaje": "Samsung A54 — No enciende",
+        "servicio_id": 101,
+        "incidencia_id": null,
+        "enlace": "/taller?ordenId=101",
+        "leida": false,
+        "created_at": "2026-09-25T18:48:34.308Z",
+        "codigo_ticket": "SFM-XXXX-YYYY"
+      }
+    ],
+    "meta": { "no_leidas": 3, "total": 18 }
+  }
+  ```
+
+### 9.2 Conteo de No Leídas (Badge)
+- **Ruta:** `GET /api/notificaciones/conteo`
+- **Acceso:** Privado (JWT)
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "no_leidas": 3
+  }
+  ```
+
+### 9.3 Marcar una Notificación como Leída
+- **Ruta:** `PATCH /api/notificaciones/:id/leer`
+- **Acceso:** Privado (JWT) — solo si `usuario_id` coincide.
+- **Errores:** `404` si no existe o no pertenece al usuario.
+
+### 9.4 Marcar Todas como Leídas
+- **Ruta:** `PATCH /api/notificaciones/leer-todas`
+- **Acceso:** Privado (JWT)
+- **Respuesta:** `{ "ok": true, "actualizadas": 5 }`
+
+### 9.5 Política de Emisión (referencia)
+Ver matriz completa en `DATABASE.md` §14 y `ARCHITECTURE.md` §8. Resumen:
+- **Campanita:** nueva orden, urgente, cambio de estado, incidencia, asignación, finalización.
+- **Correo interno (Resend):** solo `ASIGNACION` y `ORDEN_FINALIZADA` al técnico.
+- **Correo cliente:** recibido / cancelado / entregado + recibo (fuera de este módulo HTTP).
+
+---
+
+## 10. Módulo de Informes y Reportes (`/api/reportes`)
+
+Proporciona agregaciones financieras estructuradas, series temporales de flujo de taller, productividad de técnicos y listados tabulares para consulta y exportación contable.
+
+**Permisos requeridos:** Privado (JWT). Roles autorizados: `SuperAdmin` y `Admin_Sucursal`. `Secretaria` y `Tecnico` reciben `403 Forbidden`.
+
+### 10.1 Resumen Analítico y KPIs (`GET /api/reportes/resumen`)
+- **Ruta:** `GET /api/reportes/resumen`
+- **Acceso:** Privado (JWT + `checkRole(['SuperAdmin', 'Admin_Sucursal'])`)
+- **Parámetros de consulta (Query params):**
+  - `desde` (String YYYY-MM-DD, opcional): Fecha inicio en zona horaria `America/Santo_Domingo`. Por defecto: primer día del mes actual.
+  - `hasta` (String YYYY-MM-DD, opcional): Fecha fin en zona horaria `America/Santo_Domingo`. Por defecto: fecha civil actual.
+  - `sucursal_id` (INT | 'all', opcional): Sede a filtrar. Solo editable por `SuperAdmin`; para `Admin_Sucursal` se fuerza de manera estricta a su sede asignada.
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "data": {
+      "rango": {
+        "desde": "2026-09-01",
+        "hasta": "2026-09-27",
+        "sucursal_id": 1,
+        "es_superadmin": true
+      },
+      "kpis": {
+        "total_facturado": 124500.00,
+        "total_liquidado": 102000.00,
+        "total_anticipos": 22500.00,
+        "total_mano_obra": 89000.00,
+        "total_repuestos": 35500.00,
+        "total_descuentos": 4200.00,
+        "total_impuestos": 18990.00,
+        "saldo_pendiente": 14200.00,
+        "ordenes_liquidadas": 48,
+        "ordenes_recibidas": 54,
+        "ordenes_canceladas": 2,
+        "ticket_promedio": 2593.75,
+        "metodos_pago": {
+          "efectivo": 61200.00,
+          "tarjeta": 25500.00,
+          "transferencia": 15300.00
+        }
+      },
+      "serie_temporal": [
+        {
+          "fecha": "2026-09-01",
+          "entradas": 4,
+          "entregas": 3,
+          "monto_liquidado": 6500.00
+        }
+      ],
+      "productividad_tecnicos": [
+        {
+          "tecnico_id": 4,
+          "nombre": "Carlos Gómez",
+          "foto_perfil_url": "https://res.cloudinary.com/...",
+          "ordenes_entregadas": 26,
+          "ordenes_en_proceso": 5,
+          "total_mano_obra": 48500.00,
+          "tiempo_promedio_horas": 18.5,
+          "tasa_cumplimiento": 92.3
+        }
+      ],
+      "distribucion_categorias": [
+        {
+          "id": 1,
+          "categoria": "Smartphone",
+          "total": 38,
+          "porcentaje": 70.4
+        },
+        {
+          "id": 3,
+          "categoria": "Laptop",
+          "total": 11,
+          "porcentaje": 20.4
+        }
+      ],
+      "sucursales": [
+        {
+          "id": 1,
+          "codigo_sucursal": "SUC-01",
+          "nombre_sucursal": "Franyer Mobile Center - SFM"
+        }
+      ]
+    }
+  }
+  ```
+
+### 10.2 Detalle Tabular y Exportación (`GET /api/reportes/detalle`)
+- **Ruta:** `GET /api/reportes/detalle`
+- **Acceso:** Privado (JWT + `checkRole(['SuperAdmin', 'Admin_Sucursal'])`)
+- **Parámetros de consulta (Query params):**
+  - `desde`, `hasta` (String YYYY-MM-DD): Rango de fechas
+  - `sucursal_id` (INT | 'all'): Sede
+  - `estado` (String): `'entregados'` (defecto), `'recibidos'`, `'cancelados'` o `'todos'`
+  - `metodo_pago` (String): `'Efectivo'`, `'Tarjeta'`, `'Transferencia'`
+  - `q` (String): Búsqueda predictiva por ticket, cliente, teléfono o equipo
+  - `page` (INT, default 1)
+  - `limit` (INT, default 20)
+  - `export` (Boolean, default false): Si es `true`, eleva el límite hasta 5000 registros para exportación directa en formato CSV/Excel
+- **Respuesta Exitosa (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "success": true,
+    "data": {
+      "ordenes": [
+        {
+          "id": 105,
+          "codigo_ticket": "FMC-SFM-2026-0042",
+          "fecha_recepcion": "2026-09-20T14:30:00.000Z",
+          "fecha_entrega_real": "2026-09-22T17:10:00.000Z",
+          "cliente_nombre": "Juan Pérez",
+          "cliente_telefono": "8095551234",
+          "marca_equipo": "Apple",
+          "modelo_equipo": "iPhone 13 Pro",
+          "equipo": "Apple iPhone 13 Pro",
+          "categoria_nombre": "Smartphone",
+          "sucursal_nombre": "Franyer Mobile Center - SFM",
+          "codigo_sucursal": "SUC-01",
+          "codigo_estado": "ENTREGADO",
+          "nombre_estado": "Entregado al Cliente",
+          "color_badge": "#059669",
+          "tecnico_nombre": "Carlos Gómez",
+          "costo_previsto": 3500.00,
+          "costo_final_confirmado": 4000.00,
+          "mano_obra_neta": 3500.00,
+          "repuestos_cobrados": 500.00,
+          "monto_anticipo": 1000.00,
+          "monto_descuento": 0.00,
+          "monto_impuesto": 720.00,
+          "monto_liquidado": 3720.00,
+          "total_cobrado": 4720.00,
+          "metodo_pago_entrega": "Efectivo"
+        }
+      ],
+      "totales": {
+        "total_items": 48,
+        "suma_liquidado": 102000.00,
+        "suma_anticipo": 22500.00,
+        "suma_descuento": 4200.00,
+        "suma_mano_obra": 89000.00,
+        "suma_facturado": 124500.00
+      },
+      "paginacion": {
+        "page": 1,
+        "limit": 15,
+        "total": 48,
+        "totalPages": 4
+      }
+    }
+  }
+  ```
+
+#### Reglas Contables y Fórmulas de Aislamiento:
+1. **Exclusión de Anticipos Cancelados:** Las órdenes con estado `CANCELADO_DEVUELTO` se excluyen estrictamente del cálculo de `total_anticipos`, `suma_anticipo` y `total_cobrado` (`WHERE es.codigo_estado != 'CANCELADO_DEVUELTO'`). Si un servicio fue cancelado y se reintegró el anticipo al cliente, dicho monto no infla los ingresos reales del período.
+2. **Aislamiento de Mano de Obra Neta:** `costo_final_confirmado` consolida el total del servicio al entregar (Mano de Obra + Repuestos Aprobados - Descuentos). Para aislar la mano de obra pura sin duplicar repuestos, se aplica:
+   $$\text{Mano de Obra Neta} = \max(0, \text{costo\_final\_confirmado} - \text{repuestos\_aprobados} + \text{monto\_descuento})$$
+3. **Cuadre Contable 1:1:** Se garantiza el balance perfecto de ingresos:
+   $$\text{Total Facturado / Cobrado} = \text{Mano de Obra Neta} + \text{Total Repuestos Aprobados} - \text{Descuentos}$$
 
 
