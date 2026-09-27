@@ -163,8 +163,19 @@ const GlobalSearch = () => {
         setOpen(false);
       }
     };
+    const onFocusSearch = () => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+      setOpen(true);
+      setIsFocused(true);
+    };
+
     document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
+    window.addEventListener('siger:focus-global-search', onFocusSearch);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      window.removeEventListener('siger:focus-global-search', onFocusSearch);
+    };
   }, []);
 
   useEffect(() => {
@@ -278,6 +289,13 @@ const GlobalSearch = () => {
             setOpen(true);
           }}
           onBlur={() => setIsFocused(false)}
+          id="global-search-input"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setOpen(false);
+              inputRef.current?.blur();
+            }
+          }}
           placeholder="Buscar orden FMC..."
           className={`w-full h-10 pl-10 pr-9 bg-zinc-100 dark:bg-dark-card border border-zinc-200 dark:border-dark-border text-sm text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500/40 transition-all duration-300 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden ${isExpanded ? 'rounded-xl' : 'rounded-full'
             }`}
@@ -299,7 +317,7 @@ const GlobalSearch = () => {
       </div>
 
       {open ? (
-        <div className="absolute left-0 right-0 mt-2 rounded-2xl bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border shadow-xl overflow-hidden z-50 max-h-[70vh] overflow-y-auto">
+        <div className="fixed inset-x-4 top-16 mx-auto w-auto max-w-md md:absolute md:inset-x-auto md:top-auto md:left-0 md:right-0 md:mt-2 md:w-full md:max-w-none rounded-2xl bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border shadow-xl overflow-hidden z-50 max-h-[70vh] sm:max-h-[75vh] overflow-y-auto">
           {!hasQuery ? (
             <div className="p-3">
               <div className="flex items-center gap-2 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">

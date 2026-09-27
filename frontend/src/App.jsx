@@ -13,6 +13,7 @@ import NuevaOrdenPage from './pages/NuevaOrdenPage';
 import EstadoOrdenPage from './pages/EstadoOrdenPage';
 import BancoTrabajoPage from './pages/BancoTrabajoPage';
 import UploadMobilePage from './pages/UploadMobilePage';
+import ReportesPage from './pages/Reportes/ReportesPage';
 import { useTheme } from './context/ThemeContext';
 import { Toaster } from 'sileo';
 import 'sileo/styles.css';
@@ -122,6 +123,15 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={['SuperAdmin', 'Admin_Sucursal']}>
                   <ConfigurationPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/reportes"
+              element={
+                <ProtectedRoute allowedRoles={['SuperAdmin', 'Admin_Sucursal']}>
+                  <ReportesPage />
                 </ProtectedRoute>
               }
             />

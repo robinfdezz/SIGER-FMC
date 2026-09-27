@@ -719,8 +719,8 @@ const TrendChart = ({ serie = [] }) => {
                 y={height - 8}
                 textAnchor={textAnchor}
                 className={`text-[11px] transition-colors font-medium ${isHovered
-                    ? 'fill-neutral-900 dark:fill-neutral-100 font-bold'
-                    : 'fill-neutral-400 dark:fill-neutral-500'
+                  ? 'fill-neutral-900 dark:fill-neutral-100 font-bold'
+                  : 'fill-neutral-400 dark:fill-neutral-500'
                   }`}
               >
                 {formatDayLabel(item.fecha)}
@@ -918,9 +918,8 @@ const DeviceCategoryDonut = ({ data = {}, className = '', mostrarDetalle = false
       {/* Donut SVG Interactivo (Centrado vertical y horizontalmente cuando no hay detalle) */}
       <div
         ref={containerRef}
-        className={`relative flex items-center justify-center select-none ${
-          mostrarDetalle ? 'my-2' : 'flex-1 my-auto py-4 sm:py-6'
-        }`}
+        className={`relative flex items-center justify-center select-none ${mostrarDetalle ? 'my-2' : 'flex-1 my-auto py-4 sm:py-6'
+          }`}
         onMouseLeave={() => {
           setHoveredIndex(null);
           setTooltip(null);
@@ -965,11 +964,10 @@ const DeviceCategoryDonut = ({ data = {}, className = '', mostrarDetalle = false
 
         <svg
           viewBox="0 0 220 220"
-          className={`${
-            mostrarDetalle
+          className={`${mostrarDetalle
               ? 'w-48 h-48 sm:w-52 sm:h-52'
               : 'w-56 h-56 sm:w-64 sm:h-64'
-          } overflow-visible transition-all duration-300`}
+            } overflow-visible transition-all duration-300`}
           role="img"
           aria-label="Distribución por categoría de dispositivos"
         >
@@ -1007,7 +1005,7 @@ const DeviceCategoryDonut = ({ data = {}, className = '', mostrarDetalle = false
                   r={R}
                   fill="none"
                   stroke={seg.color}
-                  strokeWidth={isHovered ? 18 : 14}
+                  strokeWidth={isHovered ? 21 : 14}
                   strokeDasharray={`${seg.effectivePx} ${C - seg.effectivePx}`}
                   strokeDashoffset={seg.offsetPx}
                   strokeLinecap="round"
@@ -1039,9 +1037,8 @@ const DeviceCategoryDonut = ({ data = {}, className = '', mostrarDetalle = false
           {hoveredItem ? (
             <div className="flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-150">
               <span
-                className={`font-extrabold font-outfit tracking-tight leading-none tabular-nums ${
-                  mostrarDetalle ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-3xl'
-                }`}
+                className={`font-extrabold font-outfit tracking-tight leading-none tabular-nums ${mostrarDetalle ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-3xl'
+                  }`}
                 style={{ color: hoveredColor }}
               >
                 {hoveredItem.porcentaje}%
@@ -1056,9 +1053,8 @@ const DeviceCategoryDonut = ({ data = {}, className = '', mostrarDetalle = false
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center transition-all duration-200">
-              <span className={`font-extrabold text-neutral-900 dark:text-neutral-50 font-outfit tracking-tight leading-none tabular-nums ${
-                mostrarDetalle ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl'
-              }`}>
+              <span className={`font-extrabold text-neutral-900 dark:text-neutral-50 font-outfit tracking-tight leading-none tabular-nums ${mostrarDetalle ? 'text-2xl sm:text-3xl' : 'text-3xl sm:text-4xl'
+                }`}>
                 {total_mes}
               </span>
               <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mt-1 font-inter">
@@ -1087,11 +1083,10 @@ const DeviceCategoryDonut = ({ data = {}, className = '', mostrarDetalle = false
                   type="button"
                   onMouseEnter={() => setHoveredIndex(item.originalIndex)}
                   onMouseLeave={() => setHoveredIndex(null)}
-                  className={`flex items-center justify-between gap-2 p-1.5 sm:p-2 rounded-xl border transition-all text-left cursor-pointer ${
-                    isHovered
+                  className={`flex items-center justify-between gap-2 p-1.5 sm:p-2 rounded-xl border transition-all text-left cursor-pointer ${isHovered
                       ? 'border-neutral-300 dark:border-neutral-700 bg-neutral-100/70 dark:bg-neutral-800/70 shadow-2xs'
                       : 'border-transparent hover:bg-neutral-50 dark:hover:bg-neutral-900/50'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-1.5 min-w-0">
                     <CatIcon
@@ -1169,11 +1164,15 @@ const KpiCard = ({ title, value, badge, icon: Icon }) => {
 
 const DashboardPage = () => {
   const { user } = useAuth();
+  const { isDark } = useTheme();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  const skeletonBaseColor = isDark ? '#262626' : '#e5e7eb';
+  const skeletonHighlightColor = isDark ? '#404040' : '#f3f4f6';
 
   const isSuperAdmin = user?.rol_nombre === 'SuperAdmin';
   const roleName = String(user?.rol_nombre || '').toLowerCase();
@@ -1321,37 +1320,64 @@ const DashboardPage = () => {
           <div className="lg:col-span-8 xl:col-span-9 flex flex-col justify-between gap-4">
             {/* Banner / Encabezado Abierto (conserva dimensiones del bloque sin estilo de recuadro) */}
             <div className="rounded-2xl p-5 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="space-y-1.5 min-w-0">
-                  <div className="inline-flex items-center gap-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                    <Home className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
-                    <span className="truncate">{branchLabel}</span>
+              {loading ? (
+                <SkeletonTheme baseColor={skeletonBaseColor} highlightColor={skeletonHighlightColor}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-2 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Skeleton circle width={14} height={14} />
+                        <Skeleton width={140} height={12} />
+                      </div>
+                      <Skeleton width={320} height={32} className="max-w-[85vw]" />
+                      <div className="flex flex-wrap items-center gap-3 pt-0.5">
+                        <Skeleton width={230} height={13} />
+                        <div className="flex items-center gap-1.5">
+                          <Skeleton circle width={8} height={8} />
+                          <Skeleton width={80} height={12} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {isSuperAdmin ? (
+                      <div className="w-[180px] sm:w-[220px] self-start sm:self-center shrink-0">
+                        <Skeleton height={38} borderRadius="0.75rem" />
+                      </div>
+                    ) : null}
                   </div>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100 font-outfit">
-                    ¡Bienvenido de nuevo, {user?.nombre || 'Usuario'}!
-                  </h1>
-                  <div className="flex flex-wrap items-center gap-3 pt-0.5">
-                    <p className="text-xs sm:text-[13px] text-neutral-500 dark:text-neutral-400 font-inter">
-                      Resumen operativo del taller — {formatTodayLabel()}
-                    </p>
-                    <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                      <span>Sistema online</span>
+                </SkeletonTheme>
+              ) : (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="inline-flex items-center gap-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                      <Home className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                      <span className="truncate">{branchLabel}</span>
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100 font-outfit">
+                      ¡Bienvenido de nuevo, {user?.nombre || 'Usuario'}!
+                    </h1>
+                    <div className="flex flex-wrap items-center gap-3 pt-0.5">
+                      <p className="text-xs sm:text-[13px] text-neutral-500 dark:text-neutral-400 font-inter">
+                        Resumen operativo del taller — {formatTodayLabel()}
+                      </p>
+                      <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                        <span>Sistema online</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {isSuperAdmin ? (
-                  <div className="w-[180px] sm:w-[220px] self-start sm:self-center shrink-0">
-                    <Select
-                      value={selectedBranch}
-                      onChange={(val) => setSelectedBranch(String(val))}
-                      items={branchOptions}
-                      placeholder="Todas las sucursales"
-                    />
-                  </div>
-                ) : null}
-              </div>
+                  {isSuperAdmin ? (
+                    <div className="w-[180px] sm:w-[220px] self-start sm:self-center shrink-0">
+                      <Select
+                        value={selectedBranch}
+                        onChange={(val) => setSelectedBranch(String(val))}
+                        items={branchOptions}
+                        placeholder="Todas las sucursales"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             {error ? (
@@ -1368,22 +1394,47 @@ const DashboardPage = () => {
             ) : null}
 
             {loading ? (
-              <SkeletonTheme baseColor="#E4E4E7" highlightColor="#F4F4F5">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 p-4 sm:p-5">
-                      <Skeleton height={14} width="55%" />
-                      <Skeleton height={28} width="40%" className="mt-3" />
+              <SkeletonTheme baseColor={skeletonBaseColor} highlightColor={skeletonHighlightColor}>
+                <div className={isTecnico ? "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4" : "grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4"}>
+                  {Array.from({ length: isTecnico ? 5 : 4 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-3">
+                          <Skeleton width="60%" height={12} />
+                          <Skeleton circle width={20} height={20} />
+                        </div>
+                        <div className="mt-2">
+                          <Skeleton width="45%" height={32} />
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center gap-1.5 min-w-0">
+                        <Skeleton width={60} height={20} borderRadius="9999px" />
+                        <Skeleton width={45} height={12} />
+                      </div>
                     </div>
                   ))}
                 </div>
+
                 {canViewFinances ? (
-                  <div className="w-full rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 p-4 sm:p-5 flex items-center justify-between">
-                    <div className="space-y-2">
-                      <Skeleton height={14} width={120} />
-                      <Skeleton height={28} width={180} />
+                  <div className="w-full rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1 shrink-0">
+                      <div className="flex items-center gap-2">
+                        <Skeleton width={110} height={12} />
+                        <Skeleton circle width={16} height={16} />
+                      </div>
+                      <div className="flex flex-wrap items-baseline gap-2 mt-1">
+                        <Skeleton width={28} height={14} />
+                        <Skeleton width={160} height={30} />
+                        <Skeleton width={80} height={20} borderRadius="9999px" />
+                      </div>
                     </div>
-                    <Skeleton height={36} width={100} />
+
+                    <div className="flex-1 max-w-full md:max-w-[360px] lg:max-w-[420px] w-full min-w-0">
+                      <Skeleton height={66} borderRadius="0.75rem" />
+                    </div>
                   </div>
                 ) : null}
               </SkeletonTheme>
@@ -1539,126 +1590,283 @@ const DashboardPage = () => {
           {/* Columna Derecha: Acciones Rápidas */}
           <div className="lg:col-span-4 xl:col-span-3 h-full">
             <div className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5 h-full flex flex-col">
-              <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800 mb-3.5">
-                <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
-                  <Zap className="w-4 h-4" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 font-outfit">
-                    Acciones Rápidas
-                  </h4>
-                </div>
+              {loading ? (
+                <SkeletonTheme baseColor={skeletonBaseColor} highlightColor={skeletonHighlightColor}>
+                  <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800 mb-3.5">
+                    <div className="flex items-center gap-2">
+                      <Skeleton circle width={16} height={16} />
+                      <Skeleton width={110} height={14} />
+                    </div>
+                    <Skeleton width={32} height={32} borderRadius="0.75rem" />
+                  </div>
 
-                <AnimatedIconButton
-                  icon={RotateCcw}
-                  loading={refreshing}
-                  success={refreshSuccess}
-                  onSuccessEnd={() => setRefreshSuccess(false)}
-                  onClick={handleRefresh}
-                  title="Refrescar dashboard"
-                  ariaLabel="Refrescar datos del dashboard"
-                  className="w-8 h-8 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center justify-center transition-colors"
-                  size={15}
-                />
-              </div>
-
-              <div className="flex-1 flex flex-col justify-between gap-2.5">
-                {canCreateOrder ? (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/tickets/nueva')}
-                    className="w-full flex-1 group text-left rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 hover:bg-neutral-100/90 dark:hover:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-between cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Plus className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold leading-tight truncate">Nueva Orden</p>
-                        <p className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">Recepción de equipo</p>
+                  <div className="flex-1 flex flex-col justify-between gap-2.5">
+                    {Array.from({ length: canCreateOrder ? 4 : 3 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-full flex-1 rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Skeleton circle width={20} height={20} className="shrink-0" />
+                          <div className="space-y-1.5 min-w-0">
+                            <Skeleton width={80} height={12} />
+                            <Skeleton width={110} height={10} />
+                          </div>
+                        </div>
+                        <Skeleton width={16} height={16} borderRadius="0.25rem" className="shrink-0" />
                       </div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:translate-x-0.5 group-hover:text-red-600 dark:group-hover:text-red-500 transition-all shrink-0" />
-                  </button>
-                ) : null}
-
-                <button
-                  type="button"
-                  onClick={() => navigate('/taller')}
-                  className="w-full flex-1 group text-left rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 hover:bg-neutral-100/90 dark:hover:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-between cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Wrench className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold leading-tight truncate">Banco de Trabajo</p>
-                      <p className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">Mesa y taller kanban</p>
-                    </div>
+                    ))}
                   </div>
-                  <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:translate-x-0.5 group-hover:text-red-600 dark:group-hover:text-red-500 transition-all shrink-0" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigate('/clientes')}
-                  className="w-full flex-1 group text-left rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 hover:bg-neutral-100/90 dark:hover:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-between cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Contact className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold leading-tight truncate">Clientes</p>
-                      <p className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">Directorio y contactos</p>
+                </SkeletonTheme>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800 mb-3.5">
+                    <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
+                      <Zap className="w-4 h-4" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 font-outfit">
+                        Acciones Rápidas
+                      </h4>
                     </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:translate-x-0.5 group-hover:text-red-600 dark:group-hover:text-red-500 transition-all shrink-0" />
-                </button>
 
-                <button
-                  type="button"
-                  onClick={() => navigate('/tickets')}
-                  className="w-full flex-1 group text-left rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 hover:bg-neutral-100/90 dark:hover:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-between cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Ticket className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold leading-tight truncate">Consultar Órdenes</p>
-                      <p className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">Búsqueda y filtros</p>
-                    </div>
+                    <AnimatedIconButton
+                      icon={RotateCcw}
+                      loading={refreshing}
+                      success={refreshSuccess}
+                      onSuccessEnd={() => setRefreshSuccess(false)}
+                      onClick={handleRefresh}
+                      title="Refrescar dashboard"
+                      ariaLabel="Refrescar datos del dashboard"
+                      className="w-8 h-8 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center justify-center transition-colors"
+                      size={15}
+                    />
                   </div>
-                  <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:translate-x-0.5 group-hover:text-red-600 dark:group-hover:text-red-500 transition-all shrink-0" />
-                </button>
-              </div>
+
+                  <div className="flex-1 flex flex-col justify-between gap-2.5">
+                    {canCreateOrder ? (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/tickets/nueva')}
+                        className="w-full flex-1 group text-left rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 hover:bg-neutral-100/90 dark:hover:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-between cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Plus className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold leading-tight truncate">Nueva Orden</p>
+                            <p className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">Recepción de equipo</p>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:translate-x-0.5 group-hover:text-red-600 dark:group-hover:text-red-500 transition-all shrink-0" />
+                      </button>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      onClick={() => navigate('/taller')}
+                      className="w-full flex-1 group text-left rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 hover:bg-neutral-100/90 dark:hover:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-between cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Wrench className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold leading-tight truncate">Banco de Trabajo</p>
+                          <p className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">Mesa y taller kanban</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:translate-x-0.5 group-hover:text-red-600 dark:group-hover:text-red-500 transition-all shrink-0" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate('/clientes')}
+                      className="w-full flex-1 group text-left rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 hover:bg-neutral-100/90 dark:hover:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-between cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Contact className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold leading-tight truncate">Clientes</p>
+                          <p className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">Directorio y contactos</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:translate-x-0.5 group-hover:text-red-600 dark:group-hover:text-red-500 transition-all shrink-0" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate('/tickets')}
+                      className="w-full flex-1 group text-left rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 hover:bg-neutral-100/90 dark:hover:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 transition-all flex items-center justify-between cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Ticket className="w-5 h-5 text-red-600 dark:text-red-500 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold leading-tight truncate">Consultar Órdenes</p>
+                          <p className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">Búsqueda y filtros</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:translate-x-0.5 group-hover:text-red-600 dark:group-hover:text-red-500 transition-all shrink-0" />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
 
         {loading ? (
-          <SkeletonTheme baseColor="#E4E4E7" highlightColor="#F4F4F5">
+          <SkeletonTheme baseColor={skeletonBaseColor} highlightColor={skeletonHighlightColor}>
             {/* Flujo + Carga */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-3.5">
-              <div className="xl:col-span-2 rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 p-5">
-                <Skeleton height={18} width={160} />
-                <Skeleton height={180} className="mt-4" />
-              </div>
-              <div className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 p-5">
-                <Skeleton height={18} width={140} />
-                <div className="mt-4 space-y-3">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} height={36} />
+              {/* Flujo del taller 1:1 */}
+              <div className="xl:col-span-2 rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <Skeleton width={110} height={18} />
+                    <Skeleton width={80} height={20} borderRadius="9999px" />
+                  </div>
+                  <Skeleton width={120} height={24} borderRadius="0.5rem" className="self-start sm:self-auto" />
+                </div>
+
+                {/* Barra de progreso segmentada */}
+                <div className="mt-2 mb-3.5">
+                  <Skeleton height={8} borderRadius="9999px" />
+                </div>
+
+                {/* 6 Etapas interconectadas */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                  {Array.from({ length: 6 }).map((_, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-xl border border-neutral-200/70 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-900/40 p-3 flex flex-col justify-between"
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-2">
+                        <Skeleton width={18} height={12} />
+                        {idx < 5 ? <Skeleton width={12} height={12} className="hidden lg:block" /> : null}
+                      </div>
+                      <div>
+                        <Skeleton width={38} height={28} />
+                        <Skeleton width="80%" height={12} className="mt-1" />
+                      </div>
+                      <div className="mt-2.5 w-full">
+                        <Skeleton height={4} borderRadius="9999px" />
+                      </div>
+                    </div>
                   ))}
+                </div>
+
+                {/* TrendChart Skeleton: Tabs + Área del gráfico */}
+                <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Skeleton width={130} height={14} />
+                    <div className="flex gap-1">
+                      <Skeleton width={50} height={24} borderRadius="0.5rem" />
+                      <Skeleton width={50} height={24} borderRadius="0.5rem" />
+                      <Skeleton width={50} height={24} borderRadius="0.5rem" />
+                    </div>
+                  </div>
+                  <Skeleton height={140} borderRadius="0.75rem" />
+                </div>
+              </div>
+
+              {/* Carga por técnico 1:1 */}
+              <div className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-4">
+                    <div>
+                      <Skeleton width={120} height={18} />
+                      <Skeleton width={100} height={12} className="mt-1" />
+                    </div>
+                    <Skeleton width={75} height={24} borderRadius="0.5rem" />
+                  </div>
+
+                  <ul className="space-y-3">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <li
+                        key={i}
+                        className="p-2.5 rounded-xl border border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-900/30"
+                      >
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Skeleton width={32} height={32} borderRadius="0.75rem" />
+                            <div className="space-y-1">
+                              <Skeleton width={90} height={12} />
+                              <Skeleton width={60} height={10} />
+                            </div>
+                          </div>
+                          <div className="text-right space-y-1">
+                            <Skeleton width={48} height={12} />
+                            <Skeleton width={36} height={10} />
+                          </div>
+                        </div>
+                        <Skeleton height={8} borderRadius="9999px" />
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             </div>
 
             {/* Categorías (Izquierda 1/3) + Actividad Reciente (Derecha 2/3) */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3.5">
-              <div className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 p-5">
-                <Skeleton height={18} width={160} />
-                <div className="mt-4 flex items-center justify-center">
-                  <Skeleton circle height={170} width={170} />
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3.5 items-stretch">
+              {/* Categorías de Dispositivos 1:1 */}
+              <div className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5 h-full flex flex-col">
+                <div className="mb-2 sm:mb-3">
+                  <Skeleton width={160} height={18} />
+                  <Skeleton width={210} height={12} className="mt-1" />
+                </div>
+                <div className="relative flex items-center justify-center select-none flex-1 my-auto py-4 sm:py-6">
+                  <div className="relative flex items-center justify-center w-56 h-56 sm:w-64 sm:h-64">
+                    <Skeleton circle width="100%" height="100%" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <div className="w-36 h-36 sm:w-40 sm:h-40 rounded-full bg-white dark:bg-[#141416] flex flex-col items-center justify-center shadow-xs">
+                        <Skeleton width={40} height={32} />
+                        <Skeleton width={50} height={12} className="mt-1" />
+                        <Skeleton width={45} height={10} className="mt-0.5" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="xl:col-span-2 rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 p-5">
-                <Skeleton height={20} width={180} />
-                <div className="mt-4 space-y-3">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} height={40} />
-                  ))}
+
+              {/* Actividad Reciente 1:1 */}
+              <div className="xl:col-span-2 rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs overflow-hidden flex flex-col justify-between">
+                <div>
+                  <div className="px-4 sm:px-5 py-4 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Skeleton width={130} height={18} />
+                      <Skeleton width={200} height={14} className="hidden sm:inline-block" />
+                    </div>
+                    <Skeleton width={80} height={24} borderRadius="0.5rem" />
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[720px] text-left">
+                      <thead>
+                        <tr className="text-[11px] uppercase tracking-wider border-b border-neutral-100 dark:border-neutral-800">
+                          <th className="px-4 sm:px-5 py-3"><Skeleton width={50} height={12} /></th>
+                          <th className="px-4 py-3"><Skeleton width={60} height={12} /></th>
+                          <th className="px-4 py-3"><Skeleton width={55} height={12} /></th>
+                          <th className="px-4 py-3"><Skeleton width={50} height={12} /></th>
+                          <th className="px-4 py-3"><Skeleton width={55} height={12} /></th>
+                          <th className="px-4 sm:px-5 py-3 text-right"><Skeleton width={50} height={12} className="ml-auto" /></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <tr key={i} className="border-b border-neutral-100/60 dark:border-neutral-800/60">
+                            <td className="px-4 sm:px-5 py-3.5"><Skeleton width={90} height={14} /></td>
+                            <td className="px-4 py-3.5"><Skeleton width={110} height={14} /></td>
+                            <td className="px-4 py-3.5"><Skeleton width={100} height={14} /></td>
+                            <td className="px-4 py-3.5"><Skeleton width={75} height={20} borderRadius="9999px" /></td>
+                            <td className="px-4 py-3.5"><Skeleton width={65} height={20} borderRadius="9999px" /></td>
+                            <td className="px-4 sm:px-5 py-3.5 text-right">
+                              <div className="inline-flex items-center justify-end gap-2">
+                                <Skeleton width={28} height={28} borderRadius="0.75rem" />
+                                <Skeleton width={80} height={14} />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1840,8 +2048,8 @@ const DashboardPage = () => {
                                 ) : (
                                   <div
                                     className={`w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-bold shrink-0 shadow-xs ${item.es_sin_asignar
-                                        ? 'bg-red-500 text-white'
-                                        : 'bg-zinc-800 text-zinc-100 dark:bg-zinc-700 border border-zinc-700 dark:border-zinc-600'
+                                      ? 'bg-red-500 text-white'
+                                      : 'bg-zinc-800 text-zinc-100 dark:bg-zinc-700 border border-zinc-700 dark:border-zinc-600'
                                       }`}
                                   >
                                     {item.es_sin_asignar ? (
@@ -1898,166 +2106,166 @@ const DashboardPage = () => {
               {/* Actividad Reciente (Lado Derecho) */}
               <div className="xl:col-span-2 rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs overflow-hidden flex flex-col justify-between">
                 <div>
-                <div className="px-4 sm:px-5 py-4 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-50 font-outfit">
-                      Actividad reciente
-                    </h3>
-                    <span className="text-xs text-neutral-400 dark:text-neutral-500 hidden sm:inline">
-                      — Últimas órdenes recibidas o en proceso
-                    </span>
+                  <div className="px-4 sm:px-5 py-4 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-50 font-outfit">
+                        Actividad reciente
+                      </h3>
+                      <span className="text-xs text-neutral-400 dark:text-neutral-500 hidden sm:inline">
+                        — Últimas órdenes recibidas o en proceso
+                      </span>
+                    </div>
+                    <SimpleButton
+                      icon={ChevronRight}
+                      iconPosition="right"
+                      size="xs"
+                      onClick={() => navigate('/tickets')}
+                      iconClassName="text-red-600 dark:text-red-500"
+                    >
+                      Ver todas
+                    </SimpleButton>
                   </div>
-                  <SimpleButton
-                    icon={ChevronRight}
-                    iconPosition="right"
-                    size="xs"
-                    onClick={() => navigate('/tickets')}
-                    iconClassName="text-red-600 dark:text-red-500"
-                  >
-                    Ver todas
-                  </SimpleButton>
-                </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[720px] text-left">
-                    <thead>
-                      <tr className="text-[11px] uppercase tracking-wider text-neutral-400 dark:text-neutral-500 border-b border-neutral-100 dark:border-neutral-800">
-                        <th className="px-4 sm:px-5 py-3 font-semibold">Código</th>
-                        <th className="px-4 py-3 font-semibold">Cliente</th>
-                        <th className="px-4 py-3 font-semibold">Equipo</th>
-                        <th className="px-4 py-3 font-semibold">Estado</th>
-                        <th className="px-4 py-3 font-semibold">Prioridad</th>
-                        <th className="px-4 sm:px-5 py-3 font-semibold text-right">Técnico</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {actividad.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="px-5 py-12 text-center text-sm text-neutral-500 dark:text-neutral-400">
-                            No hay órdenes activas para mostrar.
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[720px] text-left">
+                      <thead>
+                        <tr className="text-[11px] uppercase tracking-wider text-neutral-400 dark:text-neutral-500 border-b border-neutral-100 dark:border-neutral-800">
+                          <th className="px-4 sm:px-5 py-3 font-semibold">Código</th>
+                          <th className="px-4 py-3 font-semibold">Cliente</th>
+                          <th className="px-4 py-3 font-semibold">Equipo</th>
+                          <th className="px-4 py-3 font-semibold">Estado</th>
+                          <th className="px-4 py-3 font-semibold">Prioridad</th>
+                          <th className="px-4 sm:px-5 py-3 font-semibold text-right">Técnico</th>
                         </tr>
-                      ) : (
-                        actividad.map((orden) => {
-                          const hasTecnico = orden.tecnico_nombre && orden.tecnico_nombre !== 'Sin asignar';
+                      </thead>
+                      <tbody>
+                        {actividad.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-5 py-12 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                              No hay órdenes activas para mostrar.
+                            </td>
+                          </tr>
+                        ) : (
+                          actividad.map((orden) => {
+                            const hasTecnico = orden.tecnico_nombre && orden.tecnico_nombre !== 'Sin asignar';
 
-                          return (
-                            <tr
-                              key={orden.id}
-                              onClick={() => navigate(`/taller?ordenId=${orden.id}`)}
-                              className="border-b border-neutral-100/60 dark:border-neutral-800/60 hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 cursor-pointer transition-colors group"
-                            >
-                              <td className="px-4 sm:px-5 py-3.5 whitespace-nowrap">
-                                <span className="font-mono text-xs font-semibold text-neutral-800 dark:text-neutral-200 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
-                                  {orden.codigo_ticket}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3.5 text-sm text-neutral-800 dark:text-neutral-200 whitespace-normal break-words leading-snug max-w-[160px]">
-                                {orden.cliente_nombre}
-                              </td>
-                              <td className="px-4 py-3.5 text-sm text-neutral-500 dark:text-neutral-400 whitespace-normal break-words leading-snug max-w-[150px]">
-                                {orden.equipo}
-                              </td>
-                              <td className="px-4 py-3.5 whitespace-nowrap">
-                                {orden.nombre_estado || orden.codigo_estado ? (
-                                  (() => {
-                                    const EstadoIcon = getEstadoIcon(orden);
-                                    const estadoColor = orden.color_badge || '#71717A';
-                                    const estadoLabel = orden.nombre_estado || orden.codigo_estado;
-
-                                    return (
-                                      <Badge
-                                        variant="minimal"
-                                        size="sm"
-                                        showDot={false}
-                                        icon={<EstadoIcon size={12} className="shrink-0 stroke-[2.2]" style={{ color: estadoColor }} />}
-                                        className="font-medium"
-                                        style={{ color: estadoColor }}
-                                      >
-                                        {estadoLabel}
-                                      </Badge>
-                                    );
-                                  })()
-                                ) : (
-                                  <span className="text-neutral-400 dark:text-neutral-500">—</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3.5 whitespace-nowrap">
-                                {orden.prioridad ? (
-                                  (() => {
-                                    const config = getPrioridadConfig(orden.prioridad);
-                                    const PriorityIcon = config.icon;
-                                    return (
-                                      <Badge
-                                        variant="minimal"
-                                        color={config.color}
-                                        icon={PriorityIcon}
-                                        size="sm"
-                                        className="capitalize font-medium"
-                                      >
-                                        {config.label}
-                                      </Badge>
-                                    );
-                                  })()
-                                ) : (
-                                  <span className="text-neutral-400 dark:text-neutral-500">—</span>
-                                )}
-                              </td>
-                              <td className="px-4 sm:px-5 py-3.5 text-right whitespace-nowrap">
-                                {hasTecnico ? (
-                                  <div className="inline-flex items-center justify-end gap-2 text-left">
-                                    <div className="w-7 h-7 rounded-xl bg-zinc-800 text-zinc-100 dark:bg-zinc-700 border border-zinc-700 dark:border-zinc-600 font-bold text-[10px] flex items-center justify-center shrink-0 overflow-hidden relative">
-                                      {orden.tecnico_foto_url ? (
-                                        <img
-                                          src={orden.tecnico_foto_url}
-                                          alt={orden.tecnico_nombre}
-                                          className="w-full h-full object-cover"
-                                          onError={(e) => {
-                                            e.currentTarget.style.display = 'none';
-                                            const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
-                                            if (fallback) fallback.classList.remove('hidden');
-                                          }}
-                                        />
-                                      ) : null}
-                                      <span className={`avatar-fallback ${orden.tecnico_foto_url ? 'hidden' : ''}`}>
-                                        {getInitials(orden.tecnico_nombre)}
-                                      </span>
-                                    </div>
-                                    <div className="flex flex-col items-start min-w-0">
-                                      <span
-                                        className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate max-w-[120px] leading-tight"
-                                        title={orden.tecnico_nombre}
-                                      >
-                                        {shortTechName(orden.tecnico_nombre)}
-                                      </span>
-                                      {orden.tecnicos_count > 1 ? (
-                                        <span
-                                          className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mt-0.5 leading-tight"
-                                          title={`${orden.tecnicos_count} técnicos asignados`}
-                                        >
-                                          +{orden.tecnicos_count - 1} más
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-medium bg-neutral-100 dark:bg-neutral-800/80 text-neutral-500 dark:text-neutral-400 border border-neutral-200/70 dark:border-neutral-700/60">
-                                    <UserX className="w-3 h-3 text-neutral-400 shrink-0" />
-                                    Sin asignar
+                            return (
+                              <tr
+                                key={orden.id}
+                                onClick={() => navigate(`/taller?ordenId=${orden.id}`)}
+                                className="border-b border-neutral-100/60 dark:border-neutral-800/60 hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 cursor-pointer transition-colors group"
+                              >
+                                <td className="px-4 sm:px-5 py-3.5 whitespace-nowrap">
+                                  <span className="font-mono text-xs font-semibold text-neutral-800 dark:text-neutral-200 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
+                                    {orden.codigo_ticket}
                                   </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
+                                </td>
+                                <td className="px-4 py-3.5 text-sm text-neutral-800 dark:text-neutral-200 whitespace-normal break-words leading-snug max-w-[160px]">
+                                  {orden.cliente_nombre}
+                                </td>
+                                <td className="px-4 py-3.5 text-sm text-neutral-500 dark:text-neutral-400 whitespace-normal break-words leading-snug max-w-[150px]">
+                                  {orden.equipo}
+                                </td>
+                                <td className="px-4 py-3.5 whitespace-nowrap">
+                                  {orden.nombre_estado || orden.codigo_estado ? (
+                                    (() => {
+                                      const EstadoIcon = getEstadoIcon(orden);
+                                      const estadoColor = orden.color_badge || '#71717A';
+                                      const estadoLabel = orden.nombre_estado || orden.codigo_estado;
+
+                                      return (
+                                        <Badge
+                                          variant="minimal"
+                                          size="sm"
+                                          showDot={false}
+                                          icon={<EstadoIcon size={12} className="shrink-0 stroke-[2.2]" style={{ color: estadoColor }} />}
+                                          className="font-medium"
+                                          style={{ color: estadoColor }}
+                                        >
+                                          {estadoLabel}
+                                        </Badge>
+                                      );
+                                    })()
+                                  ) : (
+                                    <span className="text-neutral-400 dark:text-neutral-500">—</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3.5 whitespace-nowrap">
+                                  {orden.prioridad ? (
+                                    (() => {
+                                      const config = getPrioridadConfig(orden.prioridad);
+                                      const PriorityIcon = config.icon;
+                                      return (
+                                        <Badge
+                                          variant="minimal"
+                                          color={config.color}
+                                          icon={PriorityIcon}
+                                          size="sm"
+                                          className="capitalize font-medium"
+                                        >
+                                          {config.label}
+                                        </Badge>
+                                      );
+                                    })()
+                                  ) : (
+                                    <span className="text-neutral-400 dark:text-neutral-500">—</span>
+                                  )}
+                                </td>
+                                <td className="px-4 sm:px-5 py-3.5 text-right whitespace-nowrap">
+                                  {hasTecnico ? (
+                                    <div className="inline-flex items-center justify-end gap-2 text-left">
+                                      <div className="w-7 h-7 rounded-xl bg-zinc-800 text-zinc-100 dark:bg-zinc-700 border border-zinc-700 dark:border-zinc-600 font-bold text-[10px] flex items-center justify-center shrink-0 overflow-hidden relative">
+                                        {orden.tecnico_foto_url ? (
+                                          <img
+                                            src={orden.tecnico_foto_url}
+                                            alt={orden.tecnico_nombre}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                              e.currentTarget.style.display = 'none';
+                                              const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback');
+                                              if (fallback) fallback.classList.remove('hidden');
+                                            }}
+                                          />
+                                        ) : null}
+                                        <span className={`avatar-fallback ${orden.tecnico_foto_url ? 'hidden' : ''}`}>
+                                          {getInitials(orden.tecnico_nombre)}
+                                        </span>
+                                      </div>
+                                      <div className="flex flex-col items-start min-w-0">
+                                        <span
+                                          className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate max-w-[120px] leading-tight"
+                                          title={orden.tecnico_nombre}
+                                        >
+                                          {shortTechName(orden.tecnico_nombre)}
+                                        </span>
+                                        {orden.tecnicos_count > 1 ? (
+                                          <span
+                                            className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 mt-0.5 leading-tight"
+                                            title={`${orden.tecnicos_count} técnicos asignados`}
+                                          >
+                                            +{orden.tecnicos_count - 1} más
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-medium bg-neutral-100 dark:bg-neutral-800/80 text-neutral-500 dark:text-neutral-400 border border-neutral-200/70 dark:border-neutral-700/60">
+                                      <UserX className="w-3 h-3 text-neutral-400 shrink-0" />
+                                      Sin asignar
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </>
+          </>
         )}
       </div>
     </DashboardLayout>

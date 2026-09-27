@@ -11,13 +11,13 @@ A continuación se detalla la estructura y el propósito de cada documento en el
 | Documento | Ubicación | Audiencia / Propósito |
 | :--- | :--- | :--- |
 | **Arquitectura Global** | [docs/ARCHITECTURE.md](./ARCHITECTURE.md) | Capas de la aplicación, ciclo de vida de tickets, aislamiento multi-sucursal, pipeline Cloudinary, campanita y correo Resend. |
-| **Catálogo de API REST** | [docs/API.md](./API.md) | Endpoints (incl. `/buscar`, `/notificaciones`, `/servicios/dashboard`), middlewares RBAC, payloads JSON y códigos de respuesta. |
+| **Catálogo de API REST** | [docs/API.md](./API.md) | Endpoints (incl. `/buscar`, `/notificaciones`, `/servicios/dashboard`, `/reportes`), middlewares RBAC, payloads JSON y códigos de respuesta. |
 | **Modelo de Base de Datos** | [docs/DATABASE.md](./DATABASE.md) | Esquema relacional PostgreSQL, tablas (incl. `notificaciones`), campos, FKs, índices y matriz de alertas por rol. |
 | **Guía de Desarrollo y UI/UX** | [docs/GUIDELINES.md](./GUIDELINES.md) | Sistema de diseño, cabecera (búsqueda + campanita), paleta por estado y convenciones de componentes. |
-| **Contexto del Proyecto** | [docs/PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) | Visión de negocio, roles, módulos (dashboard, alertas, correo) y reglas funcionales. |
+| **Contexto del Proyecto** | [docs/PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) | Visión de negocio, roles, módulos (dashboard, alertas, correo, reportes) y reglas funcionales. |
 | **Reglas para Asistentes AI** | [docs/AI_RULES.md](./AI_RULES.md) | Restricciones estrictas de desarrollo, prohibiciones de comandos destructivos y lineamientos de codificación. |
 | **Casos de Uso y Diagramas de Flujo** | [DIAGRAMAS_CASOS_DE_USO_Y_FLUJO.md](../DIAGRAMAS_CASOS_DE_USO_Y_FLUJO.md) | Especificación formal UML y flujos Mermaid (CU-01 a CU-18), catálogo de actores RBAC, ciclo de vida de taller y comprobantes. |
-| **Registro de Cambios** | [docs/CHANGELOG.md](./CHANGELOG.md) | Historial cronológico de versiones y novedades en desarrollo (`[Unreleased]`). |
+| **Registro de Cambios** | [docs/CHANGELOG.md](./CHANGELOG.md) | Historial cronológico de versiones (Versión oficial definitiva `v1.0.0`). |
 
 ---
 

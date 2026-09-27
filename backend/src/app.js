@@ -16,6 +16,7 @@ const serviciosRoutes = require('./routes/servicios.routes');
 const uploadSessionRoutes = require('./routes/uploadSession.routes');
 const searchRoutes = require('./routes/search.routes');
 const notificationsRoutes = require('./routes/notifications.routes');
+const reportesRoutes = require('./routes/reportes.routes');
 
 const app = express();
 
@@ -86,6 +87,7 @@ app.use('/api/servicios', serviciosRoutes);
 app.use('/api/upload-session', uploadSessionRoutes);
 app.use('/api/buscar', searchRoutes);
 app.use('/api/notificaciones', notificationsRoutes);
+app.use('/api/reportes', reportesRoutes);
 
 // Alias directo para el selector de categorias en el modulo de recepcion
 app.use('/api/categorias-dispositivos', catalogsRoutes);

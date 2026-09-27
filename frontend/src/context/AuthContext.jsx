@@ -25,61 +25,120 @@ const isTokenExpired = (tokenString) => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // 1. Hidratación síncrona optimista de token
+  const [token, setToken] = useState(() => {
+    try {
+      const storedToken = localStorage.getItem('siger_token') || sessionStorage.getItem('siger_token');
+      if (storedToken && !isTokenExpired(storedToken)) {
+        return storedToken;
+      }
+      if (storedToken) {
+        localStorage.removeItem('siger_token');
+        sessionStorage.removeItem('siger_token');
+      }
+    } catch (e) {
+      console.warn('Error leyendo token inicial:', e);
+    }
+    return null;
+  });
+
+  // 2. Hidratación síncrona optimista de usuario
+  const [user, setUser] = useState(() => {
+    try {
+      const storedToken = localStorage.getItem('siger_token') || sessionStorage.getItem('siger_token');
+      if (storedToken && !isTokenExpired(storedToken)) {
+        const storedUser = localStorage.getItem('siger_user') || sessionStorage.getItem('siger_user');
+        if (storedUser) {
+          return JSON.parse(storedUser);
+        }
+      } else {
+        localStorage.removeItem('siger_user');
+        sessionStorage.removeItem('siger_user');
+      }
+    } catch (e) {
+      console.warn('Error hidratando usuario inicial:', e);
+    }
+    return null;
+  });
+
+  // 3. Estado loading inicial:
+  // Si no hay token guardado (o ya expiró), no hay nada que esperar (loading = false).
+  // Si ya tenemos token y usuario hidratados, la app arranca de inmediato (loading = false).
+  // Solo si hay token pero falta el usuario en storage, dejamos loading = true mientras llega /auth/me.
+  const [loading, setLoading] = useState(() => {
+    try {
+      const storedToken = localStorage.getItem('siger_token') || sessionStorage.getItem('siger_token');
+      if (!storedToken || isTokenExpired(storedToken)) {
+        return false;
+      }
+      const storedUser = localStorage.getItem('siger_user') || sessionStorage.getItem('siger_user');
+      return !storedUser;
+    } catch {
+      return false;
+    }
+  });
+
+  const [isValidatingSession, setIsValidatingSession] = useState(false);
   const [error, setError] = useState(null);
 
-  // Inicializar estado revisando storage (localStorage o sessionStorage)
+  // Inicializar estado revisando storage y revalidando en segundo plano
   const initializeAuth = useCallback(async () => {
     try {
       const storedToken = localStorage.getItem('siger_token') || sessionStorage.getItem('siger_token');
       const storedUser = localStorage.getItem('siger_user') || sessionStorage.getItem('siger_user');
 
-      if (storedToken) {
-        // 1. Validar vigencia local del token
-        if (isTokenExpired(storedToken)) {
-          console.warn('El token almacenado ha expirado.');
-          localStorage.removeItem('siger_token');
-          localStorage.removeItem('siger_user');
-          sessionStorage.removeItem('siger_token');
-          sessionStorage.removeItem('siger_user');
-          setUser(null);
-          setToken(null);
-          setLoading(false);
-          return;
-        }
+      if (!storedToken) {
+        setUser(null);
+        setToken(null);
+        setLoading(false);
+        return;
+      }
 
-        setToken(storedToken);
-        if (storedUser) {
-          try {
-            setUser(JSON.parse(storedUser));
-          } catch (e) {
-            console.error('Error parseando usuario local:', e);
-          }
-        }
+      // 1. Validar vigencia local del token
+      if (isTokenExpired(storedToken)) {
+        console.warn('El token almacenado ha expirado.');
+        localStorage.removeItem('siger_token');
+        localStorage.removeItem('siger_user');
+        sessionStorage.removeItem('siger_token');
+        sessionStorage.removeItem('siger_user');
+        setUser(null);
+        setToken(null);
+        setLoading(false);
+        return;
+      }
 
-        // 2. Validar token y sesión activa contra el backend mediante /api/auth/me
+      setToken(storedToken);
+      if (storedUser) {
         try {
-          const response = await api.get('/auth/me');
-          if (response.data?.success && response.data?.user) {
-            setUser(response.data.user);
-            // Actualizar storage con los datos más recientes
-            if (localStorage.getItem('siger_token')) {
-              localStorage.setItem('siger_user', JSON.stringify(response.data.user));
-            } else {
-              sessionStorage.setItem('siger_user', JSON.stringify(response.data.user));
-            }
-          }
-        } catch (apiErr) {
-          console.warn('Sesión no válida o expirada en el backend:', apiErr.response?.data?.message || apiErr.message);
-          localStorage.removeItem('siger_token');
-          localStorage.removeItem('siger_user');
-          sessionStorage.removeItem('siger_token');
-          sessionStorage.removeItem('siger_user');
-          setUser(null);
-          setToken(null);
+          setUser(JSON.parse(storedUser));
+        } catch (e) {
+          console.error('Error parseando usuario local:', e);
         }
+      }
+
+      // 2. Validar token y sesión activa contra el backend mediante /api/auth/me en segundo plano
+      setIsValidatingSession(true);
+      try {
+        const response = await api.get('/auth/me');
+        if (response.data?.success && response.data?.user) {
+          setUser(response.data.user);
+          // Actualizar storage con los datos más recientes
+          if (localStorage.getItem('siger_token')) {
+            localStorage.setItem('siger_user', JSON.stringify(response.data.user));
+          } else {
+            sessionStorage.setItem('siger_user', JSON.stringify(response.data.user));
+          }
+        }
+      } catch (apiErr) {
+        console.warn('Sesión no válida o expirada en el backend:', apiErr.response?.data?.message || apiErr.message);
+        localStorage.removeItem('siger_token');
+        localStorage.removeItem('siger_user');
+        sessionStorage.removeItem('siger_token');
+        sessionStorage.removeItem('siger_user');
+        setUser(null);
+        setToken(null);
+      } finally {
+        setIsValidatingSession(false);
       }
     } catch (err) {
       console.error('Error inicializando autenticación:', err);
@@ -167,6 +226,7 @@ export const AuthProvider = ({ children }) => {
     user,
     token,
     loading,
+    isValidatingSession,
     error,
     isAuthenticated: !!token && !!user,
     login,

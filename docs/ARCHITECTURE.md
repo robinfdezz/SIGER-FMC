@@ -52,6 +52,7 @@ backend/
 │   ├── routes/              # Declaración de rutas y endpoints de la API REST
 │   │   ├── auth.routes.js
 │   │   ├── servicios.routes.js
+│   │   ├── reportes.routes.js   # Informes, KPIs analíticos, series temporales y exportación
 │   │   ├── clients.routes.js
 │   │   ├── workers.routes.js
 │   │   ├── configuracion.routes.js
@@ -84,7 +85,14 @@ frontend/
 │   │   │   ├── Pagination.jsx   # Paginador universal homologado (selector por página, botones < >)
 │   │   │   ├── TurnstileWidget.jsx # Widget anti-bot Cloudflare con soporte dark mode
 │   │   │   ├── SingleImageDropzone.jsx # Subida y recorte de logotipo / avatares
+│   │   │   ├── HelpDocsModal.jsx # Modal de documentación interactiva y atajos de teclado
+│   │   │   ├── KeycapSequence.jsx # Renderizado visual de secuencias de teclas
 │   │   │   └── TicketQR.jsx     # Renderizado vectorial QR dinámico
+│   │   ├── charts/          # Gráficas analíticas vectoriales (SVG / Catmull-Rom)
+│   │   │   ├── IncomeAreaChart.jsx # Curva suave con degradado esmeralda para ingresos
+│   │   │   └── ReportTrendChart.jsx # Tendencia temporal de entradas vs entregas
+│   │   ├── dashboard/       # Componentes analíticos del panel de control
+│   │   │   └── DeviceCategoryDonut.jsx # Gráfica interactiva de categorías en dona SVG
 │   │   ├── configuration/   # Pestañas de configuración institucional
 │   │   │   ├── CompanyProfileTab.jsx # Perfil matriz, RNC, dirección y logotipo Cloudinary
 │   │   │   ├── BranchesTab.jsx       # Gestión de sedes y datos operativos
@@ -121,7 +129,8 @@ frontend/
 │   │   └── ThemeContext.jsx     # Manejo del tema (Light por defecto / Dark)
 │   ├── pages/               # Vistas principales del sistema
 │   │   ├── Login/               # LoginPage.jsx (Formulario institucional con Turnstile)
-│   │   ├── Dashboard/           # DashboardPage.jsx (KPIs reales vía /servicios/dashboard)
+│   │   ├── Dashboard/           # DashboardPage.jsx (Layout 2 columnas, IncomeAreaChart, métricas en tiempo real)
+│   │   ├── Reportes/            # ReportesPage.jsx y ReporteEjecutivoImprimible.jsx (Auditoría contable y reportes ejecutivos)
 │   │   ├── ServiciosPage.jsx    # Listado general de órdenes con filtros y paginación
 │   │   ├── NuevaOrdenPage.jsx   # Flujo por etapas (Stepper) de recepción
 │   │   ├── BancoTrabajoPage.jsx # Tablero operativo Kanban y modo tabla
@@ -130,8 +139,8 @@ frontend/
 │   │   ├── ConfigurationPage.jsx# Panel de configuración matriz, sedes y formatos
 │   │   ├── EstadoOrdenPage.jsx  # Seguimiento público de orden con react-loading-skeleton
 │   │   └── UploadMobilePage.jsx # Captura fotográfica móvil vía QR
-│   ├── services/            # Clientes HTTP (api.js, servicios, search, notifications, etc.)
-│   ├── hooks/               # Custom hooks reutilizables
+│   ├── services/            # Clientes HTTP (api.js, servicios, reportes, search, notifications, etc.)
+│   ├── hooks/               # Custom hooks reutilizables (useGlobalShortcuts.js)
 │   ├── utils/               # Utilidades de impresión, formato y printStyles
 │   ├── App.jsx              # Configuración de React Router y providers globales
 │   ├── main.jsx             # Montaje con react-loading-skeleton/dist/skeleton.css

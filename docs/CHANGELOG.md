@@ -6,46 +6,71 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [Unreleased] - 2026-09-26
+## [1.0.0] - 2026-09-27
 
 ### Added
-- **Distribución de Órdenes por Categoría de Dispositivos (`distribucion_categorias` & `DeviceCategoryDonut`):**
-  - **Backend (`GET /api/servicios/dashboard`):** Nueva agregación mensual agrupada por `categorias_dispositivos` que contabiliza el volumen de equipos recibidos en el mes en curso (`total_mes`) y calcula el porcentaje relativo de cada categoría con aislamiento multi-sucursal.
-  - **Frontend (`DashboardPage.jsx`):** Componente interactivo de gráfica de dona (`DeviceCategoryDonut`) con estética Mono Rounded Donut en SVG y extremos redondeados (`strokeLinecap="round"`).
-  - **Identidad Corporativa y Paleta Monocromática:** Asignación dinámica del rojo institucional FMC (`#DC2626` en modo claro / `#EF4444` en modo oscuro) a la categoría predominante del mes, mientras que las categorías secundarias se distribuyen armónicamente en una escala elegante de Slate (`#334155` a `#E2E8F0`).
-  - **Iconografía y Tooltip Flotante:** Sustitución de puntos de color por iconos vectoriales de Lucide (`Smartphone`, `Laptop`, `Tablet`, `Gamepad2`, `Watch`, `Package`) a juego en segmentos, centro dinámico y leyenda. Tooltip interactivo con formato fluido de una sola línea (`N trabajos · X%`), padding balanceado y sin paréntesis.
-  - **Control Modular (`mostrarDetalle = false`):** Prop para activar o suprimir la leyenda inferior; en modo minimalista (`false`), la dona escala a `w-56 h-56 sm:w-64 sm:h-64` y se centra vertical y horizontalmente dentro de la tarjeta; en modo detallado (`true`), la leyenda filtra automáticamente categorías sin órdenes (`total > 0`).
-  - **Cabecera Limpia:** Removido badge redundante de conteo total en la cabecera del recuadro para centrar la atención en el título descriptivo y el centro dinámico de la dona.
-
-- **Segmentación del Dashboard por Rol Técnico vs Administrativo:**
-  - **Métricas Dedicadas para Técnicos:** Cuando el usuario autenticado posee rol `Tecnico`, el backend oculta los montos financieros (`ingresos_mes`, `ingresos_sparkline`) y expone métricas operativas personales: `mis_ordenes_activas` y `mis_diagnosticos_pendientes`.
-  - **Soporte de Foto de Perfil en Actividad Reciente:** La consulta de órdenes recientes ahora incluye `tecnico_foto_url`, renderizando el avatar fotográfico del técnico asignado con fallback de iniciales en caso de no poseer imagen.
-
-- **Optimización de Series Temporales (7d, 14d, 30d):**
-  - Reescritura de la consulta `serie_dias` en el backend utilizando CTEs (`entradas_agg`, `entregas_agg`) para generar las series completas de 7, 14 y 30 días en una sola pasada de consulta.
-
-- **Mejoras Sensoriales en Notificaciones In-App (`NotificationBell.jsx`):**
-  - Implementación de audio de alerta generado mediante Web Audio API (`AudioContext`, onda senoidal con decaimiento armónico) sin dependencias de archivos de audio externos.
-  - Alerta flotante vía toast (`Sileo`) y animación de campana oscilante (`animate-bell-ring`) activada exclusivamente ante incrementos reales de notificaciones no leídas.
-  - Persistencia de conteo en `sessionStorage` para suprimir alertas falsas en cambios de pestaña o navegación interna.
-  - Panel flotante ensanchado (`w-[26rem] sm:w-[28rem] md:w-[30rem]`) con iconos atenuados para notificaciones previamente leídas.
+- **Módulo Integral de Informes y Auditoría Financiera (`/reportes` & `/api/reportes`):**
+  - **Backend (`reportes.controller.js` & `reportes.routes.js`):**
+    - `GET /api/reportes/resumen`: Agregaciones analíticas estructuradas con soporte de filtros por rango de fechas (`desde`, `hasta`) en zona horaria local `America/Santo_Domingo` y aislamiento estricto por sucursal (`SuperAdmin` omnicanal o por sede; `Admin_Sucursal` confinado a su sede).
+    - Agregaciones calculadas: KPIs Financieros (Total facturado/cobrado, liquidado, anticipos, mano de obra neta pura, repuestos aprobados, descuentos aplicados, saldo pendiente en taller y total de órdenes liquidadas/recibidas/canceladas), Serie Temporal dinámica de Entradas vs. Entregas vía `generate_series`, Productividad Técnica (órdenes entregadas, activas, mano de obra generada, horas de ciclo promedio y tasa de cumplimiento a tiempo) y Distribución por Categorías de Dispositivos con porcentajes.
+    - `GET /api/reportes/detalle`: Listado tabular paginado de órdenes y transacciones con búsqueda predictiva por ticket, cliente y equipo, filtros por estado (`entregados`, `recibidos`, `cancelados`, `todos`) y método de pago (`Efectivo`, `Tarjeta`, `Transferencia`), sumatoria total del período y modo de exportación masiva (`export=true`).
+  - **Frontend (`ReportesPage.jsx` & `reportes.service.js`):**
+    - Vista ejecutiva con diseño responsive, paleta corporativa y modo oscuro/claro integrado.
+    - Cabecera de control con presets de fecha rápidos (*Hoy*, *Esta Semana*, *Este Mes*, *Mes Anterior*, *Personalizado*), selector de sucursal con control de acceso RBAC y botón de actualización en tiempo real.
+    - Exportación directa a archivo CSV con cabeceras en español y prefijo UTF-8 BOM (`\uFEFF`) para compatibilidad perfecta con Microsoft Excel.
+    - Gráfico reutilizable `DeviceCategoryDonut` y gráfico de tendencia temporal `ReportTrendChart` con curvas Bézier Catmull-Rom continuas y tooltips interactivos.
+    - Enlace "Informes" con icono `BarChart3` en `Sidebar.jsx` y menú móvil de `DashboardLayout.jsx`, protegido exclusivamente para roles `SuperAdmin` y `Admin_Sucursal`.
+- **Reporte Ejecutivo Oficial Imprimible (`ReporteEjecutivoImprimible.jsx`):**
+  - Vista formal estructurada para impresión directa (`window.print`) y exportación a PDF.
+  - Membrete corporativo oficial con logotipo institucional dinámico (obtenido de `datos_empresa` o fallback institucional `logo-FMC Black.png`), datos fiscales (RNC, teléfono y lema).
+  - Bloque de metadatos de auditoría: rango analizado, sucursal emisora, criterio de filtrado y timestamp de generación civil.
+  - Tablas ejecutivas de: (1) Resumen Financiero y Operativo, (2) Desglose de recaudación por Método de Pago, (3) Detalle de órdenes con desglose contable y (4) Sección de firmas de responsabilidad y sello de auditoría.
+- **Gráfica de Ingresos Continua con Curva Bézier y Área Degradada (`IncomeAreaChart.jsx`):**
+  - Componente vectorial en SVG puro integrado en la tarjeta de bienvenida del Dashboard.
+  - Curva suave continua interpolada mediante algoritmo Catmull-Rom (`tension = 0.25`), área inferior con gradiente esmeralda (`#10B981`), puntos interactivos y tooltips flotantes con formato monetario y badge de variación respecto al promedio.
+- **Distribución de Dispositivos en Dona SVG (`DeviceCategoryDonut.jsx`):**
+  - Dona SVG interactiva con bordes redondeados (`strokeLinecap="round"`), paleta monocromática Slate con resalte rojo institucional FMC para la categoría líder.
+  - Soporte para prop `mostrarDetalle`: modo minimalista (`false`) que amplía la dona (`w-56 h-56 sm:w-64 sm:h-64`) y la centra armónicamente; modo detallado (`true`) que incluye leyenda inferior con filtrado automático de categorías sin registros (`total > 0`).
+- **Modal de Documentación Interactiva y Atajos de Teclado (`HelpDocsModal.jsx`, `KeycapSequence.jsx`, `useGlobalShortcuts.js`):**
+  - Accesible globalmente mediante la combinación `Ctrl + /` o `Cmd + /`.
+  - Manual de referencia rápida sobre atajos, navegación, flujo de estados y roles del sistema.
 
 ### Changed
-- **Alineación Visual y Distribución del Dashboard (`DashboardPage.jsx`):**
-  - Reubicación del botón de refresco (`RotateCcw` / `AnimatedIconButton`) desde la tarjeta de bienvenida a la cabecera de **Acciones Rápidas** (`Zap`).
-  - Nivelación de tarjetas superiores mediante `items-stretch` para eliminar espacios blancos.
-  - Corrección de corte de texto en el eje horizontal de la gráfica de tendencia "Entradas vs Entregas" (`TrendChart`) y homologación del icono de entregas a flecha diagonal verde (`ArrowUpRight`).
-  - Reorganización de columnas en la tabla de Actividad Reciente: el indicador de múltiples técnicos (`+N más`) se apila verticalmente debajo del nombre del técnico responsable, prescindiendo del borde pill para un look más limpio.
-  - Distribución general equilibrada:
-    - Fila 2: Flujo del taller (2 columnas) + Carga de trabajo por técnico (1 columna).
-    - Fila 3: Categorías de Dispositivos (1 columna, izquierda) + Actividad reciente (2 columnas, derecha).
-  - Sincronización del skeleton loader para reproducir exactamente la misma cuadrícula.
-- **Formateo Monetario:**
-  - `formatCurrency` en el Dashboard actualizado para desplegar de forma estándar 2 decimales (`minimumFractionDigits: 2`, `maximumFractionDigits: 2`), asegurando cifras consistentes en RD$ para ingresos del mes y comparativas.
-- **Búsqueda Global (`GlobalSearch.jsx`):**
-  - Homologación de etiquetas con componentes `Badge` estilizados e iconos contextuales para tickets, clientes y dispositivos identificados (`getDeviceIcon`).
-- **Plantillas de Correo Transaccional (`emailTemplates.js`):**
-  - Refinamiento de estilos en plantillas de cliente: logotipo institucional, ficha estructurada con `ticketInfoCard` y jerarquía tipográfica depurada.
+- **Reestructuración del Layout Superior del Dashboard (`DashboardPage.jsx`):**
+  - División de la fila superior en 2 columnas equilibradas:
+    - **Columna Izquierda (2 cols):** Tarjeta de bienvenida con métricas operativas y gráfica `IncomeAreaChart`.
+    - **Columna Derecha (1 col):** Bloque de **Acciones Rápidas** (`Zap`) para acceso inmediato a Recepción, Banco de Trabajo, Búsqueda y Clientes.
+  - Reubicación del botón de refresco (`RotateCcw` / `AnimatedIconButton`) directamente en la cabecera de Acciones Rápidas con microanimación de giro.
+  - Homologación de alturas con `items-stretch` para eliminar espacios vacíos o desalineaciones visuales.
+- **Reorganización de la Cuadrícula del Dashboard:**
+  - Fila 2: Flujo del taller por estado (2 columnas) + Carga de trabajo por técnico (1 columna).
+  - Fila 3: Distribución por categorías de dispositivos (1 columna, dona minimalista) + Actividad reciente (2 columnas).
+  - Sincronización del skeleton loader para reproducir idéntica cuadrícula estructural.
+- **Unificación de Flechas de Flujo en Tendencia Temporal:**
+  - En la gráfica "Entradas vs Entregas" (`TrendChart`), unificación del icono de entregas a flecha diagonal verde (`ArrowUpRight`) para coherencia semántica en todo el dashboard.
+- **Formateo Monetario Estándar:**
+  - Despliegue estricto de 2 decimales (`minimumFractionDigits: 2`, `maximumFractionDigits: 2`) en montos en RD$ a lo largo de todo el sistema.
+
+### Fixed
+- **Exclusión Estricta de Anticipos en Órdenes Canceladas:**
+  - En `backend/src/controllers/reportes.controller.js` (`kpisPromise`, `totalsQuery`, `itemsQuery`), se filtran los anticipos de órdenes en estado `CANCELADO_DEVUELTO` (`WHERE es.codigo_estado != 'CANCELADO_DEVUELTO'`). Si una orden fue cancelada y su anticipo reintegrado al cliente, dicho monto no infla los ingresos reales del período.
+- **Aislamiento Contable Exacto de Mano de Obra Neta:**
+  - Corrección de la distorsión numérica donde `costo_final_confirmado` almacenaba el total general de la orden (Mano de Obra + Repuestos Aprobados - Descuentos), duplicando el valor de repuestos al desglosarlo.
+  - Cálculo de la mano de obra neta pura real:
+    $$\text{Mano de Obra Neta} = \max(0, \text{costo\_final\_confirmado} - \text{repuestos\_aprobados} + \text{monto\_descuento})$$
+  - Cuadre contable perfecto 1:1 en todas las vistas y reportes:
+    $$\text{Total Facturado} = \text{Mano de Obra Neta} + \text{Total Repuestos Aprobados} - \text{Descuentos}$$
+  - En `ReportesPage.jsx` y `ReporteEjecutivoImprimible.jsx`, integración de `mano_obra_neta` en las tarjetas KPI, tabla de órdenes, exportación CSV y resumen ejecutivo impreso.
+- **Corrección de Recorte en Ejes de Gráficas:**
+  - Ajuste en el espaciado del eje X en `TrendChart` para prevenir el corte de etiquetas de fecha en pantallas medianas y móviles.
+- **Resolución de Discrepancia de Datos en Reporte Imprimible:**
+  - Corrección de mapeo de propiedades en `ReporteEjecutivoImprimible.jsx` para garantizar que métricas financieras, repuestos y margen bruto reflejen los valores reales del período analizado sin desplegar ceros.
+
+### Security & Stability
+- Blindaje contra división por cero en indicadores financieros (Ticket Promedio, Margen Bruto %, Tasa de Cumplimiento % y Tasa de Efectividad %).
+- Sanitización y coerción estricta de tipos numéricos (`Number(x) || 0`, `parseFloat`, `toFixed(2)`) en agregaciones SQL y componentes React.
+- Preservación de aislamiento estricto multi-sucursal en todas las consultas y reportes.
+- Validación de integridad de compilación con `npm run build` (código de salida 0).
 
 ## [0.11.0] - 2026-09-25
 

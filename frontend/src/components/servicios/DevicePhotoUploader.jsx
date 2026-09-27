@@ -45,6 +45,7 @@ const DevicePhotoUploader = ({
   const [isSessionExpired, setIsSessionExpired] = useState(false);
 
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const pollTimerRef = useRef(null);
   const sessionTimeoutRef = useRef(null);
 
@@ -225,11 +226,12 @@ const DevicePhotoUploader = ({
     }
 
     const filesToProcess = Array.from(files).slice(0, availableSlots);
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/heic', 'image/heif'];
     const validFiles = [];
 
     for (const f of filesToProcess) {
-      if (!validTypes.includes(f.type)) {
+      const mime = (f.type || '').toLowerCase();
+      if (!validTypes.includes(mime) && !mime.startsWith('image/')) {
         sileo.error({ title: 'Formato no permitido', description: `${f.name}: Solo JPG, PNG o WEBP.` });
         continue;
       }
@@ -359,12 +361,27 @@ const DevicePhotoUploader = ({
         </span>
       </div>
 
-      {/* Input de archivo invisible (PC) */}
+      {/* Input de archivo invisible (PC / Galería móvil) */}
       <input
         ref={fileInputRef}
         type="file"
         multiple
         accept="image/jpeg,image/png,image/webp,image/jpg"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            handleFiles(e.target.files);
+            e.target.value = '';
+          }
+        }}
+      />
+
+      {/* Input nativo de cámara directa para móvil */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
         className="hidden"
         onChange={(e) => {
           if (e.target.files && e.target.files.length > 0) {
@@ -419,7 +436,7 @@ const DevicePhotoUploader = ({
           );
         })}
 
-        {/* Slot 1: Botón de adjuntar desde PC o Drag & Drop */}
+        {/* Slot 1: Botón de adjuntar desde PC (desktop) o galería (móvil) */}
         {!isUploading && currentPhotos.length < MAX_PHOTOS && (
           <div
             onClick={() => fileInputRef.current?.click()}
@@ -429,30 +446,32 @@ const DevicePhotoUploader = ({
             }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
-            className={`w-28 h-28 sm:w-32 sm:h-32 aspect-square shrink-0 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center p-2 text-center cursor-pointer select-none group ${
+            className={`w-28 h-28 sm:w-32 sm:h-32 aspect-square shrink-0 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center p-2 text-center cursor-pointer select-none group order-2 md:order-none ${
               isDragging
                 ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20'
                 : 'border-neutral-300 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-500 bg-neutral-50/50 dark:bg-neutral-800/40 hover:bg-neutral-100/50 dark:hover:bg-neutral-800/70'
             }`}
-            title="Hacer clic para buscar o arrastrar fotos desde esta PC"
+            title="Hacer clic para buscar o arrastrar fotos"
           >
             <div className="w-8 h-8 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 shadow-2xs border border-neutral-200 dark:border-neutral-700 flex items-center justify-center mb-1.5 transition-transform group-hover:scale-110">
               <Plus size={18} />
             </div>
             <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 font-inter">
-              Desde PC
+              <span className="hidden md:inline">Desde PC</span>
+              <span className="inline md:hidden">Desde móvil</span>
             </span>
             <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-inter leading-tight">
-              Adjuntar
+              <span className="hidden md:inline">Adjuntar</span>
+              <span className="inline md:hidden">Galería</span>
             </span>
           </div>
         )}
 
-        {/* Slot 2: Botón complementario móvil QR al lado del botón de adjuntar */}
+        {/* Slot 2: Botón complementario móvil QR (Solo Desktop) */}
         {!isUploading && currentPhotos.length < MAX_PHOTOS && (
           <div
             onClick={handleOpenQrModal}
-            className={`relative w-28 h-28 sm:w-32 sm:h-32 aspect-square shrink-0 rounded-xl border-2 border-dashed transition-all flex flex-col items-center justify-center p-2 text-center cursor-pointer select-none group ${
+            className={`relative hidden md:flex w-28 h-28 sm:w-32 sm:h-32 aspect-square shrink-0 rounded-xl border-2 border-dashed transition-all flex-col items-center justify-center p-2 text-center cursor-pointer select-none group md:order-none ${
               hasActiveWaitingSession
                 ? 'border-emerald-400 dark:border-emerald-600 bg-emerald-50/40 dark:bg-emerald-950/20 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/40 shadow-xs'
                 : 'border-red-200 dark:border-red-950/60 hover:border-red-500 dark:hover:border-red-600 bg-red-50/30 dark:bg-red-950/10 hover:bg-red-50/70 dark:hover:bg-red-950/30'
@@ -497,6 +516,25 @@ const DevicePhotoUploader = ({
               }`}
             >
               {hasActiveWaitingSession ? 'Sesión activa' : 'Código QR'}
+            </span>
+          </div>
+        )}
+
+        {/* Slot 3: Botón para tomar foto directa con cámara nativa (Solo Móvil) */}
+        {!isUploading && currentPhotos.length < MAX_PHOTOS && (
+          <div
+            onClick={() => cameraInputRef.current?.click()}
+            className="w-28 h-28 sm:w-32 sm:h-32 aspect-square shrink-0 rounded-xl border-2 border-dashed transition-all flex md:hidden flex-col items-center justify-center p-2 text-center cursor-pointer select-none group order-1 md:order-none border-red-200 dark:border-red-950/60 hover:border-red-500 dark:hover:border-red-600 bg-red-50/30 dark:bg-red-950/10 hover:bg-red-50/70 dark:hover:bg-red-950/30"
+            title="Abrir cámara del dispositivo para tomar fotografía"
+          >
+            <div className="w-8 h-8 rounded-xl shadow-2xs border border-red-200/60 dark:border-red-800/60 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 flex items-center justify-center mb-1.5 transition-transform group-hover:scale-110">
+              <Camera size={18} />
+            </div>
+            <span className="text-xs font-semibold text-red-700 dark:text-red-300 font-inter">
+              Tomar foto
+            </span>
+            <span className="text-[10px] text-red-500/80 dark:text-red-400/80 font-inter leading-tight">
+              Cámara
             </span>
           </div>
         )}
