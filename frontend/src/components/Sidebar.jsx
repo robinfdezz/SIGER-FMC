@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import Tooltip from './common/Tooltip';
+import { isRoleAuthorized } from './ProtectedRoute';
 import { MorphIcon } from 'morphicons/react';
 import { Sun, Moon } from 'lucide';
 import {
@@ -16,13 +17,17 @@ import {
   PanelLeft,
   PanelLeftClose,
   MousePointer,
-  Check
+  Check,
+  ShieldQuestion,
+  BarChart3
 } from 'lucide-react';
+import HelpDocsModal from './common/HelpDocsModal';
 
 const MENU_ITEMS = [
-  { id: 'dashboard', name: 'Inicio / Dashboard', path: '/dashboard', icon: LayoutDashboard },
+  { id: 'dashboard', name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { id: 'tickets', name: 'Órdenes de Servicio', path: '/tickets', icon: Ticket },
   { id: 'taller', name: 'Banco de Trabajo', path: '/taller', icon: Wrench },
+  { id: 'reportes', name: 'Informes', path: '/reportes', icon: BarChart3, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
   { id: 'divider-ops', isDivider: true },
   { id: 'clientes', name: 'Clientes', path: '/clientes', icon: Contact },
   { id: 'trabajadores', name: 'Usuarios', path: '/trabajadores', icon: Users, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
@@ -38,7 +43,7 @@ const Sidebar = () => {
     return MENU_ITEMS.filter((item) => {
       if (item.isDivider) return true;
       if (!item.allowedRoles) return true;
-      return item.allowedRoles.includes(user?.rol_nombre);
+      return isRoleAuthorized(user, item.allowedRoles);
     });
   }, [user]);
 
@@ -46,6 +51,8 @@ const Sidebar = () => {
     const saved = localStorage.getItem('siger_sidebar_mode');
     return saved === 'hover' || saved === 'collapsed' ? saved : 'expanded';
   });
+
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   const [isHovered, setIsHovered] = useState(false);
   const [showConfigMenu, setShowConfigMenu] = useState(false);
@@ -168,6 +175,29 @@ const Sidebar = () => {
         })}
       </nav>
 
+      {/* Botón Centro de Ayuda y Guía (Justo encima de la línea divisoria) */}
+      <div className="px-2 pb-1.5">
+        <Tooltip
+          content="Ayuda y Guía"
+          position="right"
+          enabled={!isExpanded}
+        >
+          <button
+            type="button"
+            onClick={() => setIsHelpModalOpen(true)}
+            aria-label="Ayuda y Guía"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group relative w-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 cursor-pointer ${
+              !isExpanded ? 'justify-center px-0 w-10 h-10 mx-auto' : ''
+            }`}
+          >
+            <ShieldQuestion className="w-5 h-5 flex-shrink-0 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200 transition-colors" />
+            {isExpanded && (
+              <span className="truncate whitespace-nowrap">Ayuda y Guía</span>
+            )}
+          </button>
+        </Tooltip>
+      </div>
+
       {/* Sección Inferior / Controles */}
       <div
         className={`py-2 px-2.5 border-t border-zinc-100 dark:border-dark-border space-y-1 relative flex flex-col ${isExpanded ? 'items-start' : 'items-center'
@@ -259,6 +289,12 @@ const Sidebar = () => {
         </div>
 
       </div>
+
+      {/* Modal de Centro de Ayuda y Documentación */}
+      <HelpDocsModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+      />
     </aside>
   );
 };

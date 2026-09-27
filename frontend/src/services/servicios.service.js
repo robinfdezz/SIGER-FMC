@@ -17,6 +17,16 @@ export const getServicios = async (params = {}) => {
 };
 
 /**
+ * Resumen operativo del dashboard (KPIs, flujo, serie 7d, carga técnicos, actividad)
+ * @param {Object} [params]
+ * @param {number|string} [params.sucursal_id] - Solo aplica para SuperAdmin
+ */
+export const getDashboardResumen = async (params = {}) => {
+  const response = await api.get('/servicios/dashboard', { params });
+  return response.data;
+};
+
+/**
  * Crear una nueva orden de servicio
  */
 export const createServicio = async (data) => {

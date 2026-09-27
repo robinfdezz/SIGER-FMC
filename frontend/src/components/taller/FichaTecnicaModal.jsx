@@ -276,6 +276,20 @@ export const FichaTecnicaModal = ({
   const [selectedColabId, setSelectedColabId] = useState('');
   const [isManagingTecnicos, setIsManagingTecnicos] = useState(false);
 
+  // Blindaje de tecla Escape para el visor de fotos (Stack LIFO)
+  useEffect(() => {
+    if (!activePhoto) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        setActivePhoto(null);
+      }
+    };
+    window.addEventListener('keydown', handleEsc, true);
+    return () => window.removeEventListener('keydown', handleEsc, true);
+  }, [activePhoto]);
+
   useEffect(() => {
     if (isOpen && ordenId) {
       if (ordenInicial && (ordenInicial.id === ordenId || String(ordenInicial.id) === String(ordenId))) {

@@ -14,6 +14,7 @@ import {
   Check
 } from 'lucide-react';
 import TurnstileWidget from '../../components/common/TurnstileWidget';
+import packageJson from '../../../package.json';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -266,9 +267,14 @@ const LoginPage = () => {
 
         </div>
 
-        <p className="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-600">
-          &copy; {new Date().getFullYear()} Franyer Mobile Center, S.R.L.
-        </p>
+        <div className="mt-6 text-center space-y-1">
+          <p className="text-xs text-zinc-400 dark:text-zinc-600">
+            &copy; {new Date().getFullYear()} Franyer Mobile Center, S.R.L.
+          </p>
+          <p className="text-[11px] font-mono text-zinc-400/80 dark:text-zinc-600 select-none">
+            v{packageJson.version}
+          </p>
+        </div>
 
       </div>
     </div>

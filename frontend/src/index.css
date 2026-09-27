@@ -141,3 +141,68 @@
     display: none !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────
+   ANIMACIÓN DE CAMPANA DE NOTIFICACIONES (PENDULAR / TIMBRE)
+   ───────────────────────────────────────────────────────── */
+@keyframes bell-ring {
+  0% { transform: rotate(0deg); }
+  12% { transform: rotate(14deg); }
+  24% { transform: rotate(-12deg); }
+  36% { transform: rotate(10deg); }
+  48% { transform: rotate(-8deg); }
+  60% { transform: rotate(6deg); }
+  72% { transform: rotate(-4deg); }
+  84% { transform: rotate(2deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.animate-bell-ring {
+  animation: bell-ring 1.25s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  transform-origin: top center;
+}
+
+/* ─────────────────────────────────────────────────────────
+   ANIMACIÓN DE PULSACIÓN DE TECLAS (KEYCAPS) EN ATAJOS
+   Efecto táctil mecánico en cascada que se repite cada 2s en hover
+   ───────────────────────────────────────────────────────── */
+@keyframes keycap-press-light {
+  0%, 22%, 100% {
+    transform: translateY(0);
+    box-shadow: 0 2px 0 0 rgba(0, 0, 0, 0.1);
+    border-color: #d4d4d8;
+  }
+  10% {
+    transform: translateY(2px);
+    box-shadow: 0 0px 0 0 rgba(0, 0, 0, 0.1);
+    border-color: #a1a1aa;
+  }
+}
+
+@keyframes keycap-press-dark {
+  0%, 22%, 100% {
+    transform: translateY(0);
+    box-shadow: 0 2px 0 0 rgba(0, 0, 0, 0.4);
+    border-color: #52525b;
+  }
+  10% {
+    transform: translateY(2px);
+    box-shadow: 0 0px 0 0 rgba(0, 0, 0, 0.4);
+    border-color: #71717a;
+  }
+}
+
+.group:hover .animate-keycap {
+  animation: keycap-press-light 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.dark .group:hover .animate-keycap {
+  animation: keycap-press-dark 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-bell-ring,
+  .group:hover .animate-keycap {
+    animation: none;
+  }
+}

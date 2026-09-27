@@ -69,10 +69,18 @@ Para mantener la integridad operativa del taller y la trazabilidad de los diagn�
 ---
 
 ## 5. Módulos y Entidades Clave
-* **`clientes`:** Directorio único de clientes con documento de identidad (Cédula/RNC), contactos y dirección. Soporta búsqueda integral, vista rápida 360° (`ClienteDetalleModal.jsx`) y paginación en servidor.
+* **`clientes`:** Directorio único de clientes con documento de identidad (Cédula/RNC), contactos y dirección. Soporta búsqueda integral, vista rápida 360° (`ClienteDetalleModal.jsx`) y paginación en servidor. Deep-link desde búsqueda global: `/clientes?clienteId=`.
 * **`servicios_recepcion`:** Registro maestro de la orden de reparación, especificaciones del equipo, liquidación financiera y costos. Soporta edición controlada mediante `EditarOrdenModal.jsx`.
+* **Dashboard Operativo (`/dashboard` / `DashboardPage.jsx`):** Resumen analítico en tiempo real vía `GET /api/servicios/dashboard` estructurado en layout superior de 2 columnas (bienvenida con curva continua de ingresos `IncomeAreaChart` + bloque de Acciones Rápidas con botón de refresco integrado), métricas segmentadas por rol (técnico vs administrativo), flujo de taller por estado, series temporales 7/14/30d, carga de técnicos, gráfica interactiva de dona de categorías de dispositivos (`DeviceCategoryDonut`) y actividad reciente con avatares fotográficos de los técnicos asignados.
+* **Módulo de Informes y Auditoría Financiera (`/reportes` / `ReportesPage.jsx`):** Módulo analítico y contable para roles `SuperAdmin` y `Admin_Sucursal` (`GET /api/reportes/resumen` y `GET /api/reportes/detalle`). Ofrece control de KPIs financieros, desglose por métodos de pago (Efectivo, Tarjeta, Transferencia), productividad técnica individual, exportación masiva a CSV con codificación UTF-8 BOM, e informe ejecutivo oficial imprimible (`ReporteEjecutivoImprimible.jsx`) con membrete corporativo, metadatos de auditoría y cuadre numérico balanceado 1:1 aislando la mano de obra neta y deduciendo repuestos y anticipos cancelados.
+* **Búsqueda Global (`GlobalSearch.jsx`):** Autocompletado en cabecera sobre órdenes, clientes y equipos (`GET /api/buscar`), con navegación directa a taller o ficha de cliente.
 * **Banco de Trabajo Técnico (`/taller` / `BancoTrabajoPage.jsx`):** Tablero operativo de taller con tarjetas de servicio (`TallerCard.jsx`), vista conmutativa en tabla con paginación y filtrado por estado mediante pestañas animadas (`AnimatedTabs.jsx`). Incluye la **Ficha Técnica Modal (`FichaTecnicaModal.jsx`)** para transición de estados, asignación multi-técnico y visualización gráfica del patrón/PIN de acceso.
 * **`incidencias_servicio`:** Registro de imprevistos, piezas extra y costos adicionales surgidos durante el diagnóstico o la reparación, con ciclo de vida completo de autorización del cliente (Aprobado o Rechazado formalmente por WhatsApp, Llamada o Presencial).
+* **Centro de Alertas In-App (`notificaciones` / `NotificationBell.jsx`):** Campanita en cabecera para SuperAdmin, Admin, Secretaría y Técnico. Eventos operativos (nueva orden, estados, incidencias, asignación, finalización) sin saturar el correo.
+* **Correo Transaccional (Resend):**
+  * **Cliente:** recibido, cancelado, entregado y recibo digital.
+  * **Técnico (interno):** solo al asignársele una orden y al finalizarse/entregarse su orden.
+  * El resto de movimientos internos se comunica exclusivamente por la campanita.
 * **Pipeline Unificado de Evidencias Fotográficas (`sesiones_carga_fotos` y `evidencias_fotograficas`):**
   * Subida desacoplada tanto por QR móvil (`UploadMobilePage.jsx`) como desde PC en mostrador (`DevicePhotoUploader.jsx`), garantizando que ninguna foto quede desvinculada en Cloudinary.
   * Sondeo en segundo plano (*background polling*) que recibe evidencias sin bloquear el trabajo en la PC.
@@ -89,4 +97,5 @@ Para mantener la integridad operativa del taller y la trazabilidad de los diagn�
 * **Backend:** Node.js, Express.js.
 * **Base de Datos:** PostgreSQL (`siger_fmc_db`) vía driver nativo `pg` con Connection Pooling y retención histórica automatizada.
 * **Gestión Multimedia:** Cloudinary SDK v2 + Multer (MemoryStorage), compresión adaptativa a WebP (`siger-fmc/personal-fmc`, `siger-fmc/recepcion` y `siger-fmc/evidencias-tickets`), sincronización móvil de fotos vía QR, subida unificada desde PC y recolección autónoma de imágenes huérfanas.
+* **Correo:** Resend (`resend` npm) con plantillas HTML de marca en `backend/src/config/emailTemplates.js` y borradores en `backend/src/templates/email/`.
 * **Seguridad y Sesión:** Autenticación basada en JSON Web Tokens (JWT) con contraseñas encriptadas en `bcryptjs`, RBAC estricto para operaciones críticas y protección anti-bot opcional vía Cloudflare Turnstile.

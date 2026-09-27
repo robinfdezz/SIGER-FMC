@@ -6,7 +6,114 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [Unreleased]
+## [1.0.0] - 2026-09-27
+
+### Added
+- **Módulo Integral de Informes y Auditoría Financiera (`/reportes` & `/api/reportes`):**
+  - **Backend (`reportes.controller.js` & `reportes.routes.js`):**
+    - `GET /api/reportes/resumen`: Agregaciones analíticas estructuradas con soporte de filtros por rango de fechas (`desde`, `hasta`) en zona horaria local `America/Santo_Domingo` y aislamiento estricto por sucursal (`SuperAdmin` omnicanal o por sede; `Admin_Sucursal` confinado a su sede).
+    - Agregaciones calculadas: KPIs Financieros (Total facturado/cobrado, liquidado, anticipos, mano de obra neta pura, repuestos aprobados, descuentos aplicados, saldo pendiente en taller y total de órdenes liquidadas/recibidas/canceladas), Serie Temporal dinámica de Entradas vs. Entregas vía `generate_series`, Productividad Técnica (órdenes entregadas, activas, mano de obra generada, horas de ciclo promedio y tasa de cumplimiento a tiempo) y Distribución por Categorías de Dispositivos con porcentajes.
+    - `GET /api/reportes/detalle`: Listado tabular paginado de órdenes y transacciones con búsqueda predictiva por ticket, cliente y equipo, filtros por estado (`entregados`, `recibidos`, `cancelados`, `todos`) y método de pago (`Efectivo`, `Tarjeta`, `Transferencia`), sumatoria total del período y modo de exportación masiva (`export=true`).
+  - **Frontend (`ReportesPage.jsx` & `reportes.service.js`):**
+    - Vista ejecutiva con diseño responsive, paleta corporativa y modo oscuro/claro integrado.
+    - Cabecera de control con presets de fecha rápidos (*Hoy*, *Esta Semana*, *Este Mes*, *Mes Anterior*, *Personalizado*), selector de sucursal con control de acceso RBAC y botón de actualización en tiempo real.
+    - Exportación directa a archivo CSV con cabeceras en español y prefijo UTF-8 BOM (`\uFEFF`) para compatibilidad perfecta con Microsoft Excel.
+    - Gráfico reutilizable `DeviceCategoryDonut` y gráfico de tendencia temporal `ReportTrendChart` con curvas Bézier Catmull-Rom continuas y tooltips interactivos.
+    - Enlace "Informes" con icono `BarChart3` en `Sidebar.jsx` y menú móvil de `DashboardLayout.jsx`, protegido exclusivamente para roles `SuperAdmin` y `Admin_Sucursal`.
+- **Reporte Ejecutivo Oficial Imprimible (`ReporteEjecutivoImprimible.jsx`):**
+  - Vista formal estructurada para impresión directa (`window.print`) y exportación a PDF.
+  - Membrete corporativo oficial con logotipo institucional dinámico (obtenido de `datos_empresa` o fallback institucional `logo-FMC Black.png`), datos fiscales (RNC, teléfono y lema).
+  - Bloque de metadatos de auditoría: rango analizado, sucursal emisora, criterio de filtrado y timestamp de generación civil.
+  - Tablas ejecutivas de: (1) Resumen Financiero y Operativo, (2) Desglose de recaudación por Método de Pago, (3) Detalle de órdenes con desglose contable y (4) Sección de firmas de responsabilidad y sello de auditoría.
+- **Gráfica de Ingresos Continua con Curva Bézier y Área Degradada (`IncomeAreaChart.jsx`):**
+  - Componente vectorial en SVG puro integrado en la tarjeta de bienvenida del Dashboard.
+  - Curva suave continua interpolada mediante algoritmo Catmull-Rom (`tension = 0.25`), área inferior con gradiente esmeralda (`#10B981`), puntos interactivos y tooltips flotantes con formato monetario y badge de variación respecto al promedio.
+- **Distribución de Dispositivos en Dona SVG (`DeviceCategoryDonut.jsx`):**
+  - Dona SVG interactiva con bordes redondeados (`strokeLinecap="round"`), paleta monocromática Slate con resalte rojo institucional FMC para la categoría líder.
+  - Soporte para prop `mostrarDetalle`: modo minimalista (`false`) que amplía la dona (`w-56 h-56 sm:w-64 sm:h-64`) y la centra armónicamente; modo detallado (`true`) que incluye leyenda inferior con filtrado automático de categorías sin registros (`total > 0`).
+- **Modal de Documentación Interactiva y Atajos de Teclado (`HelpDocsModal.jsx`, `KeycapSequence.jsx`, `useGlobalShortcuts.js`):**
+  - Accesible globalmente mediante la combinación `Ctrl + /` o `Cmd + /`.
+  - Manual de referencia rápida sobre atajos, navegación, flujo de estados y roles del sistema.
+
+### Changed
+- **Reestructuración del Layout Superior del Dashboard (`DashboardPage.jsx`):**
+  - División de la fila superior en 2 columnas equilibradas:
+    - **Columna Izquierda (2 cols):** Tarjeta de bienvenida con métricas operativas y gráfica `IncomeAreaChart`.
+    - **Columna Derecha (1 col):** Bloque de **Acciones Rápidas** (`Zap`) para acceso inmediato a Recepción, Banco de Trabajo, Búsqueda y Clientes.
+  - Reubicación del botón de refresco (`RotateCcw` / `AnimatedIconButton`) directamente en la cabecera de Acciones Rápidas con microanimación de giro.
+  - Homologación de alturas con `items-stretch` para eliminar espacios vacíos o desalineaciones visuales.
+- **Reorganización de la Cuadrícula del Dashboard:**
+  - Fila 2: Flujo del taller por estado (2 columnas) + Carga de trabajo por técnico (1 columna).
+  - Fila 3: Distribución por categorías de dispositivos (1 columna, dona minimalista) + Actividad reciente (2 columnas).
+  - Sincronización del skeleton loader para reproducir idéntica cuadrícula estructural.
+- **Unificación de Flechas de Flujo en Tendencia Temporal:**
+  - En la gráfica "Entradas vs Entregas" (`TrendChart`), unificación del icono de entregas a flecha diagonal verde (`ArrowUpRight`) para coherencia semántica en todo el dashboard.
+- **Formateo Monetario Estándar:**
+  - Despliegue estricto de 2 decimales (`minimumFractionDigits: 2`, `maximumFractionDigits: 2`) en montos en RD$ a lo largo de todo el sistema.
+
+### Fixed
+- **Exclusión Estricta de Anticipos en Órdenes Canceladas:**
+  - En `backend/src/controllers/reportes.controller.js` (`kpisPromise`, `totalsQuery`, `itemsQuery`), se filtran los anticipos de órdenes en estado `CANCELADO_DEVUELTO` (`WHERE es.codigo_estado != 'CANCELADO_DEVUELTO'`). Si una orden fue cancelada y su anticipo reintegrado al cliente, dicho monto no infla los ingresos reales del período.
+- **Aislamiento Contable Exacto de Mano de Obra Neta:**
+  - Corrección de la distorsión numérica donde `costo_final_confirmado` almacenaba el total general de la orden (Mano de Obra + Repuestos Aprobados - Descuentos), duplicando el valor de repuestos al desglosarlo.
+  - Cálculo de la mano de obra neta pura real:
+    $$\text{Mano de Obra Neta} = \max(0, \text{costo\_final\_confirmado} - \text{repuestos\_aprobados} + \text{monto\_descuento})$$
+  - Cuadre contable perfecto 1:1 en todas las vistas y reportes:
+    $$\text{Total Facturado} = \text{Mano de Obra Neta} + \text{Total Repuestos Aprobados} - \text{Descuentos}$$
+  - En `ReportesPage.jsx` y `ReporteEjecutivoImprimible.jsx`, integración de `mano_obra_neta` en las tarjetas KPI, tabla de órdenes, exportación CSV y resumen ejecutivo impreso.
+- **Corrección de Recorte en Ejes de Gráficas:**
+  - Ajuste en el espaciado del eje X en `TrendChart` para prevenir el corte de etiquetas de fecha en pantallas medianas y móviles.
+- **Resolución de Discrepancia de Datos en Reporte Imprimible:**
+  - Corrección de mapeo de propiedades en `ReporteEjecutivoImprimible.jsx` para garantizar que métricas financieras, repuestos y margen bruto reflejen los valores reales del período analizado sin desplegar ceros.
+
+### Security & Stability
+- Blindaje contra división por cero en indicadores financieros (Ticket Promedio, Margen Bruto %, Tasa de Cumplimiento % y Tasa de Efectividad %).
+- Sanitización y coerción estricta de tipos numéricos (`Number(x) || 0`, `parseFloat`, `toFixed(2)`) en agregaciones SQL y componentes React.
+- Preservación de aislamiento estricto multi-sucursal en todas las consultas y reportes.
+- Validación de integridad de compilación con `npm run build` (código de salida 0).
+
+## [0.11.0] - 2026-09-25
+
+### Added
+- **Dashboard Operativo con Datos Reales (`GET /api/servicios/dashboard` & `DashboardPage.jsx`):**
+  - Endpoint de resumen con aislamiento por sucursal (`SuperAdmin` omnicanal; resto confinado a su sede).
+  - KPIs: órdenes abiertas, abiertas hoy, urgentes, sin técnico, listas para entrega e ingresos del mes (liquidado + anticipos) con sparkline diario.
+  - Bloques: flujo por estado de taller, serie 7 días (entradas vs entregas), carga de técnicos y actividad reciente.
+  - UI reconstruida sobre datos del endpoint (sin mocks), anchos homologados `max-w-7xl`.
+- **Búsqueda Global Predictiva (`GET /api/buscar` & `GlobalSearch.jsx`):**
+  - Autocompletado en cabecera (`Navbar.jsx`) con debounce; mínimo 2 caracteres.
+  - Resultados segmentados: órdenes (hasta 8), clientes (hasta 6) y equipos (hasta 6), con deep-link a taller (`/taller?ordenId=`), clientes (`/clientes?clienteId=`) y ficha de orden.
+  - Aislamiento multi-sucursal idéntico al resto de la API; `SuperAdmin` puede filtrar por `sucursal_id`.
+- **Centro de Notificaciones In-App — Campanita (`/api/notificaciones` & `NotificationBell.jsx`):**
+  - Persistencia en tabla `notificaciones` (ver `DATABASE.md` §14).
+  - Endpoints: listado paginado, conteo de no leídas, marcar una / todas como leídas.
+  - Badge en cabecera con sondeo cada 15 s, refresco al enfocar la pestaña y cabeceras `Cache-Control: no-store` para evitar 304 obsoletos.
+  - Tipos: `NUEVA_ORDEN`, `PRIORIDAD_URGENTE`, `ASIGNACION`, `CAMBIO_ESTADO`, `INCIDENCIA`, `ORDEN_FINALIZADA`.
+- **Correo Transaccional vía Resend (`backend/src/config/email.js`, `emailTemplates.js`, `templates/email/`):**
+  - Integración opcional con `RESEND_API_KEY`, `RESEND_FROM_EMAIL` y `RESEND_TEST_TO` (redirección de pruebas en desarrollo / sandbox).
+  - Plantillas HTML de marca (#E11D48) para cliente e interno.
+  - **Cliente:** equipo recibido, cancelado, entregado y recibo digital (post-liquidación).
+  - **Interno (solo correo):** asignación de orden al técnico y orden finalizada/entregada al técnico asignado.
+- **Utilidad de Emisión de Alertas (`backend/src/utils/notifications.js`):**
+  - `createNotifications`, `getBranchStaffIds`, `getAssignedTechnicianIds`, `notifyUsersByEmail`.
+  - Staff de sede: `SuperAdmin` (todas las sedes) + `Admin_Sucursal` + `Secretaria` de la sucursal de la orden.
+  - `Admin_Sucursal` y `SuperAdmin` **siempre** reciben campanita (no se excluyen aunque sean el actor del evento).
+
+### Changed
+- **Política Anti-Spam de Correos Internos:**
+  - Nueva orden, prioridad urgente, cambio de estado e incidencia: **solo campanita** (sin correo).
+  - Correo interno restringido a `ASIGNACION` y `ORDEN_FINALIZADA`.
+  - Correos al cliente sin cambios de alcance (ciclo de vida completo).
+- **Hooks de Notificación en Ciclo de Orden (`servicios.controller.js`):**
+  - Creación → campanita a staff; si hay técnicos iniciales → campanita + correo de asignación; correo de recibido al cliente.
+  - Cambio de estado → campanita a técnicos asignados + staff.
+  - Asignación posterior → campanita + correo al técnico.
+  - Incidencia con costo/hallazgo → campanita a staff.
+  - Entrega → campanita (+ correo) a técnicos; campanita a staff; correos de entregado + recibo al cliente.
+  - Cancelación → correo de cancelado al cliente.
+
+### Documentation
+- Actualización coordinada de `API.md`, `ARCHITECTURE.md`, `DATABASE.md`, `PROJECT_CONTEXT.md`, `GUIDELINES.md` y `DOCUMENTACION_GENERAL.md` para reflejar dashboard, búsqueda global, campanita y Resend.
 
 ## [0.10.0] - 2026-09-20
 
@@ -31,8 +138,6 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   - **Blindaje en Backend (`servicios.controller.js`):** Doble validación en `createServicio` y `updateServicio` a nivel de día calendario (`new Date().setHours(0,0,0,0)`), rechazando con HTTP `400 Bad Request` cualquier intento de programar fechas en el pasado.
 - **Auditoría y Preservación de Esquema Limpio en Base de Datos:**
   - Garantía de conformidad con el diccionario relacional oficial en `servicios_recepcion`, prescindiendo de columnas no canónicas (`color_equipo`, `telefono_contacto_alterno`) y canalizando notas adicionales a través de `observaciones_recepcion`.
-- **Especificación Formal de Casos de Uso y Diagramas de Flujo (`DIAGRAMAS_CASOS_DE_USO_Y_FLUJO.md`):**
-  - Nuevo documento maestro de modelado UML y diagramas de flujo interactivos con sintaxis Mermaid cubriendo 18 casos de uso (CU-01 a CU-18), taxonomía RBAC, transiciones de estados de taller, pipeline multimedia Cloudinary y emisión de comprobantes.
 - **Pipeline Unificado de Evidencias Fotográficas y Prevención de Huérfanas (`DevicePhotoUploader.jsx`, `uploadSession.controller.js`, `servicios.controller.js`):**
   - **Subida Unificada desde PC:** Las imágenes seleccionadas desde PC en `DevicePhotoUploader.jsx` se canalizan a través de `subirFotosSession` (`POST /api/upload-session/:sessionId/subir`), inicializando o reutilizando la sesión activa en `sesiones_carga_fotos` con vigencia temporal de 15 minutos.
   - **Blindaje en Profundidad en Endpoint Directo (`POST /api/servicios/upload-foto`):** `uploadFotosServicio` genera o actualiza automáticamente una sesión en `sesiones_carga_fotos` con estado `COMPLETADO` y fecha de expiración, garantizando que ninguna foto quede sin registrar en base de datos.

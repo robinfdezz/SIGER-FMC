@@ -186,6 +186,20 @@ export const OrdenDetalleModal = ({
     }
   };
 
+  // Blindaje de tecla Escape para el visor de fotos (Stack LIFO)
+  useEffect(() => {
+    if (!activePhoto) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        setActivePhoto(null);
+      }
+    };
+    window.addEventListener('keydown', handleEsc, true);
+    return () => window.removeEventListener('keydown', handleEsc, true);
+  }, [activePhoto]);
+
   const targetId = ordenId || orden?.id;
 
   // Cargar detalles completos al abrir

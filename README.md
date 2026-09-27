@@ -1,13 +1,13 @@
-# 🚀 SIGER-FMC - Sistema Integral de Gestión y Reparación
+# 🚀 SIGER-FMC - Sistema Integral de Gestión y Reparación (v1.0.0)
 
-Sistema web especializado para el taller de servicio técnico **Franyer Mobile Center, S.R.L.**
+Sistema web integral y especializado para la administración y control operativo del taller de servicio técnico **Franyer Mobile Center, S.R.L.**
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-- **Backend:** Node.js, Express, PostgreSQL (`pg` Connection Pool), JWT, BcryptJS, Cloudinary SDK, Multer (Memory Storage), Cloudflare Turnstile (Anti-Bot condicional).
-- **Frontend:** React (Vite), React Router v6, Tailwind CSS (Estilo Supabase Dark/Light), Lucide React, Morphicons (Iconos animados), react-loading-skeleton, Sileo (Toaster), Axios.
+- **Backend:** Node.js, Express, PostgreSQL (`pg` Connection Pool), JWT, BcryptJS, Cloudinary SDK, Multer (Memory Storage), Resend (Correo transaccional), Cloudflare Turnstile (Anti-Bot condicional).
+- **Frontend:** React 18 (Vite), React Router v6, Tailwind CSS (Estilo Supabase Dark/Light), Lucide React, Morphicons (Iconos animados), react-loading-skeleton, Sileo (Toaster), Axios.
 - **Base de Datos:** PostgreSQL (`siger_fmc_db`).
 - **Gestión Multimedia / Cloudinary:** Carga optimizada en buffer, streaming WebP (`siger-fmc/personal-fmc`, `siger-fmc/recepcion` y `siger-fmc/evidencias-tickets`), sincronización móvil vía QR, subida unificada desde PC y recolección automática de recursos huérfanos.
 - **Flujo de Ramas Git:**
@@ -22,10 +22,10 @@ Sistema web especializado para el taller de servicio técnico **Franyer Mobile C
 SIGER-FMC/
 ├── backend/                  # Servidor API Express + PostgreSQL
 │   ├── src/
-│   │   ├── config/           # db.js (PostgreSQL pool), cloudinary.js (SDK & Upload)
-│   │   ├── controllers/      # auth, workers, clients, etc.
+│   │   ├── config/           # db.js (PostgreSQL pool), cloudinary.js, email.js
+│   │   ├── controllers/      # auth, servicios, reportes, workers, clients, etc.
 │   │   ├── middlewares/      # authMiddleware.js, roleMiddleware.js, upload.js (Multer)
-│   │   ├── routes/           # auth.routes.js, workers.routes.js, clients.routes.js, etc.
+│   │   ├── routes/           # auth, servicios, reportes, workers, clients, etc.
 │   │   ├── db/               # init.sql (DDL + Seeds para PostgreSQL)
 │   │   └── app.js            # Configuración Express, CORS y middlewares
 │   ├── server.js             # Entrada del servidor backend
@@ -35,10 +35,10 @@ SIGER-FMC/
 │
 ├── frontend/                 # Aplicación Cliente React + Vite
 │   ├── src/
-│   │   ├── components/       # Layouts, Modales (WorkerModal, ClientModal), Select, Dropzones
+│   │   ├── components/       # Layouts, Modales, Charts (IncomeAreaChart, Donut), Select, Dropzones
 │   │   ├── context/          # AuthContext (Sesión), ThemeContext (Dark/Light)
-│   │   ├── pages/            # LoginPage, DashboardPage, WorkersPage, ClientsPage, etc.
-│   │   ├── services/         # api.js (Axios), workers.service.js, clients.service.js
+│   │   ├── pages/            # LoginPage, DashboardPage, ReportesPage, BancoTrabajoPage, WorkersPage, ClientsPage, etc.
+│   │   ├── services/         # api.js (Axios), servicios, reportes, workers, clients
 │   │   ├── App.jsx           # Rutas y providers
 │   │   ├── main.jsx          # Montaje
 │   │   └── index.css         # Tailwind y tipografía Sora/Outfit/Inter
@@ -47,16 +47,15 @@ SIGER-FMC/
 │   ├── vite.config.js        # Proxy a /api
 │   └── .env                  # Variables de entorno frontend
 │
-├── DIAGRAMAS_CASOS_DE_USO_Y_FLUJO.md # Especificación formal UML y flujos Mermaid (CU-01 a CU-18)
 └── docs/
     ├── DOCUMENTACION_GENERAL.md # Índice maestro y mapa documental del proyecto
     ├── ARCHITECTURE.md          # Arquitectura global, capas y pipeline de imágenes
     ├── API.md                   # Catálogo completo de endpoints REST y ejemplos
-    ├── DATABASE.md              # Diccionario de datos y modelo relacional PostgreSQL
-    ├── GUIDELINES.md            # Guía de estándares de desarrollo y UI/UX
-    ├── PROJECT_CONTEXT.md       # Visión, roles y reglas de negocio
-    ├── AI_RULES.md              # Reglas y restricciones de desarrollo para agentes AI
-    └── CHANGELOG.md             # Registro cronológico de cambios y versiones
+    ├── DATABASE.md                    # Diccionario de datos y modelo relacional PostgreSQL
+    ├── GUIDELINES.md                  # Guía de estándares de desarrollo y UI/UX
+    ├── PROJECT_CONTEXT.md             # Visión, roles y reglas de negocio
+    ├── AI_RULES.md                    # Reglas y restricciones de desarrollo para agentes AI
+    └── CHANGELOG.md                   # Registro cronológico de cambios y versiones
 ```
 
 ---
