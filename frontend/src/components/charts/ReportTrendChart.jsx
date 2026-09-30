@@ -193,7 +193,7 @@ export const ReportTrendChart = ({
               transform: 'translate(-50%, 0)'
             }}
           >
-            <div className="bg-white dark:bg-[#18181B] border border-neutral-200/90 dark:border-neutral-800 rounded-xl shadow-xl p-2.5 min-w-[155px] text-xs animate-in fade-in zoom-in-95 duration-100">
+            <div className="bg-white/90 dark:bg-[#18181B]/90 backdrop-blur-xs border border-neutral-200/90 dark:border-neutral-800 rounded-xl p-2.5 min-w-[155px] text-xs animate-in fade-in zoom-in-95 duration-100">
               <p className="font-semibold text-neutral-900 dark:text-neutral-100 border-b border-neutral-100 dark:border-neutral-800/80 pb-1 mb-1.5 capitalize">
                 {formatDayFullLabel(hoveredItem.fecha)}
               </p>

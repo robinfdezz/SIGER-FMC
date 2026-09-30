@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MorphIcon } from 'morphicons/react';
-import { Check, RotateCcw } from 'lucide';
+import { Check, RotateCw, RotateCcw } from 'lucide';
 
 /**
  * Componente genérico de botón con icono animado vectorial interactivo.
@@ -8,7 +8,7 @@ import { Check, RotateCcw } from 'lucide';
  * Soporta estados de carga/rotación fluida (loading / isAnimating) y éxito temporal.
  * Mantiene la persistencia del borde e integridad visual en todos los estados.
  *
- * @param {Array|null} icon - Nodo de icono de 'lucide' (por defecto: RotateCcw de 'lucide')
+ * @param {Array|null} icon - Nodo de icono de 'lucide' (por defecto: RotateCw de 'lucide')
  * @param {boolean} loading - Activa la animación de giro/spin continuo de 360°
  * @param {boolean} isAnimating - Disparador alternativo de animación de rotación
  * @param {boolean} success - Activa el morphing vectorial hacia Check verde esmeralda
@@ -26,7 +26,7 @@ import { Check, RotateCcw } from 'lucide';
  * @param {React.ReactNode} children - Contenido personalizado opcional (ej. MorphIcon en ResetFiltersButton)
  */
 const AnimatedIconButton = ({
-  icon = RotateCcw,
+  icon = RotateCw,
   loading = false,
   isAnimating = false,
   success = false,
@@ -77,9 +77,12 @@ const AnimatedIconButton = ({
   const computedTitle = isSuccess ? 'Actualizado correctamente' : (title || tooltip);
   const computedAriaLabel = ariaLabel || computedTitle || 'Acción';
 
-  // Si icon es un array de nodos de 'lucide' lo usamos, si no usamos RotateCcw por defecto
-  const baseIconNode = Array.isArray(icon) && icon.length > 0 ? icon : RotateCcw;
+  // Si icon es un array de nodos de 'lucide' lo usamos, si no usamos RotateCw por defecto
+  const baseIconNode = Array.isArray(icon) && icon.length > 0 ? icon : RotateCw;
   const currentIcon = isSuccess ? Check : baseIconNode;
+
+  // Detección de giro antihorario si explícitamente se solicita RotateCcw
+  const isCounterClockwise = icon === RotateCcw || baseIconNode === RotateCcw;
 
   const variantStyles = {
     default:
@@ -125,6 +128,7 @@ const AnimatedIconButton = ({
           className={`inline-flex items-center justify-center shrink-0 transition-transform duration-300 ${
             activeAnimation ? 'animate-spin' : ''
           }`}
+          style={activeAnimation && isCounterClockwise ? { animationDirection: 'reverse' } : undefined}
         >
           <MorphIcon
             icon={currentIcon}

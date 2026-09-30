@@ -123,7 +123,7 @@ const getClients = async (req, res) => {
       page = 1,
       limit = 20,
       search = req.query.q || '',
-      estado = 'all'
+      estado = req.query.activo !== undefined ? req.query.activo : (req.query.estado || 'all')
     } = req.query;
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -135,9 +135,9 @@ const getClients = async (req, res) => {
     let paramIndex = 1;
 
     // Filtro por Estado
-    if (estado === 'active' || estado === 'true') {
+    if (estado === 'active' || estado === 'true' || estado === true) {
       whereConditions.push(`c.activo = TRUE`);
-    } else if (estado === 'inactive' || estado === 'false') {
+    } else if (estado === 'inactive' || estado === 'false' || estado === false) {
       whereConditions.push(`c.activo = FALSE`);
     }
 
@@ -492,6 +492,36 @@ const toggleClientStatus = async (req, res) => {
 
     const currentClient = clientCheck.rows[0];
     const newStatus = !currentClient.activo;
+
+    // 2. Si se va a desactivar (newStatus === false), verificar que no tenga servicios en curso
+    if (!newStatus) {
+      const activeOrdersQuery = `
+        SELECT s.id, s.codigo_ticket, es.codigo_estado, es.nombre_estado
+        FROM servicios_recepcion s
+        JOIN estados_servicio es ON s.estado_actual_id = es.id
+        WHERE s.cliente_id = $1
+          AND s.activo = TRUE
+          AND es.codigo_estado NOT IN ('ENTREGADO', 'CANCELADO_DEVUELTO')
+        ORDER BY s.created_at DESC
+      `;
+      const activeOrdersRes = await pool.query(activeOrdersQuery, [clientId]);
+
+      if (activeOrdersRes.rows.length > 0) {
+        const ticketCodes = activeOrdersRes.rows.map((r) => r.codigo_ticket);
+        const ticketList = ticketCodes.slice(0, 5).join(', ') + (ticketCodes.length > 5 ? ` y ${ticketCodes.length - 5} más` : '');
+        const plural = activeOrdersRes.rows.length > 1;
+
+        return res.status(409).json({
+          success: false,
+          ok: false,
+          message: `No se puede desactivar al cliente porque posee ${activeOrdersRes.rows.length} ${plural ? 'órdenes de servicio activas' : 'orden de servicio activa'} en curso (${ticketList}). Debe completar o cancelar los servicios antes de desactivar al cliente.`,
+          detalles: {
+            total_pendientes: activeOrdersRes.rows.length,
+            ordenes_activas: ticketCodes
+          }
+        });
+      }
+    }
 
     const result = await pool.query(
       `UPDATE clientes 

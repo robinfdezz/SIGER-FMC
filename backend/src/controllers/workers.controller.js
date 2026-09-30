@@ -783,19 +783,54 @@ const toggleWorkerStatus = async (req, res) => {
       });
     }
 
-    // 2. Alternar estado activo
+    const newStatus = !currentWorker.activo;
+
+    // 2. Si se va a desactivar (newStatus === false), verificar si tiene órdenes asignadas activas
+    if (!newStatus) {
+      const activeOrdersQuery = `
+        SELECT DISTINCT s.id, s.codigo_ticket, es.codigo_estado, es.nombre_estado
+        FROM servicios_recepcion s
+        JOIN tecnicos_asignados ta ON ta.servicio_id = s.id
+        JOIN estados_servicio es ON s.estado_actual_id = es.id
+        WHERE ta.tecnico_id = $1
+          AND s.activo = TRUE
+          AND es.codigo_estado NOT IN ('ENTREGADO', 'CANCELADO_DEVUELTO')
+        ORDER BY s.id DESC
+      `;
+      const activeOrdersRes = await pool.query(activeOrdersQuery, [workerId]);
+
+      if (activeOrdersRes.rows.length > 0) {
+        const ticketCodes = activeOrdersRes.rows.map((r) => r.codigo_ticket);
+        const ticketList = ticketCodes.slice(0, 5).join(', ') + (ticketCodes.length > 5 ? ` y ${ticketCodes.length - 5} más` : '');
+        const plural = activeOrdersRes.rows.length > 1;
+        const fullName = `${currentWorker.nombre} ${currentWorker.apellido || ''}`.trim();
+
+        return res.status(409).json({
+          ok: false,
+          success: false,
+          message: `No se puede desactivar al usuario "${fullName}" porque tiene ${activeOrdersRes.rows.length} ${plural ? 'órdenes de servicio activas asignadas' : 'orden de servicio activa asignada'} en curso (${ticketList}). Debe reasignar o completar las órdenes antes de desactivarlo.`,
+          detalles: {
+            total_pendientes: activeOrdersRes.rows.length,
+            ordenes_activas: ticketCodes
+          }
+        });
+      }
+    }
+
+    // 3. Alternar estado activo
     const toggleQuery = `
       UPDATE datos_trabajadores
-      SET activo = NOT activo, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1
+      SET activo = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
       RETURNING id, usuario, nombre, apellido, activo, updated_at
     `;
 
-    const toggleRes = await pool.query(toggleQuery, [workerId]);
+    const toggleRes = await pool.query(toggleQuery, [newStatus, workerId]);
     const updated = toggleRes.rows[0];
 
     return res.status(200).json({
       ok: true,
+      success: true,
       message: `El trabajador ${updated.nombre} ${updated.apellido} ha sido ${updated.activo ? 'activado' : 'desactivado'} exitosamente.`,
       data: updated
     });

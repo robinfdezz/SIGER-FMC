@@ -6,6 +6,7 @@ import Select from '../common/Select';
 import Badge from '../common/Badge';
 import InlineConfirmButton from '../common/InlineConfirmButton';
 import SimpleButton from '../common/SimpleButton';
+import Skeleton from '../common/Skeleton';
 import { useAuth } from '../../context/AuthContext';
 import {
   X,
@@ -21,7 +22,6 @@ import {
   FileText,
   Image as ImageIcon,
   KeyRound,
-  Loader2,
   Lock,
   Layers,
   Sparkles,
@@ -64,6 +64,7 @@ import { getWorkers } from '../../services/workers.service';
 import DevicePhotoUploader from '../servicios/DevicePhotoUploader';
 import DeviceChecklistPicker from '../servicios/DeviceChecklistPicker';
 import ServiceTimeline from '../servicios/ServiceTimeline';
+import { copyToClipboard } from '../../utils/clipboard';
 import { sileo } from 'sileo';
 
 const TIPOS_INCIDENCIA = [
@@ -229,6 +230,131 @@ const extractTecnicos = (src) => {
   }
   return [];
 };
+
+const FichaTecnicaSkeleton = () => (
+  <div className="space-y-6">
+    {/* Resumen Superior: Dispositivo y Seguridad */}
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Datos del Dispositivo */}
+      <div className="sm:col-span-2 p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-4">
+        <Skeleton className="h-3.5 w-36 rounded-md" />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Skeleton className="h-3 w-24 rounded-md" />
+            <Skeleton className="h-5 w-40 rounded-md" />
+          </div>
+          <div className="space-y-1.5">
+            <Skeleton className="h-3 w-28 rounded-md" />
+            <Skeleton className="h-5 w-32 rounded-md" />
+          </div>
+          <div className="space-y-1.5">
+            <Skeleton className="h-3 w-16 rounded-md" />
+            <Skeleton className="h-5 w-20 rounded-md" />
+          </div>
+          <div className="space-y-1.5">
+            <Skeleton className="h-3 w-28 rounded-md" />
+            <Skeleton className="h-5 w-24 rounded-md" />
+          </div>
+        </div>
+      </div>
+
+      {/* Seguridad / Acceso al Equipo */}
+      <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 flex flex-col items-center justify-between text-center gap-2">
+        <Skeleton className="h-3.5 w-28 rounded-md" />
+        <div className="my-auto py-2 w-full flex items-center justify-center">
+          <Skeleton className="w-24 h-24 rounded-xl" />
+        </div>
+        <Skeleton className="h-3 w-20 rounded-md" />
+      </div>
+    </div>
+
+    {/* Formulario de Transición de Estado */}
+    <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-3">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-44 rounded-md" />
+        <Skeleton className="h-6 w-28 rounded-md" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+        <div className="space-y-1.5">
+          <Skeleton className="h-3 w-20 rounded-md" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+        </div>
+        <div className="space-y-1.5">
+          <Skeleton className="h-3 w-36 rounded-md" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+        </div>
+      </div>
+    </div>
+
+    {/* Sección de Incidencias y Hallazgos */}
+    <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-3">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-52 rounded-md" />
+        <Skeleton className="h-8 w-32 rounded-xl" />
+      </div>
+      <div className="p-4 rounded-xl border border-neutral-200/60 dark:border-neutral-800/60 space-y-2">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-4 w-32 rounded-md" />
+          <Skeleton className="h-4 w-20 rounded-md" />
+        </div>
+        <Skeleton className="h-3.5 w-full rounded-md" />
+      </div>
+    </div>
+
+    {/* Técnicos Asignados */}
+    <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-3">
+      <Skeleton className="h-3.5 w-36 rounded-md" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+        {[1, 2].map((i) => (
+          <div
+            key={i}
+            className="flex items-center gap-2.5 p-2.5 rounded-xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-[#18181b]"
+          >
+            <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+            <div className="flex-1 space-y-1">
+              <Skeleton className="h-3.5 w-24 rounded-md" />
+              <Skeleton className="h-2.5 w-16 rounded-md" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Falla y Observaciones */}
+    <div className="space-y-3">
+      <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-2">
+        <Skeleton className="h-3.5 w-44 rounded-md" />
+        <Skeleton className="h-4 w-3/4 rounded-md" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-2">
+          <Skeleton className="h-3.5 w-36 rounded-md" />
+          <Skeleton className="h-4 w-2/3 rounded-md" />
+        </div>
+        <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-2">
+          <Skeleton className="h-3.5 w-32 rounded-md" />
+          <Skeleton className="h-4 w-1/2 rounded-md" />
+        </div>
+      </div>
+    </div>
+
+    {/* Línea de tiempo modular */}
+    <div className="space-y-4 pt-2">
+      <Skeleton className="h-4 w-40 rounded-md" />
+      <div className="space-y-4 pl-2">
+        {[1, 2].map((i) => (
+          <div key={i} className="flex gap-3">
+            <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <Skeleton className="h-4 w-48 rounded-md" />
+              <Skeleton className="h-3 w-64 rounded-md" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
 
 export const FichaTecnicaModal = ({
   isOpen,
@@ -493,6 +619,16 @@ export const FichaTecnicaModal = ({
     e.preventDefault();
     if (!selectedEstadoId) return;
 
+    if (isTerminal) {
+      sileo.warning({
+        title: isEntregado ? 'Orden entregada' : 'Orden cancelada',
+        description: isEntregado
+          ? 'No se puede modificar el estado de una orden que ya ha sido entregada.'
+          : 'No se pueden realizar cambios de estado en una orden cancelada.'
+      });
+      return;
+    }
+
     if (String(selectedEstadoId) === String(orden.estado_actual_id)) {
       sileo.info({ title: 'Mismo estado', description: 'La orden ya se encuentra en este estado.' });
       return;
@@ -697,10 +833,41 @@ export const FichaTecnicaModal = ({
   const rolesNoTecnicos = ['secretaria', 'recepcionista', 'recepcion', 'cajero'];
   const normalizedUserRole = String(effectiveUserRole || '').toLowerCase();
   const isAdministrativeOrReception = rolesNoTecnicos.some((r) => normalizedUserRole.includes(r));
-  const canSelfAssign = !isCurrentUserAssigned && !isAdministrativeOrReception;
+
+  const currentEstadoObj = (allEstados || []).find(
+    (e) => String(e.id) === String(orden?.estado_actual_id || orden?.estado_id) || e.codigo_estado === orden?.codigo_estado
+  ) || {
+    orden_flujo: orden?.orden_flujo,
+    codigo_estado: orden?.codigo_estado,
+    nombre_estado: orden?.estado
+  };
+  const CurrentEstadoIcon = getEstadoIcon(currentEstadoObj);
+  const currentEstadoColor = orden?.estado_color || currentEstadoObj.color_badge || '#6B7280';
+  const currentEstadoLabel = getEstadoLabel(currentEstadoObj);
+
+  const codEstadoOrden = String(orden?.codigo_estado || currentEstadoObj?.codigo_estado || '').toUpperCase().trim();
+  const nomEstadoOrden = String(orden?.estado || orden?.nombre_estado || currentEstadoObj?.nombre_estado || '').toLowerCase().trim();
+  const flujoEstadoOrden = Number(orden?.orden_flujo || currentEstadoObj?.orden_flujo || 0);
+
+  const isEntregado =
+    flujoEstadoOrden === 7 ||
+    codEstadoOrden === 'ENTREGADO' ||
+    codEstadoOrden.includes('ENTREG') ||
+    nomEstadoOrden.includes('entregad');
+
+  const isCancelado =
+    flujoEstadoOrden === 8 ||
+    codEstadoOrden === 'CANCELADO_DEVUELTO' ||
+    codEstadoOrden.includes('CANCEL') ||
+    nomEstadoOrden.includes('cancelad');
+
+  const isTerminal = isEntregado || isCancelado;
+
+  const canSelfAssign = !isTerminal && !isCurrentUserAssigned && !isAdministrativeOrReception;
 
   // Técnicos disponibles para agregar que no estén ya asignados, no sean secretaría/recepción y pertenezcan a la sucursal de la orden
   const availableWorkersToAdd = allWorkers.filter((w) => {
+    if (isTerminal) return false;
     if (!w.activo) return false;
     if (tecnicosList.some((t) => t.id === w.id)) return false;
 
@@ -735,7 +902,7 @@ export const FichaTecnicaModal = ({
       id: String(est.id),
       value: String(est.id),
       label: getEstadoLabel(est),
-      disabled: isBlocked,
+      disabled: isTerminal || isBlocked,
       icon: est.color_badge ? (
         <span
           className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -748,17 +915,6 @@ export const FichaTecnicaModal = ({
   const CategoryIcon = getCategoryIcon(orden?.categoria);
   const priorityConfig = getPrioridadConfig(orden?.prioridad);
   const PriorityIcon = priorityConfig.icon;
-
-  const currentEstadoObj = (allEstados || []).find(
-    (e) => String(e.id) === String(orden?.estado_actual_id || orden?.estado_id) || e.codigo_estado === orden?.codigo_estado
-  ) || {
-    orden_flujo: orden?.orden_flujo,
-    codigo_estado: orden?.codigo_estado,
-    nombre_estado: orden?.estado
-  };
-  const CurrentEstadoIcon = getEstadoIcon(currentEstadoObj);
-  const currentEstadoColor = orden?.estado_color || currentEstadoObj.color_badge || '#6B7280';
-  const currentEstadoLabel = getEstadoLabel(currentEstadoObj);
 
   const rawHistorial = Array.isArray(orden?.historial_estados) && orden.historial_estados.length > 0
     ? orden.historial_estados
@@ -834,29 +990,45 @@ export const FichaTecnicaModal = ({
         title={
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-normal text-neutral-500 dark:text-neutral-400 font-outfit">Ficha Técnica</span>
-            <button
-              type="button"
-              onClick={() => {
-                if (!orden?.codigo_ticket) return;
-                navigator.clipboard.writeText(orden.codigo_ticket).then(() => {
-                  setCopiedTicket(true);
-                  setTimeout(() => setCopiedTicket(false), 1500);
-                });
-              }}
-              title="Copiar código de ticket"
-              className="inline-flex items-center gap-1 font-bold text-neutral-900 dark:text-neutral-100 font-outfit hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer group"
-            >
-              <span>{orden?.codigo_ticket || '...'}</span>
-              {copiedTicket ? (
-                <Check size={13} className="text-emerald-500 shrink-0 animate-in fade-in duration-150" />
-              ) : (
-                <Copy size={13} className="text-neutral-400 dark:text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-              )}
-            </button>
+            {loading || !orden ? (
+              <Skeleton className="h-5 w-24 rounded-md" />
+            ) : (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!orden?.codigo_ticket) return;
+                  const success = await copyToClipboard(orden.codigo_ticket);
+                  if (success) {
+                    setCopiedTicket(true);
+                    setTimeout(() => setCopiedTicket(false), 1500);
+                    sileo.success({
+                      title: 'Código copiado',
+                      description: orden.codigo_ticket
+                    });
+                  } else {
+                    sileo.error({
+                      title: 'Error al copiar',
+                      description: 'No se pudo copiar automáticamente el código.'
+                    });
+                  }
+                }}
+                title="Copiar código de ticket"
+                className="inline-flex items-center gap-1 font-bold text-neutral-900 dark:text-neutral-100 font-outfit hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer group"
+              >
+                <span>{orden?.codigo_ticket || '...'}</span>
+                {copiedTicket ? (
+                  <Check size={13} className="text-emerald-500 shrink-0 animate-in fade-in duration-150" />
+                ) : (
+                  <Copy size={13} className="text-neutral-400 dark:text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                )}
+              </button>
+            )}
           </div>
         }
         titleSlot={
-          orden?.es_garantia ? (
+          loading || !orden ? (
+            <Skeleton className="h-5 w-16 rounded-md" />
+          ) : orden?.es_garantia ? (
             <Badge
               variant="minimal"
               color="danger"
@@ -869,7 +1041,13 @@ export const FichaTecnicaModal = ({
           ) : null
         }
         description={
-          orden ? (
+          loading || !orden ? (
+            <div className="flex items-center gap-2.5 mt-1">
+              <Skeleton className="h-4 w-36 rounded-md" />
+              <span className="text-neutral-300 dark:text-neutral-700 hidden sm:inline">·</span>
+              <Skeleton className="h-4 w-28 rounded-md" />
+            </div>
+          ) : (
             <div className="flex items-center gap-2.5 text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 font-inter flex-wrap mt-0.5">
               <div className="flex items-center gap-1.5 text-neutral-800 dark:text-neutral-200 font-medium">
                 <CategoryIcon size={14} className="text-neutral-400 dark:text-neutral-500 shrink-0" />
@@ -881,50 +1059,54 @@ export const FichaTecnicaModal = ({
                 <span>{orden.cliente || orden.nombre_cliente}</span>
               </div>
             </div>
-          ) : (
-            'Cargando información...'
           )
         }
         bodyClassName="p-5 overflow-y-auto space-y-6"
         footer={
-          <>
-            <Button
-              type="button"
-              variant="secondary"
-              size="md"
-              onClick={onClose}
-              disabled={isUpdating}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              form="form-actualizar-estado"
-              variant="primary"
-              size="md"
-              disabled={
-                isUpdating ||
-                !orden ||
-                String(selectedEstadoId) === String(orden?.estado_actual_id) ||
-                isSelectedEstadoBlocked
-              }
-              isLoading={isUpdating}
-              onClick={(e) => {
-                e.preventDefault();
-                handleUpdateEstado(e);
-              }}
-            >
-              Guardar Cambio
-            </Button>
-          </>
+          loading || !orden ? (
+            <div className="flex items-center justify-end w-full gap-2.5">
+              <Skeleton className="h-10 w-24 rounded-xl" />
+              <Skeleton className="h-10 w-32 rounded-xl" />
+            </div>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={onClose}
+                disabled={isUpdating}
+              >
+                {isTerminal ? 'Cerrar' : 'Cancelar'}
+              </Button>
+              {!isTerminal && (
+                <Button
+                  type="submit"
+                  form="form-actualizar-estado"
+                  variant="primary"
+                  size="md"
+                  disabled={
+                    isUpdating ||
+                    !orden ||
+                    String(selectedEstadoId) === String(orden?.estado_actual_id) ||
+                    isSelectedEstadoBlocked
+                  }
+                  isLoading={isUpdating}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleUpdateEstado(e);
+                  }}
+                >
+                  Guardar Cambio
+                </Button>
+              )}
+            </>
+          )
         }
       >
         {loading || !orden ? (
-            <div className="py-16 text-center flex flex-col items-center justify-center gap-3">
-              <Loader2 size={32} className="animate-spin text-red-600" />
-              <p className="text-sm font-medium text-neutral-500">Cargando expediente de taller...</p>
-            </div>
-          ) : (
+          <FichaTecnicaSkeleton />
+        ) : (
             <>
               {/* Resumen Superior: Dispositivo y Seguridad */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1016,61 +1198,93 @@ export const FichaTecnicaModal = ({
                 </div>
               </div>
 
-              {/* Formulario de Transición de Estado */}
-              <form
-                id="form-actualizar-estado"
-                onSubmit={handleUpdateEstado}
-                className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 flex items-center gap-1.5">
-                    <Sparkles size={14} className="text-red-500" />
-                    <span>Actualizar Estado Técnico</span>
-                  </span>
-                  <Badge
-                    variant="minimal"
-                    size="sm"
-                    showDot={false}
-                    icon={<CurrentEstadoIcon size={12} className="shrink-0 stroke-[2.2]" style={{ color: currentEstadoColor }} />}
-                    className="font-medium"
-                    style={{ color: currentEstadoColor }}
-                  >
-                    {currentEstadoLabel}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-                  <div>
-                    <Select
-                      label="Nuevo Estado"
-                      value={selectedEstadoId}
-                      onChange={(val) => setSelectedEstadoId(val)}
-                      items={estadoSelectItems}
-                      placeholder="Seleccionar nuevo estado..."
-                      placement="bottom"
-                    />
-                    {isSelectedEstadoBlocked && (
-                      <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 font-inter">
-                        <AlertTriangle size={12} className="shrink-0 stroke-[2.5]" />
-                        <span>Estado no permitido mientras existan costos adicionales sin resolver.</span>
+              {/* Formulario de Transición de Estado o Aviso Terminal */}
+              {isTerminal ? (
+                <div className="flex flex-col items-center justify-center text-center gap-1.5 py-2 px-4">
+                  {isEntregado ? (
+                    <CheckCircle2 size={32} className="text-emerald-600 dark:text-emerald-400 shrink-0 stroke-[1.75]" />
+                  ) : (
+                    <XCircle size={32} className="text-red-600 dark:text-red-400 shrink-0 stroke-[1.75]" />
+                  )}
+                  <div className="space-y-1 max-w-lg">
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 font-outfit">
+                        Orden de Servicio:
                       </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium font-inter text-neutral-700 dark:text-neutral-300 mb-1.5">
-                      Nota de Avance / Diagnóstico <span className="text-neutral-400 font-normal font-inter">(Opcional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={notaCambio}
-                      onChange={(e) => setNotaCambio(stripEmojis(e.target.value, false))}
-                      placeholder="Ej: Se reemplazó conector de carga..."
-                      className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:border-red-500 focus:ring-red-500/20 transition-colors"
-                    />
+                      <Badge
+                        variant="minimal"
+                        size="sm"
+                        showDot={false}
+                        icon={<CurrentEstadoIcon size={12} className="shrink-0 stroke-[2.2]" style={{ color: currentEstadoColor }} />}
+                        className="font-medium"
+                        style={{ color: currentEstadoColor }}
+                      >
+                        {currentEstadoLabel}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 font-inter leading-relaxed">
+                      {isEntregado
+                        ? 'Esta orden ya fue entregada al cliente y su ciclo técnico está cerrado definitivamente. No es posible realizar modificaciones de estado.'
+                        : 'Esta orden fue cancelada y su ciclo técnico está cerrado definitivamente. No es posible realizar modificaciones de estado.'}
+                    </p>
                   </div>
                 </div>
-              </form>
+              ) : (
+                <form
+                  id="form-actualizar-estado"
+                  onSubmit={handleUpdateEstado}
+                  className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="uppercase tracking-wider text-xs font-semibold text-neutral-400 dark:text-neutral-500 flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-red-500" />
+                      <span>Actualizar Estado Técnico</span>
+                    </span>
+                    <Badge
+                      variant="minimal"
+                      size="sm"
+                      showDot={false}
+                      icon={<CurrentEstadoIcon size={12} className="shrink-0 stroke-[2.2]" style={{ color: currentEstadoColor }} />}
+                      className="font-medium"
+                      style={{ color: currentEstadoColor }}
+                    >
+                      {currentEstadoLabel}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                    <div>
+                      <Select
+                        label="Nuevo Estado"
+                        value={selectedEstadoId}
+                        onChange={(val) => setSelectedEstadoId(val)}
+                        items={estadoSelectItems}
+                        placeholder="Seleccionar nuevo estado..."
+                        placement="bottom"
+                      />
+                      {isSelectedEstadoBlocked && (
+                        <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 font-inter">
+                          <AlertTriangle size={12} className="shrink-0 stroke-[2.5]" />
+                          <span>Estado no permitido mientras existan costos adicionales sin resolver.</span>
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium font-inter text-neutral-700 dark:text-neutral-300 mb-1.5">
+                        Nota de Avance / Diagnóstico <span className="text-neutral-400 font-normal font-inter">(Opcional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={notaCambio}
+                        onChange={(e) => setNotaCambio(stripEmojis(e.target.value, false))}
+                        placeholder="Ej: Se reemplazó conector de carga..."
+                        className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:border-red-500 focus:ring-red-500/20 transition-colors"
+                      />
+                    </div>
+                  </div>
+                </form>
+              )}
 
               {/* Sección de Incidencias y Hallazgos Técnicos */}
               <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/70 dark:border-neutral-800/80 space-y-3">
@@ -1083,19 +1297,21 @@ export const FichaTecnicaModal = ({
                     </strong>
                   </span>
 
-                  <Button
-                    type="button"
-                    variant={isReportingIncidencia ? 'secondary' : 'primary'}
-                    size="sm"
-                    icon={isReportingIncidencia ? X : Plus}
-                    onClick={() => {
-                      setIsReportingIncidencia((prev) => !prev);
-                      setErrorDescripcion('');
-                    }}
-                    className="h-8 px-3 text-xs font-semibold"
-                  >
-                    {isReportingIncidencia ? 'Cancelar' : 'Reportar Hallazgo'}
-                  </Button>
+                  {!isTerminal && (
+                    <Button
+                      type="button"
+                      variant={isReportingIncidencia ? 'secondary' : 'primary'}
+                      size="sm"
+                      icon={isReportingIncidencia ? X : Plus}
+                      onClick={() => {
+                        setIsReportingIncidencia((prev) => !prev);
+                        setErrorDescripcion('');
+                      }}
+                      className="h-8 px-3 text-xs font-semibold"
+                    >
+                      {isReportingIncidencia ? 'Cancelar' : 'Reportar Hallazgo'}
+                    </Button>
+                  )}
                 </div>
 
                 {/* Formulario colapsable para reportar incidencia */}
@@ -1649,15 +1865,17 @@ export const FichaTecnicaModal = ({
                           </div>
 
                           {/* Botón de desvincular */}
-                          <button
-                            type="button"
-                            disabled={isManagingTecnicos}
-                            onClick={() => handleRemoveTecnico(tec.id)}
-                            title="Remover de la orden"
-                            className="p-1 rounded-lg text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer shrink-0 disabled:opacity-40"
-                          >
-                            <X size={14} />
-                          </button>
+                          {!isTerminal && (
+                            <button
+                              type="button"
+                              disabled={isManagingTecnicos}
+                              onClick={() => handleRemoveTecnico(tec.id)}
+                              title="Remover de la orden"
+                              className="p-1 rounded-lg text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer shrink-0 disabled:opacity-40"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -1665,7 +1883,7 @@ export const FichaTecnicaModal = ({
                 )}
 
                 {/* Selector para agregar colaborador adicional y botón de autoasignación */}
-                {(availableWorkersToAdd.length > 0 || canSelfAssign) && (
+                {!isTerminal && (availableWorkersToAdd.length > 0 || canSelfAssign) && (
                   <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-200/60 dark:border-neutral-800/60">
                     {availableWorkersToAdd.length > 0 && (
                       <div className="flex-1 min-w-[200px]">

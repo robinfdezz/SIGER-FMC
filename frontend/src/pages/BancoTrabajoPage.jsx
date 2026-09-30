@@ -9,6 +9,7 @@ import ResetFiltersButton from '../components/common/ResetFiltersButton';
 import AnimatedIconButton from '../components/common/AnimatedIconButton';
 import Badge from '../components/common/Badge';
 import Pagination from '../components/common/Pagination';
+import Skeleton from '../components/common/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import {
   getServiciosTaller,
@@ -18,7 +19,7 @@ import {
 } from '../services/servicios.service';
 import { getEstados } from '../services/catalogs.service';
 import { sileo } from 'sileo';
-import { RotateCcw } from 'lucide';
+import { RotateCw } from 'lucide';
 import {
   LayoutGrid,
   List,
@@ -149,6 +150,186 @@ const getPrioridadConfig = (prioridad) => {
   }
 };
 
+const TallerCardSkeleton = () => (
+  <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-4 shadow-xs flex flex-col justify-between gap-3 w-full select-none">
+    <div>
+      {/* Cabecera: Ticket y Prioridad/Garantía */}
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <Skeleton className="h-3.5 w-20 font-mono" />
+        <Skeleton className="h-3.5 w-12 rounded-full" />
+      </div>
+
+      {/* Tiempo */}
+      <div className="flex items-center gap-1 mt-1 mb-2">
+        <Skeleton className="w-3.5 h-3.5 rounded-full shrink-0" />
+        <Skeleton className="h-3 w-16" />
+      </div>
+
+      {/* Dispositivo y Cliente */}
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="w-3.5 h-3.5 rounded shrink-0" />
+          <Skeleton className="h-3.5 w-28" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="w-3.5 h-3.5 rounded-full shrink-0" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+
+        {/* Falla reportada / diagnóstico */}
+        <div className="pt-1">
+          <Skeleton className="h-10 w-full rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-100 dark:border-neutral-800/60" />
+        </div>
+      </div>
+    </div>
+
+    {/* Pie: Multitécnico y Botón de Acción */}
+    <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800/80">
+      <div className="flex items-center gap-1.5">
+        <Skeleton className="w-1.5 h-1.5 rounded-full shrink-0" />
+        <Skeleton className="h-3 w-24" />
+      </div>
+      <Skeleton className="h-7 w-full rounded-xl" />
+    </div>
+  </div>
+);
+
+const TallerKanbanSkeleton = () => {
+  return (
+    <div className="w-full max-w-full overflow-x-auto pb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 w-full min-w-0 md:min-w-[1100px]">
+        {Array.from({ length: 6 }).map((_, idx) => (
+          <div
+            key={idx}
+            className="flex flex-col rounded-2xl bg-neutral-100/60 dark:bg-[#121214] border border-neutral-200/70 dark:border-neutral-800/80 p-1.5 min-h-[400px] sm:min-h-[500px] max-h-[700px] w-full min-w-0 max-w-full"
+          >
+            {/* Encabezado de Columna Skeleton */}
+            <div className="flex items-center justify-between gap-2 px-1.5 py-1.5 mb-1.5 border-b border-neutral-200/60 dark:border-neutral-800/60 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <Skeleton className="w-4 h-4 rounded-md shrink-0" />
+                <Skeleton className="h-3.5 w-20 sm:w-24" />
+              </div>
+              <Skeleton className="h-4 w-4" />
+            </div>
+
+            {/* Lista de Tarjetas */}
+            <div className="flex-1 space-y-2.5 overflow-hidden pr-0.5">
+              <TallerCardSkeleton />
+              {idx % 2 === 0 && <TallerCardSkeleton />}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const TallerTableSkeletonRows = ({ count = 7 }) => {
+  return Array.from({ length: count }).map((_, idx) => (
+    <tr key={`taller-skeleton-row-${idx}`}>
+      {/* 1. Ticket */}
+      <td className="py-3 px-3 align-middle">
+        <Skeleton className="h-4 w-20 font-mono" />
+        {idx % 3 === 0 && (
+          <Skeleton className="h-3 w-14 rounded-full mt-1.5" />
+        )}
+      </td>
+
+      {/* 2. Equipo */}
+      <td className="py-3 px-3 align-middle min-w-[150px]">
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="w-3.5 h-3.5 rounded shrink-0" />
+          <Skeleton className="h-3.5 w-28" />
+        </div>
+        <Skeleton className="h-3 w-20 mt-1 ml-5" />
+      </td>
+
+      {/* 3. Falla */}
+      <td className="py-3 px-3 align-middle max-w-xs">
+        <Skeleton className="h-3.5 w-36 sm:w-48" />
+      </td>
+
+      {/* 4. Estado */}
+      <td className="py-3 px-3 whitespace-nowrap align-middle">
+        <Skeleton className="h-6 w-24 rounded-full" />
+      </td>
+
+      {/* 5. Prioridad */}
+      <td className="py-3 px-3 whitespace-nowrap align-middle">
+        <Skeleton className="h-6 w-16 rounded-full" />
+      </td>
+
+      {/* 6. Asignado A */}
+      <td className="py-3 px-3 align-middle">
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="w-2 h-2 rounded-full shrink-0" />
+          <Skeleton className="h-3.5 w-24" />
+        </div>
+      </td>
+
+      {/* 7. Tiempo */}
+      <td className="py-3 px-3 whitespace-nowrap align-middle">
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="w-3.5 h-3.5 rounded-full shrink-0" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+      </td>
+
+      {/* 8. Acción */}
+      <td className="py-3 px-3 text-center align-middle">
+        <div className="flex items-center justify-center">
+          <Skeleton className="w-6 h-6 rounded-lg" />
+        </div>
+      </td>
+    </tr>
+  ));
+};
+
+const BancoTrabajoHeaderSkeleton = () => {
+  return (
+    <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-5">
+      {/* Fila Superior: Título, Switch de Vistas y Refrescar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
+        <div className="space-y-2">
+          <Skeleton className="h-6 sm:h-7 w-60 sm:w-72 rounded-lg" />
+          <Skeleton className="h-3.5 sm:h-4 w-72 sm:w-96" />
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-center">
+          <Skeleton className="h-8 w-36 rounded-xl" />
+          <Skeleton className="w-8 h-8 rounded-xl" />
+        </div>
+      </div>
+
+      {/* Fila Inferior: Buscador y Segmented Controls Rápidos */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <Skeleton className="h-8 w-full md:w-[380px] rounded-xl" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-full sm:w-72 rounded-xl" />
+          <Skeleton className="h-9 w-9 rounded-xl" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TallerPaginationSkeleton = () => {
+  return (
+    <div className="p-4 border-t border-neutral-100 dark:border-neutral-800/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-8 w-24 rounded-lg" />
+        <Skeleton className="h-4 w-36" />
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Skeleton className="h-8 w-8 rounded-lg" />
+        <Skeleton className="h-8 w-8 rounded-lg" />
+        <Skeleton className="h-8 w-8 rounded-lg" />
+        <Skeleton className="h-8 w-8 rounded-lg" />
+      </div>
+    </div>
+  );
+};
+
 export const BancoTrabajoPage = () => {
   const { user: currentUser } = useAuth();
   const location = useLocation();
@@ -160,6 +341,7 @@ export const BancoTrabajoPage = () => {
 
   const [ordenes, setOrdenes] = useState([]);
   const [estados, setEstados] = useState([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshSuccess, setRefreshSuccess] = useState(false);
@@ -242,6 +424,7 @@ export const BancoTrabajoPage = () => {
       sileo.error({ title: 'Error', description: 'No se pudieron cargar las órdenes de taller.' });
     } finally {
       setIsLoading(false);
+      setInitialLoading(false);
     }
   }, []);
 
@@ -394,6 +577,23 @@ export const BancoTrabajoPage = () => {
 
   // Transición de estado (botón rápido o modal)
   const handleQuickAdvance = async (orden, nextEstado) => {
+    const codEstado = String(orden?.codigo_estado || '').toUpperCase();
+    const flujo = Number(orden?.orden_flujo || 0);
+    if (flujo === 7 || codEstado === 'ENTREGADO' || codEstado.includes('ENTREG')) {
+      sileo.warning({
+        title: 'Orden entregada',
+        description: 'No se puede modificar el estado de una orden que ya ha sido entregada.'
+      });
+      return;
+    }
+    if (flujo === 8 || codEstado.includes('CANCEL')) {
+      sileo.warning({
+        title: 'Orden cancelada',
+        description: 'No se pueden realizar cambios de estado en una orden cancelada.'
+      });
+      return;
+    }
+
     try {
       const res = await updateServicioEstado(orden.id, {
         nuevo_estado_id: nextEstado.id,
@@ -420,6 +620,26 @@ export const BancoTrabajoPage = () => {
   };
 
   const handleModalEstadoUpdated = async (ordenId, nuevoEstadoId, notas) => {
+    const targetOrden = ordenes.find((o) => o.id === ordenId);
+    if (targetOrden) {
+      const codEstado = String(targetOrden?.codigo_estado || '').toUpperCase();
+      const flujo = Number(targetOrden?.orden_flujo || 0);
+      if (flujo === 7 || codEstado === 'ENTREGADO' || codEstado.includes('ENTREG')) {
+        sileo.warning({
+          title: 'Orden entregada',
+          description: 'No se puede modificar el estado de una orden que ya ha sido entregada.'
+        });
+        return;
+      }
+      if (flujo === 8 || codEstado.includes('CANCEL')) {
+        sileo.warning({
+          title: 'Orden cancelada',
+          description: 'No se pueden realizar cambios de estado en una orden cancelada.'
+        });
+        return;
+      }
+    }
+
     try {
       const res = await updateServicioEstado(ordenId, {
         nuevo_estado_id: nuevoEstadoId,
@@ -617,8 +837,40 @@ export const BancoTrabajoPage = () => {
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
-        {/* Contenedor Superior: Encabezado, Switch de Vistas y Filtros */}
-        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-5">
+        {initialLoading ? (
+          <>
+            <BancoTrabajoHeaderSkeleton />
+            {viewMode === 'table' ? (
+              <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden flex flex-col">
+                <div className="w-full overflow-x-auto overflow-y-auto h-[560px] relative">
+                  <table className="w-full text-left border-collapse min-w-[760px]">
+                    <thead className="sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs">
+                      <tr className="border-b border-neutral-200 dark:border-neutral-800 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
+                        <th className="py-3 px-3 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[12%] min-w-[110px]">Ticket</th>
+                        <th className="py-3 px-3 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[18%] min-w-[150px]">Equipo</th>
+                        <th className="py-3 px-3 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[24%] min-w-[180px]">Falla Reportada</th>
+                        <th className="py-3 px-3 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[16%] min-w-[140px]">Estado</th>
+                        <th className="py-3 px-3 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[12%] min-w-[100px]">Prioridad</th>
+                        <th className="py-3 px-3 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[14%] min-w-[120px]">Asignado A</th>
+                        <th className="py-3 px-3 bg-neutral-50 dark:bg-[#141416] sticky top-0 w-[80px]">Tiempo</th>
+                        <th className="py-3 px-3 text-center w-[60px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-xs">
+                      <TallerTableSkeletonRows count={7} />
+                    </tbody>
+                  </table>
+                </div>
+                <TallerPaginationSkeleton />
+              </div>
+            ) : (
+              <TallerKanbanSkeleton />
+            )}
+          </>
+        ) : (
+          <>
+            {/* Contenedor Superior: Encabezado, Switch de Vistas y Filtros */}
+            <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-5">
           {/* Fila Superior: Título, Switch de Vistas y Refrescar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
             <div>
@@ -641,7 +893,7 @@ export const BancoTrabajoPage = () => {
 
               {/* Botón Refrescar */}
               <AnimatedIconButton
-                icon={RotateCcw}
+                icon={RotateCw}
                 loading={isRefreshing}
                 success={refreshSuccess}
                 onSuccessEnd={() => setRefreshSuccess(false)}
@@ -697,65 +949,74 @@ export const BancoTrabajoPage = () => {
 
         {/* VISTA KANBAN */}
         {viewMode === 'kanban' && (
-          <div className="w-full max-w-full overflow-x-auto pb-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 w-full min-w-0 md:min-w-[1100px]">
-              {estados.map((estado) => {
-                const ordenesColumna = filteredOrdenes.filter(
-                  (o) => o.estado_id === estado.id || o.codigo_estado === estado.codigo_estado
-                );
-                const EstadoIcon = getEstadoIcon(estado);
+          isLoading && estados.length === 0 ? (
+            <TallerKanbanSkeleton />
+          ) : (
+            <div className="w-full max-w-full overflow-x-auto pb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 w-full min-w-0 md:min-w-[1100px]">
+                {estados.map((estado) => {
+                  const ordenesColumna = filteredOrdenes.filter(
+                    (o) => o.estado_id === estado.id || o.codigo_estado === estado.codigo_estado
+                  );
+                  const EstadoIcon = getEstadoIcon(estado);
 
-                return (
-                  <div
-                    key={estado.id}
-                    className="flex flex-col rounded-2xl bg-neutral-100/60 dark:bg-[#121214] border border-neutral-200/70 dark:border-neutral-800/80 p-1.5 min-h-[400px] sm:min-h-[500px] max-h-[700px] w-full min-w-0 max-w-full"
-                  >
-                    {/* Encabezado de Columna */}
-                    <div className="flex items-center justify-between gap-2 px-1.5 py-1.5 mb-1.5 border-b border-neutral-200/60 dark:border-neutral-800/60 shrink-0">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <EstadoIcon
-                          size={16}
-                          className="shrink-0 stroke-[2.2]"
-                          style={{ color: estado.color_badge || '#6B7280' }}
-                        />
-                        <h3 className="font-outfit font-medium text-xs text-neutral-700 dark:text-neutral-300 whitespace-normal leading-tight truncate">
-                          {getColumnTitle(estado)}
-                        </h3>
+                  return (
+                    <div
+                      key={estado.id}
+                      className="flex flex-col rounded-2xl bg-neutral-100/60 dark:bg-[#121214] border border-neutral-200/70 dark:border-neutral-800/80 p-1.5 min-h-[400px] sm:min-h-[500px] max-h-[700px] w-full min-w-0 max-w-full"
+                    >
+                      {/* Encabezado de Columna */}
+                      <div className="flex items-center justify-between gap-2 px-1.5 py-1.5 mb-1.5 border-b border-neutral-200/60 dark:border-neutral-800/60 shrink-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <EstadoIcon
+                            size={16}
+                            className="shrink-0 stroke-[2.2]"
+                            style={{ color: estado.color_badge || '#6B7280' }}
+                          />
+                          <h3 className="font-outfit font-medium text-xs text-neutral-700 dark:text-neutral-300 whitespace-normal leading-tight truncate">
+                            {getColumnTitle(estado)}
+                          </h3>
+                        </div>
+
+                        <span className="font-bold text-sm text-neutral-900 dark:text-white shrink-0">
+                          {isLoading ? '...' : ordenesColumna.length}
+                        </span>
                       </div>
 
-                      <span className="font-bold text-sm text-neutral-900 dark:text-white shrink-0">
-                        {ordenesColumna.length}
-                      </span>
+                      {/* Lista de Tarjetas */}
+                      <div className="flex-1 space-y-2.5 overflow-y-auto pr-0.5 min-h-0 w-full max-w-full overflow-x-hidden">
+                        {isLoading ? (
+                          <div className="space-y-2.5">
+                            <TallerCardSkeleton />
+                            <TallerCardSkeleton />
+                          </div>
+                        ) : ordenesColumna.length === 0 ? (
+                          <div className="py-12 flex flex-col items-center justify-center gap-2 text-center text-xs text-neutral-400 dark:text-neutral-500 font-inter select-none">
+                            <Inbox size={22} className="stroke-[1.5] text-neutral-300 dark:text-neutral-600" />
+                            <span>Sin órdenes aquí</span>
+                          </div>
+                        ) : (
+                          ordenesColumna.map((ord) => (
+                            <TallerCard
+                              key={ord.id}
+                              orden={ord}
+                              onSelect={openFicha}
+                              onQuickAdvance={handleQuickAdvance}
+                              onSelfAssign={handleSelfAssign}
+                              onEntregar={(o) => setOrdenParaEntregar(o)}
+                              currentUserId={currentUser?.id}
+                              currentUserRole={currentUser?.rol_nombre || currentUser?.rol}
+                              allEstados={estados}
+                            />
+                          ))
+                        )}
+                      </div>
                     </div>
-
-                    {/* Lista de Tarjetas */}
-                    <div className="flex-1 space-y-2.5 overflow-y-auto pr-0.5 min-h-0 w-full max-w-full overflow-x-hidden">
-                      {ordenesColumna.length === 0 ? (
-                        <div className="py-12 flex flex-col items-center justify-center gap-2 text-center text-xs text-neutral-400 dark:text-neutral-500 font-inter select-none">
-                          <Inbox size={22} className="stroke-[1.5] text-neutral-300 dark:text-neutral-600" />
-                          <span>Sin órdenes aquí</span>
-                        </div>
-                      ) : (
-                        ordenesColumna.map((ord) => (
-                          <TallerCard
-                            key={ord.id}
-                            orden={ord}
-                            onSelect={openFicha}
-                            onQuickAdvance={handleQuickAdvance}
-                            onSelfAssign={handleSelfAssign}
-                            onEntregar={(o) => setOrdenParaEntregar(o)}
-                            currentUserId={currentUser?.id}
-                            currentUserRole={currentUser?.rol_nombre || currentUser?.rol}
-                            allEstados={estados}
-                          />
-                        ))
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )
         )}
 
         {/* VISTA TABLA (BANDEJA TÉCNICA) */}
@@ -843,11 +1104,7 @@ export const BancoTrabajoPage = () => {
 
                 <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-xs">
                   {isLoading ? (
-                    <tr>
-                      <td colSpan={8} className="py-16 text-center text-neutral-400">
-                        Cargando bandeja técnica de taller...
-                      </td>
-                    </tr>
+                    <TallerTableSkeletonRows count={7} />
                   ) : sortedOrdenes.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-16 text-center text-neutral-400">
@@ -1040,6 +1297,8 @@ export const BancoTrabajoPage = () => {
               isLoading={isLoading || isRefreshing}
             />
           </div>
+        )}
+          </>
         )}
 
         {/* Modal de Ficha Técnica */}

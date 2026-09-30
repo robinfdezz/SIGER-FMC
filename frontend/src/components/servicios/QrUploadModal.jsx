@@ -13,6 +13,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { getCompanyPublicProfile } from '../../services/configuracion.service';
+import { copyToClipboard } from '../../utils/clipboard';
 import { sileo } from 'sileo';
 
 /**
@@ -66,15 +67,15 @@ export const QrUploadModal = ({
 
   const handleCopyLink = async () => {
     if (!targetUrl) return;
-    try {
-      await navigator.clipboard.writeText(targetUrl);
+    const success = await copyToClipboard(targetUrl);
+    if (success) {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
       sileo.info({
         title: 'Enlace copiado',
         description: 'Pega el enlace en tu navegador móvil si prefieres no escanear el QR.'
       });
-    } catch {
+    } else {
       sileo.error({ title: 'Error', description: 'No se pudo copiar el enlace al portapapeles.' });
     }
   };
