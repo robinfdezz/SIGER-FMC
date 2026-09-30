@@ -632,7 +632,11 @@ export const NuevaOrdenPage = () => {
         }
       }
 
-      if (!form.cliente) {
+      if (form.cliente) {
+        if (form.cliente.activo === false || form.cliente.activo === 'false') {
+          errs.cliente = 'No se puede aperturar una orden para un cliente inactivo.';
+        }
+      } else {
         const nombre = (form.nombre_cliente_libre || '').trim();
         if (!nombre) {
           errs.nombre_cliente_libre = 'El nombre del cliente es obligatorio';
@@ -744,7 +748,7 @@ export const NuevaOrdenPage = () => {
 
     if (Object.keys(allErrors).length > 0) {
       setErrors(allErrors);
-      if (errsStep1.servicio_origen_codigo || errsStep1.categoria_id || errsStep1.marca_equipo || errsStep1.modelo_equipo || errsStep1.nombre_cliente_libre) {
+      if (errsStep1.cliente || errsStep1.servicio_origen_codigo || errsStep1.categoria_id || errsStep1.marca_equipo || errsStep1.modelo_equipo || errsStep1.nombre_cliente_libre) {
         setCurrentStep(1);
       } else if (errsStep2.falla_reportada) {
         setCurrentStep(2);
@@ -771,7 +775,7 @@ export const NuevaOrdenPage = () => {
 
     if (Object.keys(allErrors).length > 0) {
       setErrors(allErrors);
-      if (errsStep1.servicio_origen_codigo || errsStep1.categoria_id || errsStep1.marca_equipo || errsStep1.modelo_equipo || errsStep1.nombre_cliente_libre) {
+      if (errsStep1.cliente || errsStep1.servicio_origen_codigo || errsStep1.categoria_id || errsStep1.marca_equipo || errsStep1.modelo_equipo || errsStep1.nombre_cliente_libre) {
         setCurrentStep(1);
       } else if (errsStep2.falla_reportada) {
         setCurrentStep(2);
@@ -1163,9 +1167,21 @@ export const NuevaOrdenPage = () => {
 
                   <ClientQuickSelect
                     value={form.cliente}
-                    onChange={(c) => set('cliente', c)}
+                    onChange={(c) => {
+                      set('cliente', c);
+                      if (errors.cliente) {
+                        setErrors(prev => {
+                          const next = { ...prev };
+                          delete next.cliente;
+                          return next;
+                        });
+                      }
+                    }}
                     disabled={isGarantiaLocked}
                   />
+                  {errors.cliente && (
+                    <p className="text-[11px] text-red-500 font-inter mt-1">{errors.cliente}</p>
+                  )}
 
                   {!form.cliente && (
                     <div className="space-y-4 pt-2">

@@ -6,6 +6,57 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [1.1.0] - 2026-09-30
+
+### Added
+- **Estandarización y Arquitectura Atómica de Skeleton Loaders:**
+  - **Primitivas Nativas Transversales (`Skeleton.jsx` y `TableSkeleton.jsx`):**
+    - `Skeleton.jsx`: Componente atómico con microanimación de pulso (`animate-pulse`), soporte completo de utilidades Tailwind (`rounded-*`, `w-*`, `h-*`, `className`) y gradientes de brillo HSL perfectamente calibrados para temas claro (`bg-neutral-200/80`) y oscuro (`dark:bg-neutral-800/80`).
+    - `TableSkeleton.jsx`: Estructura configurable por `rows` y `columns` que replica de forma fiel el contenedor, la cabecera fija y las filas de las tablas del sistema con animación continua.
+  - **Componentes Dedicados para Vistas Complejas:**
+    - `DashboardSkeleton.jsx`: Reproduce la geometría exacta 1:1 del Dashboard (tarjeta de bienvenida, acciones rápidas, flujo de taller por estado, carga de técnicos, dona de categorías y tabla de actividad reciente).
+    - `ReportesSkeleton.jsx`: Calca la cabecera de filtros ejecutivos, tarjetas KPI financieras, gráficos de tendencia y la tabla detallada de auditoría.
+  - **Skeletons Anatómicos Inline y Modales:**
+    - Implementación de estados de carga anatómicos inline en `ClientsPage.jsx`, `WorkersPage.jsx`, `ConfigurationPage.jsx` (pestañas de Empresa, Sucursales y Formatos), `NotificationBell.jsx` (panel desplegable de notificaciones) y `GlobalSearch.jsx` (resultados segmentados por órdenes, clientes y dispositivos).
+    - Esqueletos de carga anatómicos en modales de alta densidad: `OrdenDetalleModal.jsx` y `FichaTecnicaModal.jsx` (cabeceras, selectores de estado, checklist e historial).
+    - Erradicación del desplazamiento acumulativo del diseño (**Cumulative Layout Shift - CLS 0%**) en toda la aplicación.
+- **Utilidad Universal y Tolerante a Fallos de Portapapeles (`frontend/src/utils/clipboard.js`):**
+  - Función asíncrona universal `copyToClipboard(text)` con estrategia dual de contingencia:
+    1. Intento primario con Async Clipboard API (`navigator.clipboard.writeText`) para contextos seguros (`https://` y `http://localhost`).
+    2. Conmutación transparente y automática al método de contingencia compatible con un elemento `textarea` invisible temporal off-screen y `document.execCommand('copy')` para entornos HTTP sobre IP de red local (ej. `http://192.168.x.x:5173`) o navegadores con políticas de seguridad restrictivas.
+  - **Copia de Código de Ticket con 1 Clic:**
+    - Integrado en `FichaTecnicaModal.jsx` y `OrdenDetalleModal.jsx` sobre el identificador alfanumérico del ticket con microinteracción visual de `Check` esmeralda y toast de confirmación inmediata (`sileo.success`).
+    - Adopción de `copyToClipboard` en el diálogo de sincronización móvil `QrUploadModal.jsx`.
+  - **Soporte Robusto de Pegado en Consulta Pública (`EstadoOrdenPage.jsx`):**
+    - Soporte multi-formato (`text/plain` y `text`) en el evento de pegado nativo del input (`handleInputPaste`), sin bloquear el flujo por defecto si el portapapeles tarda en responder, garantizando que el pegado nativo del sistema operativo opere con normalidad.
+    - Manejo controlado de restricciones de permisos en el botón del portapapeles: si el navegador deniega la lectura programática (`readText`), enfoca automáticamente el campo de búsqueda e instruye amigablemente al usuario mediante toast a utilizar `Ctrl + V`.
+
+### Changed
+- **Desacoplamiento Total de `react-loading-skeleton`:**
+  - Eliminación definitiva del paquete externo `react-loading-skeleton` en `package.json` y remoción de sus hojas de estilos asociadas en `main.jsx` e `index.css`, reduciendo el peso del bundle final de producción.
+- **Rediseño Sobrio del Banner de Estados Terminales en Modales:**
+  - En `OrdenDetalleModal.jsx` y `FichaTecnicaModal.jsx`, se eliminó el estilo de tarjeta/caja con fondos de color para órdenes entregadas o canceladas.
+  - Nuevo bloque de diseño centrado y minimalista: icono superior ampliado de 32px (`CheckCircle2` verde para entregadas, `XCircle` rojo para canceladas), título formal `"Orden de Servicio: [Badge Estado]"` y descripción clara indicando que el ciclo operativo se encuentra cerrado.
+
+### Fixed & Integrity Rules
+- **Integridad de Negocio entre Clientes y Órdenes de Servicio:**
+  - **Bloqueo de Clientes Inactivos en Apertura de Órdenes:**
+    - *Frontend (`ClientQuickSelect.jsx`, `NuevaOrdenPage.jsx`):* Exclusión estricta de clientes inactivos (`activo = false`) tanto en el catálogo local como en las búsquedas asíncronas remotas.
+    - *Backend (`servicios.controller.js`):* Validación previa en base de datos. Si se intenta registrar una orden vinculada a un cliente inactivo, el backend aborta la transacción con código `400 Bad Request` indicando: *"No se puede aperturar una orden para un cliente inactivo. Por favor active al cliente previamente."*
+  - **Protección contra Desactivación de Clientes con Órdenes Activas:**
+    - *Backend (`clients.controller.js`):* Al intentar desactivar un cliente (`activo = false`), se valida si posee órdenes asignadas en estados no terminales (distintos de `ENTREGADO` y `CANCELADO_DEVUELTO`). Si existen órdenes activas, responde con código `409 Conflict` detallando los tickets pendientes y bloqueando la desactivación.
+    - *Frontend (`ClientsPage.jsx`):* Intercepta el código 409 y despliega un aviso modal / toast descriptivo al usuario.
+- **Integridad de Negocio en Personal y Asignación Técnica:**
+  - **Protección contra Desactivación de Personal con Órdenes Activas:**
+    - *Backend (`workers.controller.js`):* Al solicitar la desactivación de un usuario/técnico, se verifica si tiene órdenes activas en curso en el taller. En caso afirmativo, responde con código `409 Conflict` listando los tickets en progreso y abortando la operación.
+    - *Frontend (`WorkersPage.jsx`):* Captura el error 409 y notifica claramente los tickets en curso que impiden la baja del usuario.
+    - Filtrado en selectores de asignación para garantizar que solo técnicos activos puedan ser asignados a nuevos servicios.
+- **Inmutabilidad Absoluta de Estados Terminales (`ENTREGADO` y `CANCELADO_DEVUELTO`):**
+  - *Backend (`servicios.controller.js` / máquina de estados):* Al procesar cualquier cambio o actualización de estado en `actualizarEstadoServicio`, se evalúa el estado actual. Si la orden ya se encuentra en estado `ENTREGADO` o `CANCELADO_DEVUELTO`, se rechaza taxativamente cualquier transición con error `400 Bad Request` (*"No se puede modificar el estado de una orden que ya ha sido entregada/cancelada"*).
+  - *Frontend (`FichaTecnicaModal.jsx`, `BancoTrabajoPage.jsx`):* Deshabilitación total de los selectores y botones de cambio de estado cuando la orden se encuentra en un estado terminal inmutable.
+
+---
+
 ## [1.0.0] - 2026-09-27
 
 ### Added

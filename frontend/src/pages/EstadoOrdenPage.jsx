@@ -7,7 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import Badge from '../components/common/Badge';
-import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
+import Skeleton from '../components/common/Skeleton';
 import TurnstileWidget from '../components/common/TurnstileWidget';
 import logoFmcBlack from '../assets/logo-FMC Black.png';
 import logoFmcWhite from '../assets/logo-FMC White.png';
@@ -37,6 +37,7 @@ import { Sun, Moon } from 'lucide';
 
 import DeviceChecklistPicker from '../components/servicios/DeviceChecklistPicker';
 import ServiceTimeline from '../components/servicios/ServiceTimeline';
+import { sileo } from 'sileo';
 
 // Progresión cromática cálida institucional (Mamey / Naranja -> Rojo Corporativo)
 const WARM_CHROMATIC_PALETTE = {
@@ -213,21 +214,42 @@ export const EstadoOrdenPage = () => {
   };
 
   const handleInputPaste = (e) => {
-    e.preventDefault();
-    const text = e.clipboardData?.getData('text') || '';
-    const clean = text.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-    setInputCode(clean);
+    const clipboardData = e.clipboardData || window.clipboardData;
+    const text = clipboardData?.getData('text/plain') || clipboardData?.getData('text') || '';
+    if (text) {
+      e.preventDefault();
+      const clean = text.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      setInputCode(clean);
+    }
   };
 
   const handlePasteFromClipboard = async () => {
     try {
-      const text = await navigator.clipboard?.readText();
-      if (text) {
-        const clean = text.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') {
+        throw new Error('Clipboard API no disponible');
+      }
+      const text = await navigator.clipboard.readText();
+      const clean = (text || '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      if (clean) {
         setInputCode(clean);
+        sileo.success({
+          title: 'Código pegado',
+          description: clean
+        });
+      } else {
+        sileo.info({
+          title: 'Portapapeles sin código',
+          description: 'No se detectó un código válido en el portapapeles.'
+        });
       }
     } catch (err) {
-      console.warn('No se pudo acceder al portapapeles:', err);
+      console.warn('No se pudo leer el portapapeles automáticamente:', err);
+      const inputEl = document.getElementById('ticket-search-input');
+      inputEl?.focus();
+      sileo.info({
+        title: 'Presiona Ctrl + V',
+        description: 'El navegador restringió la lectura automática. Pega el código con Ctrl + V directamente en el campo.'
+      });
     }
   };
 
@@ -615,206 +637,194 @@ export const EstadoOrdenPage = () => {
           )}
         </section>
 
-        {/* Estado de Carga con react-loading-skeleton calcando 1:1 el layout real */}
+        {/* Estado de Carga Homologado con Skeleton Común (CLS 0%) */}
         {loading && (
-          <SkeletonTheme
-            baseColor={isDark ? '#262626' : '#e5e7eb'}
-            highlightColor={isDark ? '#404040' : '#f3f4f6'}
-            borderRadius="0.75rem"
+          <div
+            className="space-y-6 pb-12 select-none animate-fade-in"
+            aria-busy="true"
+            aria-label="Cargando estado de la orden"
           >
-            <div className="space-y-6 pb-12 animate-fade-in select-none">
-              {/* Réplica 1:1 del Stepper horizontal */}
-              <div className="w-full my-6 sm:my-8 overflow-x-auto no-scrollbar pb-3 pt-1 px-1 select-none">
-                <div className="min-w-[540px] sm:min-w-0 w-full flex items-start justify-between relative">
-                  {[1, 2, 3, 4, 5].map((stepIdx, idx) => (
-                    <React.Fragment key={stepIdx}>
-                      <div className="flex flex-col items-center text-center relative z-10" style={{ flex: 1 }}>
-                        {/* Círculo del paso: 40px en móvil, 44px en sm */}
-                        <div className="flex items-center justify-center">
-                          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden flex items-center justify-center">
-                            <Skeleton circle width="100%" height="100%" />
-                          </div>
-                        </div>
-                        {/* Título y subtítulo centrado */}
-                        <div className="mt-2.5 px-1 max-w-[110px] sm:max-w-[140px] w-full flex flex-col items-center">
-                          <Skeleton width={idx % 2 === 0 ? 70 : 85} height={14} className="rounded-md" />
-                          <div className="hidden sm:block mt-1">
-                            <Skeleton width={56} height={10} className="rounded-sm" />
-                          </div>
-                        </div>
+            {/* Réplica 1:1 del Stepper horizontal */}
+            <div className="w-full my-6 sm:my-8 overflow-x-auto no-scrollbar pb-3 pt-1 px-1 select-none">
+              <div className="min-w-[540px] sm:min-w-0 w-full flex items-start justify-between relative">
+                {[1, 2, 3, 4, 5].map((stepIdx, idx) => (
+                  <React.Fragment key={stepIdx}>
+                    <div className="flex flex-col items-center text-center relative z-10" style={{ flex: 1 }}>
+                      {/* Círculo del paso: 40px en móvil, 44px en sm */}
+                      <div className="flex items-center justify-center">
+                        <Skeleton className="w-10 h-10 sm:w-11 sm:h-11 rounded-full shrink-0" />
                       </div>
+                      {/* Título y subtítulo centrado */}
+                      <div className="mt-2.5 px-1 max-w-[110px] sm:max-w-[140px] w-full flex flex-col items-center space-y-1">
+                        <Skeleton className={`h-3.5 ${idx % 2 === 0 ? 'w-16' : 'w-20'} rounded-md`} />
+                        <Skeleton className="hidden sm:block h-2.5 w-14 rounded-sm" />
+                      </div>
+                    </div>
 
-                      {/* Línea conectora entre nodos */}
-                      {idx < 4 && (
-                        <div className="flex-1 h-0.5 relative z-0 self-start mt-5 mx-[-12px] sm:mx-[-15px]">
-                          <Skeleton height={2} />
-                        </div>
-                      )}
-                    </React.Fragment>
-                  ))}
+                    {/* Línea conectora entre nodos */}
+                    {idx < 4 && (
+                      <div className="flex-1 h-0.5 relative z-0 self-start mt-5 mx-[-12px] sm:mx-[-15px]">
+                        <Skeleton className="w-full h-0.5 rounded-none" />
+                      </div>
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+
+            {/* Réplica 1:1 del Grid de Tarjetas de Información */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Tarjeta 1: Dispositivo en Servicio */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="w-4.5 h-4.5 rounded-full shrink-0" />
+                    <Skeleton className="w-36 h-4 rounded-md" />
+                  </div>
+                </div>
+
+                <div className="space-y-3.5 font-inter">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                      <Skeleton className="w-20 h-3 rounded-md mb-1.5" />
+                      <Skeleton className="w-32 h-5 rounded-md" />
+                    </div>
+                    <div>
+                      <Skeleton className="w-24 h-3 rounded-md mb-1.5" />
+                      <Skeleton className="w-28 h-5 rounded-md" />
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5">
+                    <Skeleton className="w-36 h-3 rounded-md" />
+                    <Skeleton className="w-11/12 h-4.5 rounded-md" />
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Skeleton className="w-3.5 h-3.5 rounded-full shrink-0" />
+                      <Skeleton className="w-28 h-3 rounded-md" />
+                    </div>
+                    <Skeleton className="w-2/3 h-4.5 rounded-md" />
+                  </div>
                 </div>
               </div>
 
-              {/* Réplica 1:1 del Grid de Tarjetas de Información */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Tarjeta 1: Dispositivo en Servicio */}
-                <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
-                    <div className="flex items-center gap-2">
-                      <Skeleton circle width={18} height={18} />
-                      <Skeleton width={150} height={18} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-3.5 font-inter">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      <div>
-                        <span className="block mb-1">
-                          <Skeleton width={85} height={12} />
-                        </span>
-                        <Skeleton width={140} height={18} />
-                      </div>
-                      <div>
-                        <span className="block mb-1">
-                          <Skeleton width={105} height={12} />
-                        </span>
-                        <Skeleton width={125} height={18} />
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1">
-                      <Skeleton width={160} height={12} />
-                      <Skeleton width="90%" height={18} />
-                    </div>
-
-                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <Skeleton circle width={13} height={13} />
-                        <Skeleton width={130} height={12} />
-                      </div>
-                      <Skeleton width="65%" height={18} />
-                    </div>
-                  </div>
+              {/* Tarjeta 2: Tiempos y Personal */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
+                <div className="flex items-center gap-2 pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                  <Skeleton className="w-4.5 h-4.5 rounded-full shrink-0" />
+                  <Skeleton className="w-36 h-4 rounded-md" />
                 </div>
 
-                {/* Tarjeta 2: Tiempos y Personal */}
-                <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
-                  <div className="flex items-center gap-2 pb-3 border-b border-neutral-100 dark:border-neutral-800">
-                    <Skeleton circle width={18} height={18} />
-                    <Skeleton width={140} height={18} />
+                <div className="space-y-3.5 font-inter">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                      <Skeleton className="w-24 h-3 rounded-md mb-1.5" />
+                      <Skeleton className="w-24 h-5 rounded-md" />
+                    </div>
+                    <div>
+                      <Skeleton className="w-28 h-3 rounded-md mb-1.5" />
+                      <Skeleton className="w-32 h-5 rounded-md" />
+                    </div>
                   </div>
 
-                  <div className="space-y-3.5 font-inter">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      <div>
-                        <span className="block mb-1">
-                          <Skeleton width={90} height={12} />
-                        </span>
-                        <Skeleton width={100} height={18} />
-                      </div>
-                      <div>
-                        <span className="block mb-1">
-                          <Skeleton width={110} height={12} />
-                        </span>
-                        <Skeleton width={125} height={18} />
-                      </div>
+                  <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Skeleton className="w-3.5 h-3.5 rounded-full shrink-0" />
+                      <Skeleton className="w-28 h-3 rounded-md" />
                     </div>
-
-                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-0.5">
                       <div className="flex items-center gap-1.5">
-                        <Skeleton circle width={13} height={13} />
-                        <Skeleton width={110} height={12} />
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 pt-0.5">
-                        <Skeleton width={140} height={26} borderRadius="0.5rem" />
+                        <Skeleton className="w-1.5 h-1.5 rounded-full shrink-0" />
+                        <Skeleton className="w-32 h-3.5 rounded-md" />
                       </div>
                     </div>
+                  </div>
 
-                    <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <Skeleton circle width={13} height={13} />
-                        <Skeleton width={120} height={12} />
-                      </div>
-                      <Skeleton width={160} height={18} />
+                  <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Skeleton className="w-3.5 h-3.5 rounded-full shrink-0" />
+                      <Skeleton className="w-32 h-3 rounded-md" />
                     </div>
+                    <Skeleton className="w-40 h-5 rounded-md" />
                   </div>
                 </div>
+              </div>
 
-                {/* Tarjeta 3: Checklist de Recepción (Full Width) */}
-                <div className="md:col-span-2 p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-3 border-b border-neutral-100 dark:border-neutral-800">
-                    <div className="flex items-center gap-2">
-                      <Skeleton circle width={18} height={18} />
-                      <Skeleton width={160} height={18} />
-                    </div>
-                    <Skeleton width={170} height={14} />
+              {/* Tarjeta 3: Checklist de Recepción (Full Width) */}
+              <div className="md:col-span-2 p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#18181b] border border-neutral-200/80 dark:border-neutral-800 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="w-4.5 h-4.5 rounded-full shrink-0" />
+                    <Skeleton className="w-40 h-4 rounded-md" />
                   </div>
-
-                  <div className="space-y-4">
-                    {/* Flex wrap con badges que calca exactamente los 11 items del checklist */}
-                    <div className="flex flex-wrap gap-2 justify-center py-1">
-                      {[100, 140, 85, 125, 135, 130, 145, 95, 120, 140, 150].map((badgeWidth, bIdx) => (
-                        <Skeleton
-                          key={bIdx}
-                          width={badgeWidth}
-                          height={28}
-                          borderRadius="0.5rem"
-                        />
-                      ))}
-                    </div>
-
-                    {/* Resumen inferior de contadores */}
-                    <div className="flex flex-wrap items-center justify-center gap-4 mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800">
-                      <Skeleton width={110} height={14} />
-                      <Skeleton width={70} height={14} />
-                      <Skeleton width={90} height={14} />
-                    </div>
-                  </div>
+                  <Skeleton className="w-36 h-3 rounded-md" />
                 </div>
 
-                {/* Tarjeta 4: Historial de Avance en Taller (Línea de Tiempo Pública) */}
-                <div className="md:col-span-2">
-                  <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-800 p-5 bg-white dark:bg-[#18181b] shadow-xs space-y-4">
-                    <div className="flex items-center justify-between pb-1 border-b border-neutral-100 dark:border-neutral-800/80">
-                      <div className="flex items-center gap-1.5">
-                        <Skeleton circle width={14} height={14} />
-                        <Skeleton width={140} height={14} />
-                      </div>
-                      <Skeleton width={24} height={14} borderRadius="0.375rem" />
+                <div className="space-y-4">
+                  {/* Flex wrap con badges que calca exactamente los 11 items del checklist */}
+                  <div className="flex flex-wrap gap-2 justify-center py-1">
+                    {[100, 140, 85, 125, 135, 130, 145, 95, 120, 140, 150].map((badgeWidth, bIdx) => (
+                      <Skeleton
+                        key={bIdx}
+                        className="h-7 rounded-lg"
+                        style={{ width: `${badgeWidth}px` }}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Resumen inferior de contadores */}
+                  <div className="flex flex-wrap items-center justify-center gap-4 mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800">
+                    <Skeleton className="w-24 h-3.5 rounded-md" />
+                    <Skeleton className="w-16 h-3.5 rounded-md" />
+                    <Skeleton className="w-20 h-3.5 rounded-md" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Tarjeta 4: Historial de Avance en Taller (Línea de Tiempo Pública) */}
+              <div className="md:col-span-2">
+                <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-800 p-5 bg-white dark:bg-[#18181b] shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-1 border-b border-neutral-100 dark:border-neutral-800/80">
+                    <div className="flex items-center gap-1.5">
+                      <Skeleton className="w-3.5 h-3.5 rounded-full shrink-0" />
+                      <Skeleton className="w-36 h-3.5 rounded-md" />
                     </div>
+                    <Skeleton className="w-6 h-3.5 rounded-md" />
+                  </div>
 
-                    <div className="pt-2 pl-6 relative space-y-6">
-                      {[1, 2, 3].map((entryIdx, idx) => (
-                        <div key={entryIdx} className="relative space-y-1.5">
-                          {/* Línea vertical discontinua */}
-                          {idx < 2 && (
-                            <div className="absolute -left-[19px] top-3 -bottom-6 w-0 border-l-2 border-dashed border-neutral-200 dark:border-neutral-800" />
-                          )}
+                  <div className="pt-2 pl-6 relative space-y-6">
+                    {[1, 2, 3].map((entryIdx, idx) => (
+                      <div key={entryIdx} className="relative space-y-2">
+                        {/* Línea vertical discontinua */}
+                        {idx < 2 && (
+                          <div className="absolute -left-[19px] top-3 -bottom-6 w-0 border-l-2 border-dashed border-neutral-200 dark:border-neutral-800" />
+                        )}
 
-                          {/* Nodo circular hueco */}
-                          <div className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full border-2 border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#18181b]" />
+                        {/* Nodo circular hueco */}
+                        <div className="absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full border-2 border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#18181b]" />
 
-                          {/* Fila de título y fecha */}
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
-                              <Skeleton circle width={14} height={14} />
-                              <Skeleton width={130} height={16} />
-                            </div>
-                            <Skeleton width={120} height={12} />
+                        {/* Fila de título y fecha */}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <Skeleton className="w-3.5 h-3.5 rounded-full shrink-0" />
+                            <Skeleton className="w-32 h-4 rounded-md" />
                           </div>
-
-                          {/* Mensaje descriptivo o nota */}
-                          <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200/50 dark:border-neutral-800/60">
-                            <Skeleton width={idx === 0 ? '85%' : '60%'} height={14} />
-                          </div>
+                          <Skeleton className="w-28 h-3 rounded-md" />
                         </div>
-                      ))}
-                    </div>
+
+                        {/* Mensaje descriptivo o nota */}
+                        <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200/50 dark:border-neutral-800/60">
+                          <Skeleton className={`h-3.5 rounded-md ${idx === 0 ? 'w-4/5' : 'w-3/5'}`} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             </div>
-          </SkeletonTheme>
+          </div>
         )}
 
         {/* ─────────────────────────────────────────────────────────────
@@ -1071,11 +1081,11 @@ export const EstadoOrdenPage = () => {
                     </div>
 
                     {tecnicosList.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-0.5">
                         {tecnicosList.map((tec, idx) => (
                           <span
                             key={tec.id || idx}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-neutral-100 dark:bg-neutral-800/90 text-neutral-800 dark:text-neutral-200 border border-neutral-200/80 dark:border-neutral-700/80 shadow-2xs max-w-full truncate"
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-neutral-800 dark:text-neutral-200 max-w-full truncate"
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
                             <span className="truncate">{tec.nombre_completo || `${tec.nombre} ${tec.apellido}`}</span>

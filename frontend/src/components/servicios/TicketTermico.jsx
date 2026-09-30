@@ -129,8 +129,13 @@ export const TicketTermico = ({
   const clienteTel = data.telefono_cliente || data.telefono_cliente_libre || data.cliente?.telefono || '';
   const clienteCedula = data.cedula_cliente || data.cedula_cliente_libre || data.cliente?.cedula_rnc || '';
 
-  // URL real de seguimiento para código QR
-  const cleanDomain = (companyData?.dominio_sistema || servicio?.dominio_sistema || 'https://franyermobilecenter.com').replace(/\/$/, '');
+  // URL real de seguimiento para código QR y consulta web
+  const cleanDomain = (
+    companyData?.dominio_sistema ||
+    servicio?.dominio_sistema ||
+    (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '') ||
+    'https://franyermobilecenter.com'
+  ).replace(/\/$/, '');
   const trackingUrl = `${cleanDomain}/estado/${encodeURIComponent(data.codigo_ticket || '')}`;
 
   // Checklist normalizado (soporta JSON string, array u objeto de claves booleanas)
@@ -386,6 +391,9 @@ export const TicketTermico = ({
               </span>
               <div className="font-mono font-bold text-[10px] text-neutral-900 tracking-wider">
                 #{data.codigo_ticket || 'FMC-TICKET'}
+              </div>
+              <div className="text-[8.5px] sm:text-[9px] font-mono text-neutral-700 text-center tracking-tight break-all max-w-[210px] sm:max-w-[250px] mx-auto pt-0.5">
+                {`${cleanDomain.replace(/^https?:\/\//, '')}/estado`}
               </div>
             </div>
           </div>

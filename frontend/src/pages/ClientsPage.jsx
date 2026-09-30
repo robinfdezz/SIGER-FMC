@@ -12,7 +12,9 @@ import AnimatedIconButton from '../components/common/AnimatedIconButton';
 import { useAuth } from '../context/AuthContext';
 import { getClients, getClientById, toggleClientStatus } from '../services/clients.service';
 import { sileo } from 'sileo';
-import { RotateCcw } from 'lucide';
+import Skeleton from '../components/common/Skeleton';
+import TableSkeleton from '../components/common/TableSkeleton';
+import { RotateCw } from 'lucide';
 import {
   UserPlus,
   Search,
@@ -22,7 +24,6 @@ import {
   Phone,
   Mail,
   MapPin,
-  RefreshCw,
   Users,
   CreditCard,
   Calendar,
@@ -31,6 +32,56 @@ import {
   ChevronUp,
   ChevronDown
 } from 'lucide-react';
+
+const ClientsHeaderFiltersSkeleton = ({ canCreateEdit }) => {
+  return (
+    <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-5">
+      {/* Fila Superior: Título, subtítulo y botones de acción */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
+        <div className="space-y-2">
+          <Skeleton className="h-6 sm:h-7 w-48 sm:w-56 rounded-lg" />
+          <Skeleton className="h-3.5 sm:h-4 w-64 sm:w-80" />
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <Skeleton className="w-9 h-9 rounded-xl" />
+          {canCreateEdit && (
+            <Skeleton className="h-10 w-32 rounded-xl" />
+          )}
+        </div>
+      </div>
+
+      {/* Fila Inferior: Buscador y Filtros */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3 w-full">
+          {/* Buscador Prominente Dinámico */}
+          <Skeleton className="h-10 flex-1 min-w-[240px] sm:min-w-[280px] rounded-xl" />
+
+          {/* Selectores Dinámicos y Botón Limpiar */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto flex-1 lg:flex-initial">
+            <Skeleton className="h-10 w-full sm:w-44 rounded-xl" />
+            <Skeleton className="h-10 w-10 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ClientsPaginationSkeleton = () => (
+  <div className="p-4 border-t border-neutral-100 dark:border-neutral-800/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div className="flex items-center gap-2">
+      <Skeleton className="h-8 w-24 rounded-lg" />
+      <Skeleton className="h-4 w-36" />
+    </div>
+    <div className="flex items-center gap-1.5">
+      <Skeleton className="h-8 w-8 rounded-lg" />
+      <Skeleton className="h-8 w-8 rounded-lg" />
+      <Skeleton className="h-8 w-8 rounded-lg" />
+      <Skeleton className="h-8 w-8 rounded-lg" />
+    </div>
+  </div>
+);
 
 export const ClientsPage = () => {
   const { user: currentUser } = useAuth();
@@ -43,6 +94,7 @@ export const ClientsPage = () => {
   const isReadOnlyRole = userRole === 'Tecnico';
 
   const [clients, setClients] = useState([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshSuccess, setRefreshSuccess] = useState(false);
@@ -144,6 +196,7 @@ export const ClientsPage = () => {
       return false;
     } finally {
       setIsLoading(false);
+      setInitialLoading(false);
     }
   }, [debouncedSearch, selectedStatus, page, limit]);
 
@@ -320,8 +373,9 @@ export const ClientsPage = () => {
       }
     } catch (error) {
       console.error('Error al cambiar estado del cliente:', error);
+      const isConflict = error.response?.status === 409 || error.response?.status === 400;
       sileo.error({
-        title: 'Error al cambiar estado',
+        title: isConflict ? 'No se puede desactivar' : 'Error al cambiar estado',
         description: error.response?.data?.message || 'No se pudo actualizar el estado del cliente.'
       });
     } finally {
@@ -343,78 +397,82 @@ export const ClientsPage = () => {
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
         {/* Contenedor Superior Integrado (Encabezado + Filtros) */}
-        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-5">
-          {/* Fila Superior: Título, subtítulo y botones de acción */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 font-outfit">
-                Gestión de Clientes
-              </h1>
-              <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 font-inter">
-                Directorio y cartera de clientes para órdenes de servicio técnico y reparaciones.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2.5 shrink-0">
-              <AnimatedIconButton
-                icon={RotateCcw}
-                loading={isRefreshing}
-                success={refreshSuccess}
-                onSuccessEnd={() => setRefreshSuccess(false)}
-                onClick={handleRefresh}
-                title="Refrescar lista"
-                ariaLabel="Refrescar lista de clientes"
-              />
-              {canCreateEdit && (
-                <button
-                  onClick={handleOpenCreateModal}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl shadow-xs hover:shadow-md transition-all font-inter cursor-pointer"
-                >
-                  <UserPlus size={17} />
-                  <span>Nuevo Cliente</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Fila Inferior: Buscador y Filtros */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3 w-full">
-              {/* Buscador Prominente Dinámico */}
-              <div className="relative flex-1 min-w-[240px] sm:min-w-[280px] w-full">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
-                  <Search size={16} />
-                </span>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar por nombre, cédula/RNC, teléfono, correo..."
-                  className="w-full pl-9 pr-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors"
-                />
+        {initialLoading ? (
+          <ClientsHeaderFiltersSkeleton canCreateEdit={canCreateEdit} />
+        ) : (
+          <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-5">
+            {/* Fila Superior: Título, subtítulo y botones de acción */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 font-outfit">
+                  Gestión de Clientes
+                </h1>
+                <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 font-inter">
+                  Directorio y cartera de clientes para órdenes de servicio técnico y reparaciones.
+                </p>
               </div>
 
-              {/* Selectores Dinámicos y Botón Limpiar */}
-              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto flex-1 lg:flex-initial">
-                {/* Selector Estado */}
-                <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[160px]">
-                  <Select
-                    value={selectedStatus}
-                    onChange={(val) => setSelectedStatus(val)}
-                    items={statusOptions}
-                    placeholder="Todos los Estados"
+              <div className="flex items-center gap-2.5 shrink-0">
+                <AnimatedIconButton
+                  icon={RotateCw}
+                  loading={isRefreshing}
+                  success={refreshSuccess}
+                  onSuccessEnd={() => setRefreshSuccess(false)}
+                  onClick={handleRefresh}
+                  title="Refrescar lista"
+                  ariaLabel="Refrescar lista de clientes"
+                />
+                {canCreateEdit && (
+                  <button
+                    onClick={handleOpenCreateModal}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl shadow-xs hover:shadow-md transition-all font-inter cursor-pointer"
+                  >
+                    <UserPlus size={17} />
+                    <span>Nuevo Cliente</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Fila Inferior: Buscador y Filtros */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3 w-full">
+                {/* Buscador Prominente Dinámico */}
+                <div className="relative flex-1 min-w-[240px] sm:min-w-[280px] w-full">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
+                    <Search size={16} />
+                  </span>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Buscar por nombre, cédula/RNC, teléfono, correo..."
+                    className="w-full pl-9 pr-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors"
                   />
                 </div>
 
-                {/* Botón Acción Limpiar Filtros con MorphIcon */}
-                <ResetFiltersButton
-                  onClick={handleClearFilters}
-                  hasActiveFilters={hasActiveFilters}
-                />
+                {/* Selectores Dinámicos y Botón Limpiar */}
+                <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto flex-1 lg:flex-initial">
+                  {/* Selector Estado */}
+                  <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[160px]">
+                    <Select
+                      value={selectedStatus}
+                      onChange={(val) => setSelectedStatus(val)}
+                      items={statusOptions}
+                      placeholder="Todos los Estados"
+                    />
+                  </div>
+
+                  {/* Botón Acción Limpiar Filtros con MorphIcon */}
+                  <ResetFiltersButton
+                    onClick={handleClearFilters}
+                    hasActiveFilters={hasActiveFilters}
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Tabla de Clientes */}
         <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden flex flex-col">
@@ -474,14 +532,7 @@ export const ClientsPage = () => {
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
                 {isLoading ? (
-                  <tr>
-                    <td colSpan={6} className="py-12 text-center text-neutral-400">
-                      <div className="flex flex-col items-center justify-center gap-3">
-                        <RefreshCw className="animate-spin text-red-500" size={28} />
-                        <span className="text-sm">Cargando cartera de clientes...</span>
-                      </div>
-                    </td>
-                  </tr>
+                  <TableSkeleton rows={7} cols={6} />
                 ) : sortedClients.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-neutral-400">
@@ -645,16 +696,20 @@ export const ClientsPage = () => {
           </div>
 
           {/* Paginación Reutilizable */}
-          <Pagination
-            currentPage={Number(pagination?.page) || Number(page) || 1}
-            totalPages={Number(pagination?.totalPages) || 1}
-            totalItems={Number(pagination?.total) >= 0 ? Number(pagination.total) : 0}
-            itemsPerPage={Number(pagination?.limit) || Number(limit) || 20}
-            onPageChange={handlePageChange}
-            onItemsPerPageChange={handleItemsPerPageChange}
-            pageSizeOptions={[10, 20, 50, 100]}
-            isLoading={isLoading || isRefreshing}
-          />
+          {initialLoading ? (
+            <ClientsPaginationSkeleton />
+          ) : (
+            <Pagination
+              currentPage={Number(pagination?.page) || Number(page) || 1}
+              totalPages={Number(pagination?.totalPages) || 1}
+              totalItems={Number(pagination?.total) >= 0 ? Number(pagination.total) : 0}
+              itemsPerPage={Number(pagination?.limit) || Number(limit) || 20}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={handleItemsPerPageChange}
+              pageSizeOptions={[10, 20, 50, 100]}
+              isLoading={isLoading || isRefreshing}
+            />
+          )}
         </div>
       </div>
 

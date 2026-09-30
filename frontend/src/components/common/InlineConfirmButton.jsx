@@ -30,6 +30,7 @@ export const InlineConfirmButton = ({
   const containerRef = useRef(null);
   const timerRef = useRef(null);
   const exitTimerRef = useRef(null);
+  const hasInteractedRef = useRef(false);
 
   const loading = isLoading || internalLoading;
 
@@ -50,6 +51,7 @@ export const InlineConfirmButton = ({
     if (stopPropagation) e.stopPropagation();
     if (disabled || loading) return;
     if (onBeforeConfirm && onBeforeConfirm(e) === false) return;
+    hasInteractedRef.current = true;
     setIsExiting(false);
     setIsConfirming(true);
   };
@@ -165,7 +167,11 @@ export const InlineConfirmButton = ({
         onClick={handleStartConfirm}
         className={`${baseClasses} ${hoverClasses} flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
       >
-        <div className="flex items-center justify-center gap-1.5 transition-all duration-200 ease-out opacity-100 scale-100">
+        <div
+          className={`flex items-center justify-center gap-1.5 ${
+            hasInteractedRef.current ? 'animate-confirm-in-center' : ''
+          }`}
+        >
           {renderIcon(iconSize)}
           <span>{text}</span>
         </div>
@@ -181,10 +187,10 @@ export const InlineConfirmButton = ({
       onClick={(e) => stopPropagation && e.stopPropagation()}
       className={`${baseClasses} flex items-center justify-between gap-2.5 ${confirmClassName || className}`}
     >
-      {/* Icono original y Texto con animación suave de entrada y salida */}
+      {/* Icono original y Texto con animación sutil homologada de entrada y salida */}
       <div
-        className={`flex items-center gap-1.5 min-w-0 transition-all duration-200 ease-out ${
-          isExiting ? 'opacity-0 -translate-x-1.5 scale-95' : 'opacity-100 translate-x-0 scale-100'
+        className={`flex items-center gap-1.5 min-w-0 ${
+          isExiting ? 'animate-confirm-out-left' : 'animate-confirm-in-left'
         }`}
       >
         {renderIcon(iconSize)}
@@ -205,10 +211,10 @@ export const InlineConfirmButton = ({
         </span>
       </div>
 
-      {/* Micro-acciones: Check (✓) y Cancelar (✕) más sutiles, un poco más grandes y con animación */}
+      {/* Micro-acciones: Check (✓) y Cancelar (✕) con animación sutil homologada de entrada y salida */}
       <div
-        className={`flex items-center gap-1 shrink-0 transition-all duration-200 ease-out ${
-          isExiting ? 'opacity-0 translate-x-1.5 scale-95' : 'opacity-100 translate-x-0 scale-100'
+        className={`flex items-center gap-1 shrink-0 ${
+          isExiting ? 'animate-confirm-out-right' : 'animate-confirm-in-right'
         }`}
       >
         {/* Botón Check (Confirmar) */}

@@ -83,6 +83,8 @@ frontend/
 │   │   │   ├── ConfirmModal.jsx # Modal de confirmación de acciones críticas
 │   │   │   ├── InlineConfirmButton.jsx # Microcomponente inline de confirmación (sm/md, onBeforeConfirm)
 │   │   │   ├── Pagination.jsx   # Paginador universal homologado (selector por página, botones < >)
+│   │   │   ├── Skeleton.jsx     # Primitiva atómica de carga con pulso y gradiente HSL adaptativo
+│   │   │   ├── TableSkeleton.jsx# Estructura configurable para tablas de gestión con 0% CLS
 │   │   │   ├── TurnstileWidget.jsx # Widget anti-bot Cloudflare con soporte dark mode
 │   │   │   ├── SingleImageDropzone.jsx # Subida y recorte de logotipo / avatares
 │   │   │   ├── HelpDocsModal.jsx # Modal de documentación interactiva y atajos de teclado
@@ -104,7 +106,7 @@ frontend/
 │   │   │   ├── DevicePhotoUploader.jsx  # Subida de evidencias a Cloudinary
 │   │   │   ├── DeviceSecurityPicker.jsx # Diseñador de patrones gráficos y contraseñas
 │   │   │   ├── EntregaServicioModal.jsx # Modal de liquidación y cobro con InlineConfirmButton
-│   │   │   ├── OrdenDetalleModal.jsx    # Visor 360° de orden con deep linking a taller y bitácora
+│   │   │   ├── OrdenDetalleModal.jsx    # Visor 360° de orden con deep linking a taller, skeleton y copia de ticket
 │   │   │   ├── PostCreacionModal.jsx    # Diálogo post-creación y selector de reimpresión
 │   │   │   ├── PostEntregaModal.jsx     # Diálogo post-despacho y disparador de recibo
 │   │   │   ├── QrUploadModal.jsx        # Modal de sincronización QR para fotos móviles
@@ -114,13 +116,13 @@ frontend/
 │   │   │   ├── StickerTermico.jsx       # Etiqueta adhesiva térmica con QR
 │   │   │   └── TicketTermico.jsx        # Ticket térmico original de recepción
 │   │   ├── taller/          # Componentes de mesa de trabajo técnica
-│   │   │   ├── FichaTecnicaModal.jsx    # Ficha técnica, incidencias y timeline unificado
+│   │   │   ├── FichaTecnicaModal.jsx    # Ficha técnica, incidencias, timeline y copia tolerante de ticket
 │   │   │   ├── TallerCard.jsx           # Tarjeta de orden en banco de trabajo
 │   │   │   └── AnimatedTabs.jsx         # Selector animado de fases operativas
 │   │   ├── DashboardLayout.jsx  # Shell principal (Header + Sidebar + Menú móvil)
 │   │   ├── Navbar.jsx           # Header superior: búsqueda global + campanita + perfil
-│   │   ├── GlobalSearch.jsx     # Autocompletado predictivo (órdenes / clientes / equipos)
-│   │   ├── NotificationBell.jsx # Campanita in-app (badge, panel, marcar leídas)
+│   │   ├── GlobalSearch.jsx     # Autocompletado predictivo (órdenes / clientes / equipos) con skeleton anatómico
+│   │   ├── NotificationBell.jsx # Campanita in-app (badge, panel, marcar leídas) con skeleton inline
 │   │   ├── Sidebar.jsx          # Barra lateral con 3 modos (expanded, hover, collapsed)
 │   │   ├── ProtectedRoute.jsx   # Guarda de rutas privadas
 │   │   └── ThemeToggle.jsx      # Alternancia animada de tema claro/oscuro
@@ -129,23 +131,23 @@ frontend/
 │   │   └── ThemeContext.jsx     # Manejo del tema (Light por defecto / Dark)
 │   ├── pages/               # Vistas principales del sistema
 │   │   ├── Login/               # LoginPage.jsx (Formulario institucional con Turnstile)
-│   │   ├── Dashboard/           # DashboardPage.jsx (Layout 2 columnas, IncomeAreaChart, métricas en tiempo real)
-│   │   ├── Reportes/            # ReportesPage.jsx y ReporteEjecutivoImprimible.jsx (Auditoría contable y reportes ejecutivos)
-│   │   ├── ServiciosPage.jsx    # Listado general de órdenes con filtros y paginación
-│   │   ├── NuevaOrdenPage.jsx   # Flujo por etapas (Stepper) de recepción
-│   │   ├── BancoTrabajoPage.jsx # Tablero operativo Kanban y modo tabla
-│   │   ├── ClientsPage.jsx      # Directorio de clientes con paginación y búsqueda
-│   │   ├── WorkersPage.jsx      # Gestión de personal/usuarios con paginación
-│   │   ├── ConfigurationPage.jsx# Panel de configuración matriz, sedes y formatos
-│   │   ├── EstadoOrdenPage.jsx  # Seguimiento público de orden con react-loading-skeleton
+│   │   ├── Dashboard/           # DashboardPage.jsx y DashboardSkeleton.jsx (Layout 2 columnas, métricas y 0% CLS)
+│   │   ├── Reportes/            # ReportesPage.jsx, ReportesSkeleton.jsx y ReporteEjecutivoImprimible.jsx
+│   │   ├── ServiciosPage.jsx    # Listado general de órdenes con TableSkeleton y filtros
+│   │   ├── NuevaOrdenPage.jsx   # Flujo por etapas (Stepper) de recepción con ClientQuickSelect activo
+│   │   ├── BancoTrabajoPage.jsx # Tablero operativo Kanban y modo tabla con estados terminales protegidos
+│   │   ├── ClientsPage.jsx      # Directorio de clientes con TableSkeleton y bloqueo 409
+│   │   ├── WorkersPage.jsx      # Gestión de personal con TableSkeleton y bloqueo 409
+│   │   ├── ConfigurationPage.jsx# Panel de configuración matriz, sedes y formatos con skeleton inline
+│   │   ├── EstadoOrdenPage.jsx  # Seguimiento público de orden con skeleton anatómico nativo y pegado tolerante
 │   │   └── UploadMobilePage.jsx # Captura fotográfica móvil vía QR
 │   ├── services/            # Clientes HTTP (api.js, servicios, reportes, search, notifications, etc.)
 │   ├── hooks/               # Custom hooks reutilizables (useGlobalShortcuts.js)
-│   ├── utils/               # Utilidades de impresión, formato y printStyles
+│   ├── utils/               # clipboard.js (copia tolerante a fallos), printStyles y formato
 │   ├── App.jsx              # Configuración de React Router y providers globales
-│   ├── main.jsx             # Montaje con react-loading-skeleton/dist/skeleton.css
-│   └── index.css            # Directivas Tailwind y tokens del sistema de diseño
-├── package.json             # Dependencias (react, vite, tailwindcss, morphicons, react-loading-skeleton)
+│   ├── main.jsx             # Punto de montaje de la aplicación React
+│   └── index.css            # Directivas Tailwind, animaciones y tokens del sistema de diseño
+├── package.json             # Dependencias (react, vite, tailwindcss, morphicons, lucide-react, sileo)
 ├── tailwind.config.js       # Paleta de colores, breakpoints y temas
 ├── vite.config.js           # Configuración del bundler y proxy de desarrollo
 └── index.html               # Plantilla HTML base con favicon institucional y fuentes
@@ -363,48 +365,71 @@ Arquitectura desacoplada en tres componentes especializados para la culminación
    - Detección normalizada y tolerante a mayúsculas/minúsculas de órdenes despachadas (`estadoNormalizado.includes('ENTREG') || orden_flujo === 7 || estado_id === 7 || fecha_entrega_real`).
    - Al abrir el diálogo de impresión de una orden entregada, destaca prioritariamente el botón rojo **"Recibo de Entrega y Liquidación"** (renderizando `ReciboEntregaTermico`), manteniendo accesibles de forma secundaria el ticket de recepción original y los stickers.
 
-### 4.7 Arquitectura de Cancelación de Órdenes y Salvaguardas Defensivas de Taller
+### 4.7 Inmutabilidad de Estados Terminales y Reglas de Integridad de Negocio
 
-Para garantizar la integridad operativa y contable del taller frente a equipos dados de baja o presupuestos rechazados por clientes:
+Para blindar la integridad operativa, contable y contractual de la empresa, el sistema impone reglas estrictas de inmutabilidad sobre los estados terminales y validaciones de integridad referencial entre clientes, técnicos y órdenes de servicio:
 
 ```
-                              [Orden Activa (Recibido..Listo)]
-                                             │
-                                             │ POST /api/servicios/:id/cancelar
-                                             ▼
-                               [CANCELADO_DEVUELTO (ID 8)]
-                                ├── motivo_cancelacion
-                                ├── fecha_cancelacion
-                                └── usuario_cancela_id
-                                             │
-             ┌───────────────────────────────┴───────────────────────────────┐
-             ▼                                                               ▼
-  [Consulta Pública /estado]                                   [Operaciones de Taller y Mutaciones]
-  - Visualización transparente                                 - updateServicioEstado ────► [400 Bloqueado]
-  - Stepper con nodo terminal (X roja)                         - assignTecnicoServicio ───► [400 Bloqueado]
-  - Motivo visible en Tiempos y Personal                       - createIncidencia ────────► [400 Bloqueado]
-  - Sin banners invasivos de alerta                            - liquidarYEntregar ───────► [400 Bloqueado]
-                                                               - ticket-impresion ────────► [400 Bloqueado]
+                               ┌─────────────────────────────────────────┐
+                               │     Órdenes Activas de Servicio         │
+                               │  (Recibido ──► Diagnóstico ──► Listo)   │
+                               └────────────────────┬────────────────────┘
+                                                    │
+                                ┌───────────────────┴───────────────────┐
+                                ▼                                       ▼
+                   [7. ENTREGADO] (Orden 7)            [8. CANCELADO_DEVUELTO] (Orden 8)
+                   - Ciclo operativo completado        - Dispositivo devuelto / rechazado
+                   - Saldo liquidado en caja           - Motivo de cancelación obligatorio
+                   - Garantía formal activa            - Reintegro de anticipos registrado
+                                │                                       │
+                                └───────────────────┬───────────────────┘
+                                                    │
+                                                    ▼
+                                 ╔═════════════════════════════════════╗
+                                 ║    ESTADOS TERMINALES INMUTABLES    ║
+                                 ║  - Transición de estado: [400 Block]║
+                                 ║  - Asignación técnica:   [400 Block]║
+                                 ║  - Incidencias / Costos: [400 Block]║
+                                 ║  - Edición técnica:      [400 Block]║
+                                 ╚═════════════════════════════════════╝
 ```
 
-1. **Flujo Transaccional de Cancelación (`POST /api/servicios/:id/cancelar`):**
+1. **Inmutabilidad Absoluta de Estados Terminales (`ENTREGADO` y `CANCELADO_DEVUELTO`):**
+   - **Premisa de Negocio:** Tanto una orden entregada y cobrada (`ENTREGADO`, orden de flujo 7) como una orden cancelada y devuelta (`CANCELADO_DEVUELTO`, orden de flujo 8) representan el cierre definitivo e irreversible del ciclo del servicio. Permitir reabrir o mutar estas órdenes generaría fraudes de caja, descuadres en garantías e inconsistencias en la auditoría contable.
+   - **Protección Backend (`servicios.controller.js`):**
+     * En `actualizarEstadoServicio`, se evalúa el estado actual en base de datos previo a cualquier mutación. Si la orden ya está en `ENTREGADO` o `CANCELADO_DEVUELTO`, la petición es rechazada taxativamente con código `400 Bad Request` (*"No se puede modificar el estado de una orden que ya ha sido entregada / cancelada"*).
+     * Se bloquean de igual modo asignaciones técnicas (`assignTecnicoServicio`), desasignaciones (`removeTecnicoServicio`), generación de incidencias (`createIncidenciaServicio`), liquidaciones secundarias e impresiones de comprobantes para órdenes canceladas.
+   - **Protección Frontend y Banner Sobrio:**
+     * En `FichaTecnicaModal.jsx` y `BancoTrabajoPage.jsx`, los selectores y botones de transición quedan completamente inhabilitados.
+     * Se despliega un banner informativo limpio y centrado, sin cajas estridentes ni fondos pesados: icono superior de 32px (`CheckCircle2` verde para entregado, `XCircle` rojo para cancelado), título formal `"Orden de Servicio: [Badge Estado]"` y descripción clara indicando que el ciclo del equipo concluyó formalmente.
+
+2. **Integridad de Negocio entre Clientes y Órdenes de Servicio:**
+   - **Bloqueo de Clientes Inactivos en Apertura de Órdenes:**
+     * *Frontend (`ClientQuickSelect.jsx`, `NuevaOrdenPage.jsx`):* Exclusión automática de clientes con `activo = false` en listas estáticas y búsquedas predictivas remotas en tiempo real.
+     * *Backend (`servicios.controller.js`):* Al invocar `createServicio`, se consulta la tabla `clientes`. Si `activo = false`, se aborta la transacción con HTTP `400 Bad Request` (*"No se puede aperturar una orden para un cliente inactivo. Por favor active al cliente previamente"*).
+   - **Protección contra Desactivación de Clientes con Órdenes Activas (`clients.controller.js`):**
+     * Al solicitar la desactivación de un cliente (`activo = false`), el backend realiza una subconsulta en `servicios_recepcion` verificando si posee órdenes en estados no terminales (`codigo_estado NOT IN ('ENTREGADO', 'CANCELADO_DEVUELTO')`).
+     * Si existen órdenes activas en curso, se rechaza la desactivación con código `409 Conflict`, devolviendo la lista de tickets involucrados.
+     * La interfaz (`ClientsPage.jsx`) captura el código 409 y presenta un aviso de alerta (`sileo.warning`) detallando los tickets pendientes de resolución.
+
+3. **Integridad de Negocio en Personal y Asignación Técnica:**
+   - **Filtro de Técnicos Activos:** Solo los trabajadores con `activo = true` y rol `Tecnico` son proyectados en selectores y elegibles para asignación.
+   - **Protección contra Desactivación de Personal con Órdenes Asignadas (`workers.controller.js`):**
+     * Al intentar desactivar a un usuario (`activo = false`), se valida si figura asignado en `tecnicos_asignados` para servicios en curso que no hayan alcanzado un estado terminal.
+     * Si posee órdenes operativas pendientes, la API responde con HTTP `409 Conflict` enumerando los tickets asignados, impidiendo dejar servicios huérfanos sin supervisión técnica.
+     * La interfaz (`WorkersPage.jsx`) notifica al administrador mediante toast (`sileo.error`) para que reasigne previamente los tickets pendientes antes de dar de baja al usuario.
+
+4. **Flujo Transaccional de Cancelación (`POST /api/servicios/:id/cancelar`):**
    - **Control de Acceso Estricto (RBAC):** Protegido por `checkRole(['SuperAdmin', 'Admin_Sucursal'])`. Usuarios con rol `Secretaria` o `Tecnico` tienen prohibida la anulación de servicios con HTTP `403 Forbidden`.
    - Requiere obligatoriamente un `motivo_cancelacion` descriptivo (longitud mínima validada en backend y frontend).
    - Registra en `servicios_recepcion`: `estado_id = 8` (`CANCELADO_DEVUELTO`), `motivo_cancelacion`, `fecha_cancelacion = NOW()` y `usuario_cancela_id = req.user.id`.
    - Inserta atómicamente el hito en `historial_estados` con la nota de cambio explicativa para auditoría.
 
-2. **Salvaguardas Defensivas en Backend (HTTP 400):**
-   - Todos los controladores y servicios de mutación operativa de taller validan el estado de la orden antes de procesar cambios:
-     * **`updateServicioEstado`:** Rechaza transiciones con `400 Bad Request` (*"No se puede modificar el estado de una orden cancelada"*).
-     * **`assignTecnicoServicio` / `removeTecnicoServicio`:** Rechaza asignaciones y desasignaciones con `400 Bad Request` (*"No se pueden asignar/desasignar técnicos a una orden cancelada"*).
-     * **`createIncidenciaServicio` / `updateAprobacionIncidencia`:** Impide registrar o alterar incidencias y costos adicionales con `400 Bad Request`.
-     * **`liquidarYEntregarServicio`:** Bloquea liquidaciones y cierres de caja con `400 Bad Request` (*"No se puede liquidar ni entregar una orden cancelada"*).
-
-3. **Separación de Responsabilidades: Consulta Pública vs. Emisión Física:**
+5. **Separación de Responsabilidades: Consulta Pública vs. Emisión Física:**
    - **Consulta Pública (`GET /api/servicios/ticket/:codigo` / `consultarEstadoPublico`):** NUNCA bloquea la consulta de órdenes canceladas. Proyecta de manera transparente el estado de la orden para que el cliente conozca el motivo de detención del trabajo, integrando los datos de cancelación dentro del bloque contextual "Tiempos y Personal" y marcando el stepper con un nodo terminal rojo `<X />`.
    - **Emisión e Impresión Física (`GET /api/servicios/:id/ticket-impresion`):** Endpoint de validación estricta previo a la generación de comprobantes que bloquea la emisión con `400 Bad Request` (*"No se permite emitir comprobantes o etiquetas para órdenes canceladas"*).
 
-4. **Componentes Visuales Homologados:**
+6. **Componentes Visuales Homologados:**
    - **`CancelarOrdenModal.jsx`:** Ventana modal con ancho adaptado (`max-w-xl`), cabecera homologada sin iconos de bloqueo discordantes, metadatos contextuales jerarquizados (código de ticket con badge destacado, cliente con icono `<User />`, equipo con icono `<Smartphone />`), área de texto con validación reactiva y botón de confirmación inline destructivo.
    - **`OrdenDetalleModal.jsx`:** Visor integral 360° de la orden con botón de enlace directo al banco de trabajo (`/taller?buscar=SFM-...`), desglose financiero, checklist con badges minimalistas (`badgeVariant="minimal"`), historial de estados e incidencias unificado, y formateo inteligente de dispositivo (`formatDeviceName`) para prevenir duplicidades de marca/modelo.
 
@@ -723,3 +748,73 @@ Los correos al **cliente** se invocan directamente desde `servicios.controller.j
 - `NotificationBell.jsx`: badge con alertas auditivas sintetizadas (Web Audio API), animación de campana, panel desplegable extendido, persistencia en sessionStorage y marcar leída / todas; polling 15 s + refresh on focus; requests sin caché.
 - `GlobalSearch.jsx`: búsqueda predictiva en la misma cabecera (`Navbar.jsx`).
 - `DashboardPage.jsx`: consume `GET /api/servicios/dashboard` con datos reales de la sede, KPIs segmentados por rol, gráfica de dona de categorías de dispositivos (`DeviceCategoryDonut`) y actividad reciente con avatares de técnicos.
+
+---
+
+## 9. Subsistema de Experiencia de Carga (Skeletons Nativos y Cero CLS)
+
+Para optimizar el rendimiento visual, acelerar el tiempo de renderizado y erradicar por completo el salto acumulativo del diseño (**Cumulative Layout Shift - CLS = 0%**), SIGER-FMC eliminó cualquier dependencia de librerías externas de skeleton (como `react-loading-skeleton`) y estandarizó una arquitectura de esqueletos de carga basada en primitivas atómicas de React y Tailwind CSS nativo:
+
+```
+                                  ┌───────────────────────────┐
+                                  │   Primitiva Skeleton.jsx  │
+                                  │   - animate-pulse         │
+                                  │   - bg-neutral-200/80     │
+                                  │   - dark:bg-neutral-800/80│
+                                  └─────────────┬─────────────┘
+                                                │
+                 ┌──────────────────────────────┼──────────────────────────────┐
+                 ▼                              ▼                              ▼
+      [Componentes Dedicados]        [TableSkeleton.jsx]             [Skeletons Inline]
+      - DashboardSkeleton.jsx        - Filas y columnas              - ClientsPage / WorkersPage
+      - ReportesSkeleton.jsx           homologadas a tablas          - ConfigurationPage (Tabs)
+      - Vistas complejas multi-grid    con 0% de salto de layout     - NotificationBell / GlobalSearch
+                                                                     - OrdenDetalle / FichaTecnica
+```
+
+### 9.1 Criterio de Selección: Componente Dedicado vs. Skeleton Inline
+1. **Componentes Dedicados Separados (`DashboardSkeleton.jsx`, `ReportesSkeleton.jsx`):**
+   - **Criterio:** Reservado exclusivamente para pantallas analíticas, paneles de control o vistas ejecutivas con múltiples cuadrículas (`grid-cols-1 md:grid-cols-3...`), gráficas vectoriales y distribución no lineal de datos.
+   - **Implementación:** Calcan con fidelidad geométrica 1:1 el árbol DOM de la vista final (`Card`, dimensiones fijas `h-*`, `w-*`, gráficos de dona y series temporales), de modo que al completarse la petición asíncrona la transición sea imperceptible y sin saltos visuales.
+2. **`TableSkeleton.jsx` para Vistas Tabulares:**
+   - **Criterio:** Vistas maestras de datos (`ServiciosPage.jsx`, tablas de consulta masiva).
+   - **Implementación:** Provee un contenedor con altura y cabecera estática que renderiza un número configurable de filas (`rows`) y columnas (`columns`), simulando píldoras de badges, textos y avatares con dimensiones realistas.
+3. **Skeletons Inline (Anatómicos):**
+   - **Criterio:** Vistas CRUD (`ClientsPage.jsx`, `WorkersPage.jsx`), modales de configuración (`ConfigurationPage.jsx`), paneles flotantes (`NotificationBell.jsx`, `GlobalSearch.jsx`) y modales de inspección (`OrdenDetalleModal.jsx`, `FichaTecnicaModal.jsx`).
+   - **Implementación:** Se construyen directamente dentro de la vista mediante bloques ternarios `{loading ? (...) : (...)}` utilizando la primitiva `<Skeleton className="..." />`, asegurando que la cabecera, filtros y estructura externa permanezcan intactos durante la recarga de datos.
+
+---
+
+## 10. Subsistema Universal de Portapapeles (`clipboard.js`)
+
+Para asegurar que la copia y el pegado de códigos de ticket y enlaces opere sin fricción en cualquier entorno de red, SIGER-FMC implementa una utilidad transversal tolerante a fallos:
+
+### 10.1 Arquitectura de Copia con Estrategia Dual (`copyToClipboard`)
+```javascript
+// frontend/src/utils/clipboard.js
+export async function copyToClipboard(text) {
+  // 1. Contexto seguro moderno (HTTPS / http://localhost)
+  if (navigator?.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch { /* Fallback */ }
+  }
+  // 2. Fallback síncrono compatible (HTTP IP LAN 192.168.x.x / Navegadores Legacy)
+  try {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.select();
+    const success = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    return !!success;
+  } catch { return false; }
+}
+```
+
+### 10.2 Pautas de Integración en UI
+- **Feedback Inmediato:** Toda acción de copiado debe estar acompañada de una microanimación con el icono `<Check />` y un toast informativo (`sileo.success({ title: 'Código copiado', description: ticket })`).
+- **Respeto a Políticas de Seguridad de Lectura:** El pegado programático (`navigator.clipboard.readText()`) requiere permisos explícitos del usuario que suelen ser bloqueados en contextos HTTP locales. La interfaz nunca debe asumir que la lectura automática es infalible: ante cualquier bloqueo de permisos, enfoca el campo de entrada y guía al usuario con una notificación no intrusiva a usar `Ctrl + V`.
