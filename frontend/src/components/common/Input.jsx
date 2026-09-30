@@ -32,7 +32,7 @@ const Input = forwardRef(({
 
   const handlePaste = (e) => {
     if (!allowEmojis && type !== 'password') {
-      const pasteText = e.clipboardData?.getData('text') || '';
+      const pasteText = e.clipboardData?.getData('text/plain') || e.clipboardData?.getData('text') || '';
       const cleanText = stripEmojis(pasteText, false);
       if (cleanText !== pasteText) {
         e.preventDefault();

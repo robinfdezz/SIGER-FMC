@@ -128,7 +128,7 @@ const LoginPage = () => {
           />
         </div>
 
-        <div className="bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border rounded-2xl shadow-xl p-6 sm:p-8 backdrop-blur-sm transition-all duration-200">
+        <div className="bg-white dark:bg-dark-card border border-zinc-200 dark:border-dark-border rounded-2xl p-6 sm:p-8 backdrop-blur-sm transition-all duration-200">
 
           <div className="mb-6">
             <h2 className="text-xl font-bold text-center text-zinc-900 dark:text-zinc-100">

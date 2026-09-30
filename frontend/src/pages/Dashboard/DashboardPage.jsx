@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Skeleton, { SkeletonTheme } from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+import DashboardSkeleton from './DashboardSkeleton';
 import {
   AlertCircle,
   AlertTriangle,
@@ -26,7 +25,6 @@ import {
   Package,
   PackageCheck,
   Plus,
-  RotateCcw,
   Search,
   Smartphone,
   Sparkles,
@@ -46,6 +44,7 @@ import Badge from '../../components/common/Badge';
 import Select from '../../components/common/Select';
 import SimpleButton from '../../components/common/SimpleButton';
 import AnimatedIconButton from '../../components/common/AnimatedIconButton';
+import { RotateCw } from 'lucide';
 import AnimatedTabs from '../../components/common/AnimatedTabs';
 import { getDashboardResumen } from '../../services/servicios.service';
 import { getSucursales } from '../../services/catalogs.service';
@@ -547,7 +546,7 @@ const TrendChart = ({ serie = [] }) => {
               transform: 'translate(-50%, 0)'
             }}
           >
-            <div className="bg-white dark:bg-[#18181B] border border-neutral-200/90 dark:border-neutral-800 rounded-xl shadow-xl p-2.5 min-w-[145px] text-xs animate-in fade-in zoom-in-95 duration-100">
+            <div className="bg-white/90 dark:bg-[#18181B]/90 backdrop-blur-xs border border-neutral-200/90 dark:border-neutral-800 rounded-xl p-2.5 min-w-[145px] text-xs animate-in fade-in zoom-in-95 duration-100">
               <p className="font-semibold text-neutral-900 dark:text-neutral-100 border-b border-neutral-100 dark:border-neutral-800/80 pb-1 mb-1.5 capitalize">
                 {formatDayFullLabel(hoveredItem.fecha)}
               </p>
@@ -693,18 +692,16 @@ const TrendChart = ({ serie = [] }) => {
           {displaySerie.map((item, index) => {
             const stepX = displaySerie.length > 1 ? chartW / (displaySerie.length - 1) : chartW;
             const x = padding.left + index * stepX;
-            const isHovered = hoveredIndex === index;
             const isFirst = index === 0;
             const isLast = index === displaySerie.length - 1;
             const isSingle = displaySerie.length <= 1;
 
-            // Evitar solapamiento cuando hay 14 o 30 días
+            // Evitar solapamiento cuando hay 14 o 30 días: etiquetas base estables
             const shouldShowLabel =
               displaySerie.length <= 7 ||
               (displaySerie.length <= 14
                 ? index % 2 === 0 || index === displaySerie.length - 1
-                : index % 5 === 0 || index === displaySerie.length - 1) ||
-              isHovered;
+                : index % 5 === 0 || index === displaySerie.length - 1);
 
             if (!shouldShowLabel) return null;
 
@@ -718,10 +715,7 @@ const TrendChart = ({ serie = [] }) => {
                 x={labelX}
                 y={height - 8}
                 textAnchor={textAnchor}
-                className={`text-[11px] transition-colors font-medium ${isHovered
-                  ? 'fill-neutral-900 dark:fill-neutral-100 font-bold'
-                  : 'fill-neutral-400 dark:fill-neutral-500'
-                  }`}
+                className="text-[11px] font-medium fill-neutral-400 dark:fill-neutral-500"
               >
                 {formatDayLabel(item.fecha)}
               </text>
@@ -1164,15 +1158,11 @@ const KpiCard = ({ title, value, badge, icon: Icon }) => {
 
 const DashboardPage = () => {
   const { user } = useAuth();
-  const { isDark } = useTheme();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-
-  const skeletonBaseColor = isDark ? '#262626' : '#e5e7eb';
-  const skeletonHighlightColor = isDark ? '#404040' : '#f3f4f6';
 
   const isSuperAdmin = user?.rol_nombre === 'SuperAdmin';
   const roleName = String(user?.rol_nombre || '').toLowerCase();
@@ -1314,71 +1304,53 @@ const DashboardPage = () => {
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-5 max-w-[1400px] mx-auto w-full">
-        {/* Cabecera Superior: Columna Principal + Acciones Rápidas */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-stretch">
-          {/* Columna Principal */}
-          <div className="lg:col-span-8 xl:col-span-9 flex flex-col justify-between gap-4">
-            {/* Banner / Encabezado Abierto (conserva dimensiones del bloque sin estilo de recuadro) */}
-            <div className="rounded-2xl p-5 sm:p-6">
-              {loading ? (
-                <SkeletonTheme baseColor={skeletonBaseColor} highlightColor={skeletonHighlightColor}>
+        {loading ? (
+          <DashboardSkeleton
+            isSuperAdmin={isSuperAdmin}
+            isTecnico={isTecnico}
+            canViewFinances={canViewFinances}
+            canCreateOrder={canCreateOrder}
+          />
+        ) : (
+          <>
+            {/* Cabecera Superior: Columna Principal + Acciones Rápidas */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-stretch">
+              {/* Columna Principal */}
+              <div className="lg:col-span-8 xl:col-span-9 flex flex-col justify-between gap-4">
+                {/* Banner / Encabezado Abierto (conserva dimensiones del bloque sin estilo de recuadro) */}
+                <div className="rounded-2xl p-5 sm:p-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="space-y-2 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Skeleton circle width={14} height={14} />
-                        <Skeleton width={140} height={12} />
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="inline-flex items-center gap-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                        <Home className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                        <span className="truncate">{branchLabel}</span>
                       </div>
-                      <Skeleton width={320} height={32} className="max-w-[85vw]" />
+                      <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100 font-outfit">
+                        ¡Bienvenido de nuevo, {user?.nombre || 'Usuario'}!
+                      </h1>
                       <div className="flex flex-wrap items-center gap-3 pt-0.5">
-                        <Skeleton width={230} height={13} />
-                        <div className="flex items-center gap-1.5">
-                          <Skeleton circle width={8} height={8} />
-                          <Skeleton width={80} height={12} />
+                        <p className="text-xs sm:text-[13px] text-neutral-500 dark:text-neutral-400 font-inter">
+                          Resumen operativo del taller — {formatTodayLabel()}
+                        </p>
+                        <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                          <span>Sistema online</span>
                         </div>
                       </div>
                     </div>
 
                     {isSuperAdmin ? (
                       <div className="w-[180px] sm:w-[220px] self-start sm:self-center shrink-0">
-                        <Skeleton height={38} borderRadius="0.75rem" />
+                        <Select
+                          value={selectedBranch}
+                          onChange={(val) => setSelectedBranch(String(val))}
+                          items={branchOptions}
+                          placeholder="Todas las sucursales"
+                        />
                       </div>
                     ) : null}
                   </div>
-                </SkeletonTheme>
-              ) : (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1.5 min-w-0">
-                    <div className="inline-flex items-center gap-2 text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                      <Home className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
-                      <span className="truncate">{branchLabel}</span>
-                    </div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100 font-outfit">
-                      ¡Bienvenido de nuevo, {user?.nombre || 'Usuario'}!
-                    </h1>
-                    <div className="flex flex-wrap items-center gap-3 pt-0.5">
-                      <p className="text-xs sm:text-[13px] text-neutral-500 dark:text-neutral-400 font-inter">
-                        Resumen operativo del taller — {formatTodayLabel()}
-                      </p>
-                      <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                        <span>Sistema online</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {isSuperAdmin ? (
-                    <div className="w-[180px] sm:w-[220px] self-start sm:self-center shrink-0">
-                      <Select
-                        value={selectedBranch}
-                        onChange={(val) => setSelectedBranch(String(val))}
-                        items={branchOptions}
-                        placeholder="Todas las sucursales"
-                      />
-                    </div>
-                  ) : null}
                 </div>
-              )}
-            </div>
 
             {error ? (
               <div className="rounded-2xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-700 dark:text-red-300 flex items-center justify-between gap-3">
@@ -1393,54 +1365,7 @@ const DashboardPage = () => {
               </div>
             ) : null}
 
-            {loading ? (
-              <SkeletonTheme baseColor={skeletonBaseColor} highlightColor={skeletonHighlightColor}>
-                <div className={isTecnico ? "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4" : "grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4"}>
-                  {Array.from({ length: isTecnico ? 5 : 4 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5 flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-start justify-between gap-3">
-                          <Skeleton width="60%" height={12} />
-                          <Skeleton circle width={20} height={20} />
-                        </div>
-                        <div className="mt-2">
-                          <Skeleton width="45%" height={32} />
-                        </div>
-                      </div>
-                      <div className="mt-3 flex items-center gap-1.5 min-w-0">
-                        <Skeleton width={60} height={20} borderRadius="9999px" />
-                        <Skeleton width={45} height={12} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {canViewFinances ? (
-                  <div className="w-full rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1 shrink-0">
-                      <div className="flex items-center gap-2">
-                        <Skeleton width={110} height={12} />
-                        <Skeleton circle width={16} height={16} />
-                      </div>
-                      <div className="flex flex-wrap items-baseline gap-2 mt-1">
-                        <Skeleton width={28} height={14} />
-                        <Skeleton width={160} height={30} />
-                        <Skeleton width={80} height={20} borderRadius="9999px" />
-                      </div>
-                    </div>
-
-                    <div className="flex-1 max-w-full md:max-w-[360px] lg:max-w-[420px] w-full min-w-0">
-                      <Skeleton height={66} borderRadius="0.75rem" />
-                    </div>
-                  </div>
-                ) : null}
-              </SkeletonTheme>
-            ) : (
-              <>
-                {/* KPIs Operacionales */}
+            {/* KPIs Operacionales */}
                 {isTecnico ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                     <KpiCard
@@ -1583,44 +1508,12 @@ const DashboardPage = () => {
                     </div>
                   </div>
                 ) : null}
-              </>
-            )}
           </div>
 
           {/* Columna Derecha: Acciones Rápidas */}
           <div className="lg:col-span-4 xl:col-span-3 h-full">
             <div className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5 h-full flex flex-col">
-              {loading ? (
-                <SkeletonTheme baseColor={skeletonBaseColor} highlightColor={skeletonHighlightColor}>
-                  <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800 mb-3.5">
-                    <div className="flex items-center gap-2">
-                      <Skeleton circle width={16} height={16} />
-                      <Skeleton width={110} height={14} />
-                    </div>
-                    <Skeleton width={32} height={32} borderRadius="0.75rem" />
-                  </div>
-
-                  <div className="flex-1 flex flex-col justify-between gap-2.5">
-                    {Array.from({ length: canCreateOrder ? 4 : 3 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="w-full flex-1 rounded-xl p-3 bg-neutral-50/80 dark:bg-neutral-900/60 border border-neutral-200/80 dark:border-neutral-800 flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <Skeleton circle width={20} height={20} className="shrink-0" />
-                          <div className="space-y-1.5 min-w-0">
-                            <Skeleton width={80} height={12} />
-                            <Skeleton width={110} height={10} />
-                          </div>
-                        </div>
-                        <Skeleton width={16} height={16} borderRadius="0.25rem" className="shrink-0" />
-                      </div>
-                    ))}
-                  </div>
-                </SkeletonTheme>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800 mb-3.5">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800 mb-3.5">
                     <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
                       <Zap className="w-4 h-4" />
                       <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 font-outfit">
@@ -1629,7 +1522,7 @@ const DashboardPage = () => {
                     </div>
 
                     <AnimatedIconButton
-                      icon={RotateCcw}
+                      icon={RotateCw}
                       loading={refreshing}
                       success={refreshSuccess}
                       onSuccessEnd={() => setRefreshSuccess(false)}
@@ -1704,177 +1597,12 @@ const DashboardPage = () => {
                       <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:translate-x-0.5 group-hover:text-red-600 dark:group-hover:text-red-500 transition-all shrink-0" />
                     </button>
                   </div>
-                </>
-              )}
             </div>
           </div>
         </div>
 
-        {loading ? (
-          <SkeletonTheme baseColor={skeletonBaseColor} highlightColor={skeletonHighlightColor}>
-            {/* Flujo + Carga */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3.5">
-              {/* Flujo del taller 1:1 */}
-              <div className="xl:col-span-2 rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <Skeleton width={110} height={18} />
-                    <Skeleton width={80} height={20} borderRadius="9999px" />
-                  </div>
-                  <Skeleton width={120} height={24} borderRadius="0.5rem" className="self-start sm:self-auto" />
-                </div>
-
-                {/* Barra de progreso segmentada */}
-                <div className="mt-2 mb-3.5">
-                  <Skeleton height={8} borderRadius="9999px" />
-                </div>
-
-                {/* 6 Etapas interconectadas */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                  {Array.from({ length: 6 }).map((_, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-xl border border-neutral-200/70 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-900/40 p-3 flex flex-col justify-between"
-                    >
-                      <div className="flex items-center justify-between gap-1 mb-2">
-                        <Skeleton width={18} height={12} />
-                        {idx < 5 ? <Skeleton width={12} height={12} className="hidden lg:block" /> : null}
-                      </div>
-                      <div>
-                        <Skeleton width={38} height={28} />
-                        <Skeleton width="80%" height={12} className="mt-1" />
-                      </div>
-                      <div className="mt-2.5 w-full">
-                        <Skeleton height={4} borderRadius="9999px" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* TrendChart Skeleton: Tabs + Área del gráfico */}
-                <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Skeleton width={130} height={14} />
-                    <div className="flex gap-1">
-                      <Skeleton width={50} height={24} borderRadius="0.5rem" />
-                      <Skeleton width={50} height={24} borderRadius="0.5rem" />
-                      <Skeleton width={50} height={24} borderRadius="0.5rem" />
-                    </div>
-                  </div>
-                  <Skeleton height={140} borderRadius="0.75rem" />
-                </div>
-              </div>
-
-              {/* Carga por técnico 1:1 */}
-              <div className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-4">
-                    <div>
-                      <Skeleton width={120} height={18} />
-                      <Skeleton width={100} height={12} className="mt-1" />
-                    </div>
-                    <Skeleton width={75} height={24} borderRadius="0.5rem" />
-                  </div>
-
-                  <ul className="space-y-3">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <li
-                        key={i}
-                        className="p-2.5 rounded-xl border border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-900/30"
-                      >
-                        <div className="flex items-center justify-between gap-3 mb-2">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Skeleton width={32} height={32} borderRadius="0.75rem" />
-                            <div className="space-y-1">
-                              <Skeleton width={90} height={12} />
-                              <Skeleton width={60} height={10} />
-                            </div>
-                          </div>
-                          <div className="text-right space-y-1">
-                            <Skeleton width={48} height={12} />
-                            <Skeleton width={36} height={10} />
-                          </div>
-                        </div>
-                        <Skeleton height={8} borderRadius="9999px" />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Categorías (Izquierda 1/3) + Actividad Reciente (Derecha 2/3) */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3.5 items-stretch">
-              {/* Categorías de Dispositivos 1:1 */}
-              <div className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5 h-full flex flex-col">
-                <div className="mb-2 sm:mb-3">
-                  <Skeleton width={160} height={18} />
-                  <Skeleton width={210} height={12} className="mt-1" />
-                </div>
-                <div className="relative flex items-center justify-center select-none flex-1 my-auto py-4 sm:py-6">
-                  <div className="relative flex items-center justify-center w-56 h-56 sm:w-64 sm:h-64">
-                    <Skeleton circle width="100%" height="100%" />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <div className="w-36 h-36 sm:w-40 sm:h-40 rounded-full bg-white dark:bg-[#141416] flex flex-col items-center justify-center shadow-xs">
-                        <Skeleton width={40} height={32} />
-                        <Skeleton width={50} height={12} className="mt-1" />
-                        <Skeleton width={45} height={10} className="mt-0.5" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Actividad Reciente 1:1 */}
-              <div className="xl:col-span-2 rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs overflow-hidden flex flex-col justify-between">
-                <div>
-                  <div className="px-4 sm:px-5 py-4 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Skeleton width={130} height={18} />
-                      <Skeleton width={200} height={14} className="hidden sm:inline-block" />
-                    </div>
-                    <Skeleton width={80} height={24} borderRadius="0.5rem" />
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[720px] text-left">
-                      <thead>
-                        <tr className="text-[11px] uppercase tracking-wider border-b border-neutral-100 dark:border-neutral-800">
-                          <th className="px-4 sm:px-5 py-3"><Skeleton width={50} height={12} /></th>
-                          <th className="px-4 py-3"><Skeleton width={60} height={12} /></th>
-                          <th className="px-4 py-3"><Skeleton width={55} height={12} /></th>
-                          <th className="px-4 py-3"><Skeleton width={50} height={12} /></th>
-                          <th className="px-4 py-3"><Skeleton width={55} height={12} /></th>
-                          <th className="px-4 sm:px-5 py-3 text-right"><Skeleton width={50} height={12} className="ml-auto" /></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <tr key={i} className="border-b border-neutral-100/60 dark:border-neutral-800/60">
-                            <td className="px-4 sm:px-5 py-3.5"><Skeleton width={90} height={14} /></td>
-                            <td className="px-4 py-3.5"><Skeleton width={110} height={14} /></td>
-                            <td className="px-4 py-3.5"><Skeleton width={100} height={14} /></td>
-                            <td className="px-4 py-3.5"><Skeleton width={75} height={20} borderRadius="9999px" /></td>
-                            <td className="px-4 py-3.5"><Skeleton width={65} height={20} borderRadius="9999px" /></td>
-                            <td className="px-4 sm:px-5 py-3.5 text-right">
-                              <div className="inline-flex items-center justify-end gap-2">
-                                <Skeleton width={28} height={28} borderRadius="0.75rem" />
-                                <Skeleton width={80} height={14} />
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </SkeletonTheme>
-        ) : (
-          <>
-            {/* Flujo + Carga (Disposición Original) */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3.5">
+        {/* Flujo + Carga (Disposición Original) */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-3.5">
               {/* Pipeline / Flujo del taller */}
               <div className="xl:col-span-2 rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 shadow-xs p-4 sm:p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">

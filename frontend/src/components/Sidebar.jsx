@@ -175,8 +175,13 @@ const Sidebar = () => {
         })}
       </nav>
 
-      {/* Botón Centro de Ayuda y Guía (Justo encima de la línea divisoria) */}
-      <div className="px-2 pb-1.5">
+      {/* Sección Inferior / Controles */}
+      <div
+        className={`py-2 px-2.5 border-t border-zinc-100 dark:border-dark-border space-y-1 relative flex flex-col ${isExpanded ? 'items-start' : 'items-center'
+          }`}
+        ref={configMenuRef}
+      >
+        {/* 1. Botón Centro de Ayuda y Guía */}
         <Tooltip
           content="Ayuda y Guía"
           position="right"
@@ -186,25 +191,14 @@ const Sidebar = () => {
             type="button"
             onClick={() => setIsHelpModalOpen(true)}
             aria-label="Ayuda y Guía"
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group relative w-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 cursor-pointer ${
-              !isExpanded ? 'justify-center px-0 w-10 h-10 mx-auto' : ''
-            }`}
+            title="Ayuda y Guía"
+            className="w-10 h-10 flex items-center justify-center rounded-lg aspect-square text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 opacity-65 hover:opacity-100 transition-all cursor-pointer shrink-0"
           >
-            <ShieldQuestion className="w-5 h-5 flex-shrink-0 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200 transition-colors" />
-            {isExpanded && (
-              <span className="truncate whitespace-nowrap">Ayuda y Guía</span>
-            )}
+            <ShieldQuestion className="w-5 h-5 transition-colors" />
           </button>
         </Tooltip>
-      </div>
 
-      {/* Sección Inferior / Controles */}
-      <div
-        className={`py-2 px-2.5 border-t border-zinc-100 dark:border-dark-border space-y-1 relative flex flex-col ${isExpanded ? 'items-start' : 'items-center'
-          }`}
-        ref={configMenuRef}
-      >
-        {/* 1. Botón de Tema (Icono animado MorphIcon con Tooltip) */}
+        {/* 2. Botón de Tema (Icono animado MorphIcon con Tooltip) */}
         <Tooltip
           content={isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
           position="right"

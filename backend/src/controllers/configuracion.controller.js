@@ -123,7 +123,6 @@ const updateCompanyProfile = async (req, res) => {
       telefono_principal,
       correo_contacto,
       direccion_fiscal,
-      dominio_sistema,
       logo_url,
       logo_public_id
     } = req.body;
@@ -212,26 +211,6 @@ const updateCompanyProfile = async (req, res) => {
       });
     }
 
-    const cleanDominio = typeof dominio_sistema === 'string' ? dominio_sistema.trim() : '';
-    if (!cleanDominio) {
-      return res.status(400).json({
-        ok: false,
-        message: 'El dominio web del sistema es obligatorio.'
-      });
-    }
-    if (cleanDominio.length > 150) {
-      return res.status(400).json({
-        ok: false,
-        message: 'El dominio web del sistema no puede exceder los 150 caracteres.'
-      });
-    }
-    if (!/^https?:\/\/.+/i.test(cleanDominio)) {
-      return res.status(400).json({
-        ok: false,
-        message: 'El dominio web del sistema debe ser una URL válida (iniciar con http:// o https://).'
-      });
-    }
-
     const pool = getPool();
 
     // 1. Consultar registro actual para determinar si es UPDATE o INSERT
@@ -263,7 +242,7 @@ const updateCompanyProfile = async (req, res) => {
         }
       }
 
-      // Actualizar registro existente
+      // Actualizar registro existente (dominio_sistema permanece inmutable desde DB)
       const updateQuery = `
         UPDATE datos_companhia
         SET 
@@ -272,12 +251,11 @@ const updateCompanyProfile = async (req, res) => {
           telefono_principal = $3,
           correo_contacto = $4,
           direccion_fiscal = $5,
-          dominio_sistema = $6,
-          logo_url = $7,
-          logo_public_id = $8,
-          tasa_impuesto_defecto = COALESCE($9, tasa_impuesto_defecto, 18.00),
+          logo_url = $6,
+          logo_public_id = $7,
+          tasa_impuesto_defecto = COALESCE($8, tasa_impuesto_defecto, 18.00),
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $10
+        WHERE id = $9
         RETURNING 
           id,
           nombre_empresa,
@@ -299,7 +277,6 @@ const updateCompanyProfile = async (req, res) => {
         cleanTel,
         cleanEmail,
         cleanDireccion,
-        cleanDominio,
         cleanLogoUrl,
         cleanLogoPublicId,
         cleanTasaImpuesto,
@@ -308,7 +285,7 @@ const updateCompanyProfile = async (req, res) => {
 
       savedCompany = updateRes.rows[0];
     } else {
-      // Inserción inicial
+      // Inserción inicial con valores por defecto en DB para dominio_sistema
       const insertQuery = `
         INSERT INTO datos_companhia (
           nombre_empresa,
@@ -316,11 +293,10 @@ const updateCompanyProfile = async (req, res) => {
           telefono_principal,
           correo_contacto,
           direccion_fiscal,
-          dominio_sistema,
           logo_url,
           logo_public_id,
           tasa_impuesto_defecto
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 18.00))
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 18.00))
         RETURNING 
           id,
           nombre_empresa,
@@ -342,7 +318,6 @@ const updateCompanyProfile = async (req, res) => {
         cleanTel,
         cleanEmail,
         cleanDireccion,
-        cleanDominio,
         cleanLogoUrl,
         cleanLogoPublicId,
         cleanTasaImpuesto

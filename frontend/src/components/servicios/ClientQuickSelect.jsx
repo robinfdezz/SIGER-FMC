@@ -46,11 +46,18 @@ const ClientQuickSelect = ({ value, onChange, disabled = false }) => {
       setIsSearching(true);
       try {
         const cleanTerm = term.trim().toLowerCase();
-        const res = await getClients({ search: term.trim(), q: term.trim(), limit: 12 });
+        const res = await getClients({
+          search: term.trim(),
+          q: term.trim(),
+          limit: 12,
+          estado: 'active',
+          activo: 'true'
+        });
         const list = res.success ? (res.data || []) : [];
         
-        // Filtrado reactivo estricto
+        // Filtrado reactivo estricto: solo clientes con estado activo
         const filtered = list.filter((c) => {
+          if (c.activo === false || c.activo === 'false') return false;
           const fullName = `${c.nombre || ''} ${c.apellido || ''}`.toLowerCase();
           const cedula = (c.cedula_rnc || '').toLowerCase();
           const tel = (c.telefono || '').toLowerCase();
@@ -76,6 +83,7 @@ const ClientQuickSelect = ({ value, onChange, disabled = false }) => {
   }, []);
 
   const handleSelect = (client) => {
+    if (!client || client.activo === false || client.activo === 'false') return;
     onChange(client);
     setQuery('');
     setResults([]);
@@ -90,7 +98,7 @@ const ClientQuickSelect = ({ value, onChange, disabled = false }) => {
   // Callback cuando se crea un cliente nuevo desde el modal
   const handleNewClientSuccess = (newClient) => {
     setShowNewClientModal(false);
-    if (newClient) {
+    if (newClient && newClient.activo !== false && newClient.activo !== 'false') {
       onChange(newClient);
     }
   };
@@ -99,12 +107,24 @@ const ClientQuickSelect = ({ value, onChange, disabled = false }) => {
 
   // Si ya hay cliente seleccionado, muestra ficha compacta con paleta institucional roja
   if (value && value.id) {
+    const isInactive = value.activo === false || value.activo === 'false';
     const fullName = [value.nombre, value.apellido].filter(Boolean).join(' ');
     return (
-      <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-red-50/60 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 text-neutral-900 dark:text-neutral-100">
-        <CheckCircle2 size={16} className="text-red-600 dark:text-red-400 shrink-0" />
+      <div className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl border ${
+        isInactive
+          ? 'bg-amber-50/80 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800 text-neutral-900 dark:text-neutral-100'
+          : 'bg-red-50/60 dark:bg-red-950/20 border-red-200 dark:border-red-900/50 text-neutral-900 dark:text-neutral-100'
+      }`}>
+        <CheckCircle2 size={16} className={`${isInactive ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'} shrink-0`} />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{fullName}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{fullName}</p>
+            {isInactive && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 uppercase tracking-wider">
+                Inactivo
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-inter truncate">
             {value.telefono && <span className="mr-2">{value.telefono}</span>}
             {value.cedula_rnc && <span>Céd: {value.cedula_rnc}</span>}

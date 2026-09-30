@@ -11,8 +11,10 @@ import Pagination from '../components/common/Pagination';
 import { getWorkers, toggleWorkerStatus } from '../services/workers.service';
 import { getRoles, getSucursales } from '../services/catalogs.service';
 import { useAuth } from '../context/AuthContext';
+import Skeleton from '../components/common/Skeleton';
+import TableSkeleton from '../components/common/TableSkeleton';
+import { RotateCw } from 'lucide';
 import { sileo } from 'sileo';
-import { RotateCcw } from 'lucide';
 import {
   UserPlus,
   Search,
@@ -22,7 +24,6 @@ import {
   Store,
   Phone,
   Mail,
-  RefreshCw,
   Users,
   CheckCircle2,
   XCircle,
@@ -85,6 +86,56 @@ const extractArray = (res) => {
   return [];
 };
 
+const WorkersHeaderFiltersSkeleton = ({ isSuperAdmin }) => {
+  return (
+    <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-5">
+      {/* Fila Superior: Título, subtítulo y botones de acción */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
+        <div className="space-y-2">
+          <Skeleton className="h-6 sm:h-7 w-48 sm:w-56 rounded-lg" />
+          <Skeleton className="h-3.5 sm:h-4 w-64 sm:w-80" />
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <Skeleton className="w-9 h-9 rounded-xl" />
+          <Skeleton className="h-10 w-32 rounded-xl" />
+        </div>
+      </div>
+
+      {/* Fila Inferior: Buscador y Filtros */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3 w-full">
+          {/* Buscador Prominente Dinámico */}
+          <Skeleton className="h-10 flex-1 min-w-[240px] sm:min-w-[280px] rounded-xl" />
+
+          {/* Selectores Dinámicos y Botón Limpiar */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto flex-1 lg:flex-initial">
+            <Skeleton className="h-10 w-full sm:w-44 rounded-xl" />
+            {isSuperAdmin && <Skeleton className="h-10 w-full sm:w-44 rounded-xl" />}
+            <Skeleton className="h-10 w-full sm:w-36 rounded-xl" />
+            <Skeleton className="h-10 w-10 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const WorkersPaginationSkeleton = () => (
+  <div className="p-4 border-t border-neutral-100 dark:border-neutral-800/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div className="flex items-center gap-2">
+      <Skeleton className="h-8 w-24 rounded-lg" />
+      <Skeleton className="h-4 w-36" />
+    </div>
+    <div className="flex items-center gap-1.5">
+      <Skeleton className="h-8 w-8 rounded-lg" />
+      <Skeleton className="h-8 w-8 rounded-lg" />
+      <Skeleton className="h-8 w-8 rounded-lg" />
+      <Skeleton className="h-8 w-8 rounded-lg" />
+    </div>
+  </div>
+);
+
 const WorkersPage = () => {
   const { user: currentUser } = useAuth();
   const isBranchAdmin = currentUser?.rol_nombre === 'Admin_Sucursal';
@@ -93,6 +144,7 @@ const WorkersPage = () => {
   const [workers, setWorkers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [sucursales, setSucursales] = useState([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshSuccess, setRefreshSuccess] = useState(false);
@@ -206,6 +258,7 @@ const WorkersPage = () => {
       console.error('Error al cargar datos de usuarios:', error);
     } finally {
       if (!isSilent) setIsLoading(false);
+      setInitialLoading(false);
     }
   }, [page, limit, debouncedSearch, selectedRole, selectedBranch, selectedStatus]);
 
@@ -286,22 +339,29 @@ const WorkersPage = () => {
           description: res.data?.message || res.message || 'Estado actualizado correctamente'
         }),
         error: (err) => ({
-          title: 'Error al cambiar estado',
+          title: err.response?.status === 409 ? 'No se puede desactivar' : 'Error al cambiar estado',
           description: err.response?.data?.message || 'No se pudo completar la acción'
         })
       });
 
-      // Actualizar estado local inmediato
-      setWorkers((prev) =>
-        prev.map((w) => (w.id === workerToToggle.id ? { ...w, activo: !w.activo } : w))
-      );
-
-      setIsConfirmOpen(false);
-      setWorkerToToggle(null);
+      // Actualizar estado local inmediato respetando el filtro de estado si aplica
+      setWorkers((prev) => {
+        if (selectedStatus === 'active' && workerToToggle.activo) {
+          return prev.filter((w) => Number(w.id) !== Number(workerToToggle.id));
+        }
+        if (selectedStatus === 'inactive' && !workerToToggle.activo) {
+          return prev.filter((w) => Number(w.id) !== Number(workerToToggle.id));
+        }
+        return prev.map((w) =>
+          Number(w.id) === Number(workerToToggle.id) ? { ...w, activo: !w.activo } : w
+        );
+      });
     } catch (err) {
       console.error('Error al alternar estado:', err);
     } finally {
       setIsToggling(false);
+      setIsConfirmOpen(false);
+      setWorkerToToggle(null);
     }
   };
 
@@ -423,98 +483,102 @@ const WorkersPage = () => {
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
         {/* Contenedor Superior Integrado (Encabezado + Filtros) */}
-        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-5">
-          {/* Fila Superior: Título, subtítulo y botones de acción */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 font-outfit">
-                Gestión de Usuarios
-              </h1>
-              <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 font-inter">
-                Administración de accesos, roles y personal técnico de las sucursales.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2.5 shrink-0">
-              <AnimatedIconButton
-                icon={RotateCcw}
-                loading={isRefreshing}
-                success={refreshSuccess}
-                onSuccessEnd={() => setRefreshSuccess(false)}
-                onClick={handleRefresh}
-                title="Refrescar lista"
-                ariaLabel="Refrescar lista de usuarios"
-              />
-              <button
-                onClick={handleOpenCreateModal}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl shadow-xs hover:shadow-md transition-all font-inter cursor-pointer"
-              >
-                <UserPlus size={17} />
-                <span>Nuevo Usuario</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Fila Inferior: Buscador y Filtros */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3 w-full">
-              {/* Buscador Prominente Dinámico */}
-              <div className="relative flex-1 min-w-[240px] sm:min-w-[280px] w-full">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
-                  <Search size={16} />
-                </span>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar por nombre, usuario, cédula..."
-                  className="w-full pl-9 pr-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors"
-                />
+        {initialLoading ? (
+          <WorkersHeaderFiltersSkeleton isSuperAdmin={isSuperAdmin} />
+        ) : (
+          <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-5">
+            {/* Fila Superior: Título, subtítulo y botones de acción */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 font-outfit">
+                  Gestión de Usuarios
+                </h1>
+                <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 font-inter">
+                  Administración de accesos, roles y personal técnico de las sucursales.
+                </p>
               </div>
 
-              {/* Selectores Dinámicos y Botón Limpiar */}
-              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto flex-1 lg:flex-initial">
-                {/* Selector Rol (Filtrado según RBAC) */}
-                <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[160px]">
-                  <Select
-                    value={selectedRole}
-                    onChange={(val) => setSelectedRole(val)}
-                    items={roleOptions}
-                    placeholder="Todos los Roles"
+              <div className="flex items-center gap-2.5 shrink-0">
+                <AnimatedIconButton
+                  icon={RotateCw}
+                  loading={isRefreshing}
+                  success={refreshSuccess}
+                  onSuccessEnd={() => setRefreshSuccess(false)}
+                  onClick={handleRefresh}
+                  title="Refrescar lista"
+                  ariaLabel="Refrescar lista de usuarios"
+                />
+                <button
+                  onClick={handleOpenCreateModal}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl shadow-xs hover:shadow-md transition-all font-inter cursor-pointer"
+                >
+                  <UserPlus size={17} />
+                  <span>Nuevo Usuario</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Fila Inferior: Buscador y Filtros */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3 w-full">
+                {/* Buscador Prominente Dinámico */}
+                <div className="relative flex-1 min-w-[240px] sm:min-w-[280px] w-full">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
+                    <Search size={16} />
+                  </span>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Buscar por nombre, usuario, cédula..."
+                    className="w-full pl-9 pr-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors"
                   />
                 </div>
 
-                {/* Selector Sucursal (Visible únicamente para SuperAdmin) */}
-                {isSuperAdmin && (
-                  <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[180px]">
+                {/* Selectores Dinámicos y Botón Limpiar */}
+                <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto flex-1 lg:flex-initial">
+                  {/* Selector Rol (Filtrado según RBAC) */}
+                  <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[160px]">
                     <Select
-                      value={selectedBranch}
-                      onChange={(val) => setSelectedBranch(val)}
-                      items={branchOptions}
-                      placeholder="Todas las Sucursales"
+                      value={selectedRole}
+                      onChange={(val) => setSelectedRole(val)}
+                      items={roleOptions}
+                      placeholder="Todos los Roles"
                     />
                   </div>
-                )}
 
-                {/* Selector Estado */}
-                <div className="flex-1 sm:flex-initial min-w-[130px] sm:min-w-[150px]">
-                  <Select
-                    value={selectedStatus}
-                    onChange={(val) => setSelectedStatus(val)}
-                    items={statusOptions}
-                    placeholder="Todos los Estados"
+                  {/* Selector Sucursal (Visible únicamente para SuperAdmin) */}
+                  {isSuperAdmin && (
+                    <div className="flex-1 sm:flex-initial min-w-[140px] sm:min-w-[180px]">
+                      <Select
+                        value={selectedBranch}
+                        onChange={(val) => setSelectedBranch(val)}
+                        items={branchOptions}
+                        placeholder="Todas las Sucursales"
+                      />
+                    </div>
+                  )}
+
+                  {/* Selector Estado */}
+                  <div className="flex-1 sm:flex-initial min-w-[130px] sm:min-w-[150px]">
+                    <Select
+                      value={selectedStatus}
+                      onChange={(val) => setSelectedStatus(val)}
+                      items={statusOptions}
+                      placeholder="Todos los Estados"
+                    />
+                  </div>
+
+                  {/* Botón Acción Limpiar Filtros con MorphIcon */}
+                  <ResetFiltersButton
+                    onClick={handleClearFilters}
+                    hasActiveFilters={hasActiveFilters}
                   />
                 </div>
-
-                {/* Botón Acción Limpiar Filtros con MorphIcon */}
-                <ResetFiltersButton
-                  onClick={handleClearFilters}
-                  hasActiveFilters={hasActiveFilters}
-                />
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Tabla de Usuarios */}
         <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden flex flex-col">
@@ -565,14 +629,7 @@ const WorkersPage = () => {
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
                 {isLoading ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-neutral-400">
-                      <div className="flex flex-col items-center justify-center gap-3">
-                        <RefreshCw className="animate-spin text-red-500" size={28} />
-                        <span className="text-sm">Cargando usuarios...</span>
-                      </div>
-                    </td>
-                  </tr>
+                  <TableSkeleton rows={7} cols={5} />
                 ) : sortedWorkers.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-12 text-center text-neutral-400">
@@ -740,18 +797,22 @@ const WorkersPage = () => {
           </div>
 
           {/* Paginación */}
-          <Pagination
-            currentPage={pagination.page}
-            totalPages={pagination.totalPages}
-            totalItems={pagination.total}
-            itemsPerPage={pagination.limit}
-            onPageChange={(newPage) => setPage(newPage)}
-            onItemsPerPageChange={(newLimit) => {
-              setLimit(newLimit);
-              setPage(1);
-            }}
-            isLoading={isLoading || isRefreshing}
-          />
+          {initialLoading ? (
+            <WorkersPaginationSkeleton />
+          ) : (
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              itemsPerPage={pagination.limit}
+              onPageChange={(newPage) => setPage(newPage)}
+              onItemsPerPageChange={(newLimit) => {
+                setLimit(newLimit);
+                setPage(1);
+              }}
+              isLoading={isLoading || isRefreshing}
+            />
+          )}
         </div>
       </div>
 

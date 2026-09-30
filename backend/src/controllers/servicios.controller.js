@@ -184,6 +184,10 @@ const createServicio = async (req, res) => {
 
       if (!isBlank(cedula_cliente)) {
         sanitizedCedula = String(cedula_cliente).replace(/[^0-9\-]/g, '').trim().slice(0, 20);
+        const cedCheck = await client.query('SELECT id, activo FROM clientes WHERE cedula_rnc = $1', [sanitizedCedula]);
+        if (cedCheck.rows.length > 0 && !cedCheck.rows[0].activo) {
+          return res.status(400).json({ ok: false, message: 'No se puede aperturar una orden para un cliente inactivo.' });
+        }
       }
 
       var rawCorreo = correo_cliente || email_cliente;
@@ -196,6 +200,18 @@ const createServicio = async (req, res) => {
         sanitizedCorreo = trimmedCorreo;
       }
     } else {
+      // Validar que el cliente exista y esté activo en base de datos
+      const clientCheck = await client.query(
+        'SELECT id, nombre, apellido, activo FROM clientes WHERE id = $1',
+        [cliente_id]
+      );
+      if (clientCheck.rows.length === 0) {
+        return res.status(400).json({ ok: false, message: 'El cliente seleccionado no existe.' });
+      }
+      if (!clientCheck.rows[0].activo) {
+        return res.status(400).json({ ok: false, message: 'No se puede aperturar una orden para un cliente inactivo.' });
+      }
+
       sanitizedNombre = isBlank(nombre_cliente) ? null : String(nombre_cliente).trim().slice(0, 100);
       sanitizedTelefono = isBlank(telefono_cliente) ? null : String(telefono_cliente).trim().slice(0, 20);
       sanitizedCedula = isBlank(cedula_cliente) ? null : String(cedula_cliente).trim().slice(0, 20);
@@ -1659,9 +1675,22 @@ const updateServicioEstado = async (req, res) => {
     }
 
     const ordenActual = ordenRes.rows[0];
-    if (Number(ordenActual.orden_flujo) === 8 || String(ordenActual.codigo_estado || '').toUpperCase().includes('CANCEL')) {
+    const codEstadoActual = String(ordenActual.codigo_estado || '').toUpperCase();
+    const flujoActual = Number(ordenActual.orden_flujo || 0);
+
+    // Validación de estados terminales inmutables (ENTREGADO y CANCELADO_DEVUELTO)
+    if (codEstadoActual === 'ENTREGADO' || codEstadoActual.includes('ENTREG') || flujoActual === 7) {
       return res.status(400).json({
         ok: false,
+        success: false,
+        message: 'No se puede modificar el estado de una orden que ya ha sido entregada.'
+      });
+    }
+
+    if (codEstadoActual === 'CANCELADO_DEVUELTO' || codEstadoActual.includes('CANCEL') || flujoActual === 8) {
+      return res.status(400).json({
+        ok: false,
+        success: false,
         message: 'No se pueden realizar cambios de estado en una orden cancelada.'
       });
     }
@@ -1953,9 +1982,18 @@ const assignTecnicoServicio = async (req, res) => {
     }
     const ordenInfo = ordenRes.rows[0];
 
+    if (Number(ordenInfo.orden_flujo) === 7 || String(ordenInfo.codigo_estado || '').toUpperCase().includes('ENTREG')) {
+      return res.status(400).json({
+        ok: false,
+        success: false,
+        message: 'No se pueden asignar técnicos a una orden que ya ha sido entregada.'
+      });
+    }
+
     if (Number(ordenInfo.orden_flujo) === 8 || String(ordenInfo.codigo_estado || '').toUpperCase().includes('CANCEL')) {
       return res.status(400).json({
         ok: false,
+        success: false,
         message: 'No se pueden asignar técnicos a una orden cancelada.'
       });
     }
@@ -2081,9 +2119,19 @@ const removeTecnicoServicio = async (req, res) => {
     }
 
     const estadoOrden = ordenRes.rows[0];
+
+    if (Number(estadoOrden.orden_flujo) === 7 || String(estadoOrden.codigo_estado || '').toUpperCase().includes('ENTREG')) {
+      return res.status(400).json({
+        ok: false,
+        success: false,
+        message: 'No se pueden modificar los técnicos de una orden que ya ha sido entregada.'
+      });
+    }
+
     if (Number(estadoOrden.orden_flujo) === 8 || String(estadoOrden.codigo_estado || '').toUpperCase().includes('CANCEL')) {
       return res.status(400).json({
         ok: false,
+        success: false,
         message: 'No se pueden modificar los técnicos de una orden cancelada.'
       });
     }
@@ -2280,9 +2328,19 @@ const createIncidenciaServicio = async (req, res) => {
     }
 
     const ordenActualInc = ordenRes.rows[0];
+
+    if (Number(ordenActualInc.orden_flujo) === 7 || String(ordenActualInc.codigo_estado || '').toUpperCase().includes('ENTREG')) {
+      return res.status(400).json({
+        ok: false,
+        success: false,
+        message: 'No se pueden registrar repuestos o incidencias en una orden que ya ha sido entregada.'
+      });
+    }
+
     if (Number(ordenActualInc.orden_flujo) === 8 || String(ordenActualInc.codigo_estado || '').toUpperCase().includes('CANCEL')) {
       return res.status(400).json({
         ok: false,
+        success: false,
         message: 'No se pueden registrar repuestos o incidencias en una orden cancelada.'
       });
     }
@@ -2526,9 +2584,19 @@ const updateAprobacionIncidencia = async (req, res) => {
     }
 
     const ordenActualAprob = ordenRes.rows[0];
+
+    if (Number(ordenActualAprob.orden_flujo) === 7 || String(ordenActualAprob.codigo_estado || '').toUpperCase().includes('ENTREG')) {
+      return res.status(400).json({
+        ok: false,
+        success: false,
+        message: 'No se pueden modificar incidencias de una orden que ya ha sido entregada.'
+      });
+    }
+
     if (Number(ordenActualAprob.orden_flujo) === 8 || String(ordenActualAprob.codigo_estado || '').toUpperCase().includes('CANCEL')) {
       return res.status(400).json({
         ok: false,
+        success: false,
         message: 'No se pueden modificar incidencias de una orden cancelada.'
       });
     }

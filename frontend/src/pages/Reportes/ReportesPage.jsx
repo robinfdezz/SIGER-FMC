@@ -14,6 +14,9 @@ import AnimatedTabs from '../../components/common/AnimatedTabs';
 import Select from '../../components/common/Select';
 import DatePicker from '../../components/common/DatePicker';
 import ReporteEjecutivoImprimible from './ReporteEjecutivoImprimible';
+import Skeleton from '../../components/common/Skeleton';
+import TableSkeleton from '../../components/common/TableSkeleton';
+import ReportesSkeleton from './ReportesSkeleton';
 import { sileo } from 'sileo';
 import {
   BarChart3,
@@ -324,6 +327,7 @@ const ReportesPage = () => {
   }, [isSuperAdmin, sucursalId, branchOptions, sucursalesList, user]);
 
   // Estados de datos
+  const [initialLoading, setInitialLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [resumenData, setResumenData] = useState(null);
 
@@ -336,6 +340,14 @@ const ReportesPage = () => {
   const [exportingCsv, setExportingCsv] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [companyData, setCompanyData] = useState(null);
+
+  // Control de carga inicial sincronizada
+  const initialLoadsRef = React.useRef({ resumen: false, detalle: false });
+  const checkInitialLoaded = useCallback(() => {
+    if (initialLoadsRef.current.resumen && initialLoadsRef.current.detalle) {
+      setInitialLoading(false);
+    }
+  }, []);
 
   // Cargar datos de la empresa
   useEffect(() => {
@@ -386,6 +398,8 @@ const ReportesPage = () => {
       sileo.error(err.response?.data?.message || 'Error al conectar con el servidor.');
     } finally {
       setLoading(false);
+      initialLoadsRef.current.resumen = true;
+      checkInitialLoaded();
     }
   }, [dateRange, sucursalId, isSuperAdmin]);
 
@@ -410,6 +424,8 @@ const ReportesPage = () => {
       console.error('Error al cargar detalle:', err);
     } finally {
       setDetalleLoading(false);
+      initialLoadsRef.current.detalle = true;
+      checkInitialLoaded();
     }
   }, [dateRange, sucursalId, isSuperAdmin, detallePage, detalleEstado, detalleSearch]);
 
@@ -647,8 +663,12 @@ const ReportesPage = () => {
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1400px] mx-auto w-full pb-12">
-        {/* Cabecera Principal y Barra de Control Homologada */}
-        <div className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 p-5 sm:p-6">
+        {initialLoading ? (
+          <ReportesSkeleton />
+        ) : (
+          <>
+            {/* Cabecera Principal y Barra de Control Homologada */}
+            <div className="rounded-2xl bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 p-5 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-neutral-100 dark:border-neutral-800/80 pb-5">
             <div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100 font-outfit">
@@ -763,23 +783,35 @@ const ReportesPage = () => {
                 <span className="text-xs sm:text-sm font-bold text-neutral-400 dark:text-neutral-500 select-none font-mono">
                   RD$
                 </span>
-                <span className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
-                  {formatCurrency(kpis.total_facturado)}
-                </span>
+                {loading ? (
+                  <Skeleton className="h-7 sm:h-8 w-28 sm:w-36 rounded-md my-0.5" />
+                ) : (
+                  <span className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
+                    {formatCurrency(kpis.total_facturado)}
+                  </span>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs text-neutral-500 dark:text-neutral-400 font-medium pt-3 mt-3 border-t border-neutral-100 dark:border-neutral-800/80">
               <div className="min-w-0">
                 <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">Liquidado:</span>
-                <span className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono text-xs sm:text-[13px] whitespace-nowrap block mt-0.5">
-                  RD$ {formatCurrency(kpis.total_liquidado)}
-                </span>
+                {loading ? (
+                  <Skeleton className="h-4 w-20 mt-1" />
+                ) : (
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono text-xs sm:text-[13px] whitespace-nowrap block mt-0.5">
+                    RD$ {formatCurrency(kpis.total_liquidado)}
+                  </span>
+                )}
               </div>
               <div className="min-w-0 text-right">
                 <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">Anticipos:</span>
-                <span className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono text-xs sm:text-[13px] whitespace-nowrap block mt-0.5">
-                  RD$ {formatCurrency(kpis.total_anticipos)}
-                </span>
+                {loading ? (
+                  <Skeleton className="h-4 w-20 mt-1 ml-auto" />
+                ) : (
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono text-xs sm:text-[13px] whitespace-nowrap block mt-0.5">
+                    RD$ {formatCurrency(kpis.total_anticipos)}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -797,23 +829,35 @@ const ReportesPage = () => {
                 <span className="text-xs sm:text-sm font-bold text-neutral-400 dark:text-neutral-500 select-none font-mono">
                   RD$
                 </span>
-                <span className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
-                  {formatCurrency(kpis.total_mano_obra)}
-                </span>
+                {loading ? (
+                  <Skeleton className="h-7 sm:h-8 w-28 sm:w-36 rounded-md my-0.5" />
+                ) : (
+                  <span className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
+                    {formatCurrency(kpis.total_mano_obra)}
+                  </span>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs text-neutral-500 dark:text-neutral-400 font-medium pt-3 mt-3 border-t border-neutral-100 dark:border-neutral-800/80">
               <div className="min-w-0">
                 <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">Repuestos:</span>
-                <span className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono text-xs sm:text-[13px] whitespace-nowrap block mt-0.5">
-                  RD$ {formatCurrency(kpis.total_repuestos)}
-                </span>
+                {loading ? (
+                  <Skeleton className="h-4 w-20 mt-1" />
+                ) : (
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono text-xs sm:text-[13px] whitespace-nowrap block mt-0.5">
+                    RD$ {formatCurrency(kpis.total_repuestos)}
+                  </span>
+                )}
               </div>
               <div className="min-w-0 text-right">
                 <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">Descuentos:</span>
-                <span className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono text-xs sm:text-[13px] whitespace-nowrap block mt-0.5">
-                  RD$ {formatCurrency(kpis.total_descuentos)}
-                </span>
+                {loading ? (
+                  <Skeleton className="h-4 w-20 mt-1 ml-auto" />
+                ) : (
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono text-xs sm:text-[13px] whitespace-nowrap block mt-0.5">
+                    RD$ {formatCurrency(kpis.total_descuentos)}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -831,9 +875,13 @@ const ReportesPage = () => {
                 <span className="text-xs sm:text-sm font-bold text-neutral-400 dark:text-neutral-500 select-none font-mono">
                   RD$
                 </span>
-                <span className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
-                  {formatCurrency(kpis.saldo_pendiente)}
-                </span>
+                {loading ? (
+                  <Skeleton className="h-7 sm:h-8 w-28 sm:w-36 rounded-md my-0.5" />
+                ) : (
+                  <span className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
+                    {formatCurrency(kpis.saldo_pendiente)}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex items-center text-xs text-neutral-500 dark:text-neutral-400 font-medium pt-3 mt-3 border-t border-neutral-100 dark:border-neutral-800/80">
@@ -851,20 +899,30 @@ const ReportesPage = () => {
                 <CheckCircle2 className="w-5 h-5 shrink-0 text-red-600 dark:text-red-400" />
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
-                  {kpis.ordenes_liquidadas || 0}
-                </span>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">
-                  de {kpis.ordenes_recibidas || 0} recibidas
-                </span>
+                {loading ? (
+                  <Skeleton className="h-7 sm:h-8 w-20 rounded-md my-0.5" />
+                ) : (
+                  <>
+                    <span className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
+                      {kpis.ordenes_liquidadas || 0}
+                    </span>
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">
+                      de {kpis.ordenes_recibidas || 0} recibidas
+                    </span>
+                  </>
+                )}
               </div>
             </div>
             <div className="text-xs text-neutral-500 dark:text-neutral-400 font-medium pt-3 mt-3 border-t border-neutral-100 dark:border-neutral-800/80">
               <div className="min-w-0">
                 <span className="block text-[11px] text-neutral-500 dark:text-neutral-400">Ticket promedio:</span>
-                <span className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono text-xs sm:text-[13px] whitespace-nowrap block mt-0.5">
-                  RD$ {formatCurrency(kpis.ticket_promedio)}
-                </span>
+                {loading ? (
+                  <Skeleton className="h-4 w-28 mt-1" />
+                ) : (
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono text-xs sm:text-[13px] whitespace-nowrap block mt-0.5">
+                    RD$ {formatCurrency(kpis.ticket_promedio)}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -893,9 +951,8 @@ const ReportesPage = () => {
               return (
                 <div
                   key={m.id}
-                  className={`p-3.5 sm:p-4 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-[#141416] shadow-xs flex flex-col justify-between transition-opacity ${
-                    isZero ? 'opacity-65' : ''
-                  }`}
+                  className={`p-3.5 sm:p-4 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-[#141416] shadow-xs flex flex-col justify-between transition-opacity ${isZero ? 'opacity-65' : ''
+                    }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">
@@ -1007,8 +1064,8 @@ const ReportesPage = () => {
                   cumplimiento >= 85
                     ? 'text-emerald-600 dark:text-emerald-400'
                     : cumplimiento >= 70
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-red-600 dark:text-red-400';
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-red-600 dark:text-red-400';
                 const initials = getInitials(tec.nombre);
 
                 return (
@@ -1176,11 +1233,10 @@ const ReportesPage = () => {
                       setDetalleEstado(tab.id);
                       setDetallePage(1);
                     }}
-                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                      isActive
+                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${isActive
                         ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
                         : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -1190,7 +1246,17 @@ const ReportesPage = () => {
           </div>
 
           {/* Resumen del Período Filtrado con Identificadores Sutiles */}
-          {detalleData.totales?.total_items > 0 && (
+          {detalleLoading ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 py-1.5 px-0.5 mb-3.5 text-xs">
+              <Skeleton className="h-4 w-40" />
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+          ) : detalleData.totales?.total_items > 0 ? (
             <div className="flex flex-wrap items-center justify-between gap-3 py-1.5 px-0.5 mb-3.5 text-xs">
               <div className="flex items-center gap-1.5">
                 <span className="font-outfit font-bold text-neutral-800 dark:text-neutral-200 text-xs sm:text-[13px]">
@@ -1239,7 +1305,7 @@ const ReportesPage = () => {
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Tabla Responsive */}
           <div className="overflow-x-auto rounded-2xl border border-neutral-200/70 dark:border-neutral-800/80">
@@ -1261,12 +1327,7 @@ const ReportesPage = () => {
               </thead>
               <tbody className="divide-y divide-neutral-200/70 dark:divide-neutral-800 text-neutral-800 dark:text-neutral-200 font-medium">
                 {detalleLoading ? (
-                  <tr>
-                    <td colSpan={11} className="py-12 text-center text-neutral-400">
-                      <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-2 text-red-600" />
-                      Cargando listado detallado...
-                    </td>
-                  </tr>
+                  <TableSkeleton rows={8} cols={11} />
                 ) : (!detalleData.ordenes || detalleData.ordenes.length === 0) ? (
                   <tr>
                     <td colSpan={11} className="py-12 text-center text-neutral-400">
@@ -1418,6 +1479,8 @@ const ReportesPage = () => {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
 
       {/* ── Portal de Impresión Ejecutiva A4/Carta ── */}

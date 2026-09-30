@@ -7,12 +7,12 @@ import {
   CheckCheck,
   CheckCircle2,
   ClipboardPlus,
-  Loader2,
   Package,
   Wrench,
   XCircle
 } from 'lucide-react';
 import { sileo } from 'sileo';
+import Skeleton from './common/Skeleton';
 import {
   getConteoNotificaciones,
   getNotificaciones,
@@ -177,6 +177,24 @@ const formatRelative = (value) => {
   if (days < 7) return `Hace ${days} d`;
   return date.toLocaleDateString('es-DO', { day: 'numeric', month: 'short' });
 };
+
+const NotificationsSkeleton = ({ count = 4 }) => (
+  <div className="divide-y divide-zinc-50 dark:divide-zinc-800/80">
+    {Array.from({ length: count }).map((_, idx) => (
+      <div key={idx} className="flex items-start gap-3 px-4 py-3">
+        <Skeleton className="w-8 h-8 rounded-full shrink-0 mt-0.5" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Skeleton className={`h-4 ${idx % 2 === 0 ? 'w-3/5' : 'w-1/2'} rounded-md`} />
+            <Skeleton className="w-2 h-2 rounded-full shrink-0" />
+          </div>
+          <Skeleton className={`h-3 ${idx % 2 === 0 ? 'w-4/5' : 'w-3/4'} rounded-md`} />
+          <Skeleton className="h-2.5 w-16 rounded-md mt-1" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 const NotificationBell = () => {
   const navigate = useNavigate();
@@ -371,10 +389,7 @@ const NotificationBell = () => {
 
           <div className="overflow-y-auto max-h-[calc(80vh-4.5rem)] sm:max-h-[22rem]">
             {loading ? (
-              <div className="flex items-center justify-center gap-2 py-12 text-sm text-zinc-500">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Cargando...
-              </div>
+              <NotificationsSkeleton count={4} />
             ) : items.length === 0 ? (
               <p className="px-4 py-12 text-center text-sm text-zinc-500">
                 No hay alertas por ahora.
