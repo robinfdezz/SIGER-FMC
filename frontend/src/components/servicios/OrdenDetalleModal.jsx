@@ -25,7 +25,6 @@ import {
   Image as ImageIcon,
   KeyRound,
   Unlock,
-  RefreshCw,
   Flame,
   ChevronsUp,
   Equal,
@@ -35,12 +34,18 @@ import {
   ClipboardCheck,
   PackageCheck,
   Shield,
-  Pencil
+  Pencil,
+  XCircle,
+  Check,
+  Copy
 } from 'lucide-react';
+import { copyToClipboard } from '../../utils/clipboard';
+import { sileo } from 'sileo';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
 import Badge from '../common/Badge';
 import SimpleButton from '../common/SimpleButton';
+import Skeleton from '../common/Skeleton';
 import { DeviceChecklistPicker } from './DeviceChecklistPicker';
 import { UnlockMethodView } from '../common/PatternLock';
 import { ServiceTimeline } from './ServiceTimeline';
@@ -162,6 +167,124 @@ const getEstadoIcon = (codigoEstado = '', ordenFlujo = null) => {
   return Clock;
 };
 
+const OrdenDetalleSkeleton = () => (
+  <div className="space-y-5">
+    {/* SECCIÓN 1: Tarjeta de Cliente y Recepción */}
+    <div className="p-4 rounded-2xl bg-neutral-50/80 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-3">
+      <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800/60">
+        <Skeleton className="h-3.5 w-56 rounded-md" />
+        <Skeleton className="h-3.5 w-28 rounded-md" />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start pt-1">
+        <div className="space-y-1.5">
+          <Skeleton className="h-2.5 w-16 rounded-md" />
+          <Skeleton className="h-4 w-36 rounded-md" />
+        </div>
+        <div className="space-y-1.5">
+          <Skeleton className="h-2.5 w-24 rounded-md" />
+          <Skeleton className="h-4 w-32 rounded-md" />
+        </div>
+        <div className="space-y-1.5">
+          <Skeleton className="h-2.5 w-20 rounded-md" />
+          <Skeleton className="h-4 w-28 rounded-md" />
+        </div>
+      </div>
+    </div>
+
+    {/* SECCIÓN 2: Datos del Dispositivo y Seguridad */}
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="sm:col-span-2 p-4 rounded-2xl bg-neutral-50/80 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-3">
+        <Skeleton className="h-3.5 w-36 rounded-md" />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Skeleton className="h-2.5 w-20 rounded-md" />
+            <Skeleton className="h-4 w-32 rounded-md" />
+          </div>
+          <div className="space-y-1.5">
+            <Skeleton className="h-2.5 w-24 rounded-md" />
+            <Skeleton className="h-4 w-28 rounded-md" />
+          </div>
+          <div className="space-y-1.5">
+            <Skeleton className="h-2.5 w-16 rounded-md" />
+            <Skeleton className="h-4 w-20 rounded-md" />
+          </div>
+          <div className="space-y-1.5">
+            <Skeleton className="h-2.5 w-20 rounded-md" />
+            <Skeleton className="h-4 w-24 rounded-md" />
+          </div>
+        </div>
+      </div>
+
+      {/* Seguridad / Acceso */}
+      <div className="p-4 rounded-2xl bg-neutral-50/80 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 flex flex-col items-center justify-between text-center gap-2">
+        <Skeleton className="h-3.5 w-28 rounded-md" />
+        <div className="my-auto py-2 w-full flex items-center justify-center">
+          <Skeleton className="w-20 h-20 rounded-xl" />
+        </div>
+        <Skeleton className="h-2.5 w-16 rounded-md" />
+      </div>
+    </div>
+
+    {/* SECCIÓN 3: Diagnóstico / Falla Reportada y Observaciones */}
+    <div className="p-4 rounded-2xl bg-neutral-50/80 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-3">
+      <div className="space-y-2">
+        <Skeleton className="h-3.5 w-48 rounded-md" />
+        <Skeleton className="h-4 w-full rounded-md" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+        <div className="space-y-1.5">
+          <Skeleton className="h-2.5 w-32 rounded-md" />
+          <Skeleton className="h-3.5 w-3/4 rounded-md" />
+        </div>
+        <div className="space-y-1.5">
+          <Skeleton className="h-2.5 w-28 rounded-md" />
+          <Skeleton className="h-3.5 w-1/2 rounded-md" />
+        </div>
+      </div>
+    </div>
+
+    {/* SECCIÓN 4: Resumen Económico */}
+    <div className="p-4 rounded-2xl bg-neutral-50/80 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-3">
+      <Skeleton className="h-3.5 w-40 rounded-md" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+        <div className="space-y-1">
+          <Skeleton className="h-2.5 w-20 rounded-md" />
+          <Skeleton className="h-4 w-24 rounded-md" />
+        </div>
+        <div className="space-y-1">
+          <Skeleton className="h-2.5 w-16 rounded-md" />
+          <Skeleton className="h-4 w-20 rounded-md" />
+        </div>
+        <div className="space-y-1">
+          <Skeleton className="h-2.5 w-16 rounded-md" />
+          <Skeleton className="h-4 w-20 rounded-md" />
+        </div>
+        <div className="space-y-1">
+          <Skeleton className="h-2.5 w-12 rounded-md" />
+          <Skeleton className="h-5 w-28 rounded-md" />
+        </div>
+      </div>
+    </div>
+
+    {/* SECCIÓN 5: Línea de Tiempo / Bitácora */}
+    <div className="space-y-4 pt-1">
+      <Skeleton className="h-4 w-44 rounded-md" />
+      <div className="space-y-4 pl-2">
+        {[1, 2].map((i) => (
+          <div key={i} className="flex gap-3">
+            <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <Skeleton className="h-4 w-44 rounded-md" />
+              <Skeleton className="h-3 w-56 rounded-md" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
 export const OrdenDetalleModal = ({
   isOpen,
   onClose,
@@ -175,6 +298,7 @@ export const OrdenDetalleModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [activePhoto, setActivePhoto] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [copiedTicket, setCopiedTicket] = useState(false);
 
   const { user } = useAuth();
   const userRole = String(user?.rol_nombre || user?.rol || '').toLowerCase();
@@ -438,26 +562,55 @@ export const OrdenDetalleModal = ({
     return [];
   }, [currentOrder]);
 
-  if (!isOpen || !currentOrder) return null;
+  if (!isOpen) return null;
 
-  const prioridadConfig = getPrioridadConfig(currentOrder.prioridad);
-  const estadoColor = currentOrder.estado_color || '#DC2626';
-  const EstadoIcon = getEstadoIcon(currentOrder.codigo_estado, currentOrder.orden_flujo);
-  const estadoNombre = currentOrder.estado || currentOrder.nombre_estado || 'En Proceso';
-  const formattedDate = formatDateTime(currentOrder.created_at);
+  const isDetalleLoading = !detalles || isLoading || !currentOrder;
+
+  const prioridadConfig = getPrioridadConfig(currentOrder?.prioridad);
+  const estadoColor = currentOrder?.estado_color || '#DC2626';
+  const EstadoIcon = getEstadoIcon(currentOrder?.codigo_estado, currentOrder?.orden_flujo);
+  const estadoNombre = currentOrder?.estado || currentOrder?.nombre_estado || 'En Proceso';
+  const formattedDate = formatDateTime(currentOrder?.created_at);
 
   const numTecnicos = listaTecnicos.length;
   const labelTecnicos = numTecnicos > 1 ? 'Técnicos' : 'Técnico';
   const textoTecnicos = numTecnicos > 0 ? listaTecnicos.join(', ') : 'Sin asignar';
 
   // Desduplicación inteligente de marca y modelo
-  const rawMarca = (currentOrder.marca_equipo || '').trim();
-  let rawModelo = (currentOrder.modelo_equipo || '').trim();
+  const rawMarca = (currentOrder?.marca_equipo || '').trim();
+  let rawModelo = (currentOrder?.modelo_equipo || '').trim();
   if (rawMarca && rawModelo.toLowerCase().startsWith(rawMarca.toLowerCase())) {
     rawModelo = rawModelo.slice(rawMarca.length).replace(/^[\s\-_/]+/, '').trim();
   }
 
-  const customHeader = (
+  const customHeader = isDetalleLoading ? (
+    <div className="p-5 sm:p-6 pb-4 shrink-0 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-900/40 flex items-start justify-between gap-4">
+      <div className="min-w-0 space-y-2 flex-1">
+        {/* Fila 1: Marca · Modelo + Badge Estado + Badge Prioridad */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <Skeleton className="h-6 w-44 rounded-md" />
+          <Skeleton className="h-5 w-24 rounded-md" />
+          <Skeleton className="h-5 w-16 rounded-md" />
+        </div>
+        {/* Fila 2: Ticket, Fecha Ingreso y Técnico */}
+        <div className="flex items-center gap-2.5 flex-wrap mt-1">
+          <Skeleton className="h-4 w-28 rounded-md" />
+          <span className="text-neutral-300 dark:text-neutral-700 font-bold">·</span>
+          <Skeleton className="h-4 w-36 rounded-md" />
+          <span className="text-neutral-300 dark:text-neutral-700 font-bold">·</span>
+          <Skeleton className="h-4 w-28 rounded-md" />
+        </div>
+      </div>
+      <button
+        onClick={onClose}
+        className="p-2 rounded-xl text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-800 transition-colors shrink-0 cursor-pointer"
+        title="Cerrar modal"
+        aria-label="Cerrar"
+      >
+        <X size={18} />
+      </button>
+    </div>
+  ) : (
     <div className="p-5 sm:p-6 pb-4 shrink-0 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-900/40 flex items-start justify-between gap-4">
       <div className="min-w-0 space-y-1 flex-1">
         {/* Fila 1: Marca · Modelo + Badge Estado + Badge Prioridad + Garantía */}
@@ -494,7 +647,7 @@ export const OrdenDetalleModal = ({
           >
             {prioridadConfig.label}
           </Badge>
-          {currentOrder.es_garantia && (
+          {currentOrder?.es_garantia && (
             <Badge
               variant="minimal"
               color="danger"
@@ -509,10 +662,36 @@ export const OrdenDetalleModal = ({
 
         {/* Fila 2: Ticket, Fecha Ingreso y Técnico/s (Limpia sin cajas redundantes) */}
         <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 font-inter mt-1">
-          <span className="inline-flex items-center gap-1 font-mono font-bold text-neutral-800 dark:text-neutral-200">
+          <button
+            type="button"
+            onClick={async () => {
+              if (!currentOrder?.codigo_ticket) return;
+              const success = await copyToClipboard(currentOrder.codigo_ticket);
+              if (success) {
+                setCopiedTicket(true);
+                setTimeout(() => setCopiedTicket(false), 1500);
+                sileo.success({
+                  title: 'Código copiado',
+                  description: currentOrder.codigo_ticket
+                });
+              } else {
+                sileo.error({
+                  title: 'Error al copiar',
+                  description: 'No se pudo copiar automáticamente el código.'
+                });
+              }
+            }}
+            title="Copiar código de ticket"
+            className="inline-flex items-center gap-1 font-mono font-bold text-neutral-800 dark:text-neutral-200 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer group"
+          >
             <Hash size={13} className="shrink-0 text-red-500" />
-            <span>{currentOrder.codigo_ticket}</span>
-          </span>
+            <span>{currentOrder?.codigo_ticket}</span>
+            {copiedTicket ? (
+              <Check size={13} className="text-emerald-500 shrink-0 animate-in fade-in duration-150" />
+            ) : (
+              <Copy size={12} className="text-neutral-400 dark:text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            )}
+          </button>
           <span className="text-neutral-300 dark:text-neutral-700 font-bold">·</span>
           <span className="inline-flex items-center gap-1.5">
             <Calendar size={13} className="shrink-0 text-neutral-400" />
@@ -537,9 +716,9 @@ export const OrdenDetalleModal = ({
     </div>
   );
 
-  const codEstado = String(currentOrder.codigo_estado || '').toUpperCase().trim();
-  const nomEstado = String(currentOrder.estado || currentOrder.nombre_estado || '').toLowerCase().trim();
-  const flujoEstado = Number(currentOrder.orden_flujo || 0);
+  const codEstado = String(currentOrder?.codigo_estado || '').toUpperCase().trim();
+  const nomEstado = String(currentOrder?.estado || currentOrder?.nombre_estado || '').toLowerCase().trim();
+  const flujoEstado = Number(currentOrder?.orden_flujo || 0);
 
   const esEstadoInactivo =
     flujoEstado === 7 ||
@@ -552,7 +731,12 @@ export const OrdenDetalleModal = ({
   const canEdit = !esEstadoInactivo && userRole !== 'tecnico';
   const canShowOpenTaller = Boolean(onOpenTaller && !esEstadoInactivo);
 
-  const footer = (canEdit || canShowOpenTaller) ? (
+  const footer = isDetalleLoading ? (
+    <div className="flex items-center justify-between w-full gap-3">
+      <Skeleton className="h-9 w-28 rounded-xl" />
+      <Skeleton className="h-9 w-44 rounded-xl ml-auto" />
+    </div>
+  ) : (canEdit || canShowOpenTaller) ? (
     <div className="flex items-center justify-between w-full gap-3 flex-wrap">
       <div>
         {canEdit && (
@@ -583,7 +767,17 @@ export const OrdenDetalleModal = ({
         )}
       </div>
     </div>
-  ) : null;
+  ) : (
+    <div className="flex items-center justify-end w-full">
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onClose}
+      >
+        Cerrar
+      </Button>
+    </div>
+  );
 
   return (
     <>
@@ -596,13 +790,43 @@ export const OrdenDetalleModal = ({
         height="h-auto max-h-[90vh]"
         bodyClassName="p-5 sm:p-6 overflow-y-auto space-y-6"
       >
-        {isLoading && !detalles ? (
-          <div className="py-16 flex flex-col items-center justify-center gap-3 text-neutral-400">
-            <RefreshCw size={28} className="animate-spin text-red-500" />
-            <p className="text-sm font-medium font-inter">Cargando detalles de la orden...</p>
-          </div>
+        {isDetalleLoading ? (
+          <OrdenDetalleSkeleton />
         ) : (
           <div className="space-y-5">
+            {/* Aviso sutil de Ciclo Cerrado si la orden es terminal */}
+            {esEstadoInactivo && (
+              <div className="flex flex-col items-center justify-center text-center gap-1.5 py-2 px-4">
+                {flujoEstado === 7 || codEstado.includes('ENTREG') ? (
+                  <CheckCircle2 size={32} className="text-emerald-600 dark:text-emerald-400 shrink-0 stroke-[1.75]" />
+                ) : (
+                  <XCircle size={32} className="text-red-600 dark:text-red-400 shrink-0 stroke-[1.75]" />
+                )}
+                <div className="space-y-1 max-w-lg">
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 font-outfit">
+                      Orden de Servicio:
+                    </p>
+                    <Badge
+                      variant="minimal"
+                      size="sm"
+                      showDot={false}
+                      icon={<EstadoIcon size={12} className="shrink-0 stroke-[2.2]" style={{ color: estadoColor }} />}
+                      className="font-medium"
+                      style={{ color: estadoColor }}
+                    >
+                      {estadoNombre}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 font-inter leading-relaxed">
+                    {flujoEstado === 7 || codEstado.includes('ENTREG')
+                      ? 'Esta orden ya fue liquidada y entregada al cliente. Su ciclo de servicio está cerrado y no admite modificaciones de estado.'
+                      : 'Esta orden fue cancelada y devuelta al cliente. Su ciclo técnico está cerrado definitivamente.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* SECCIÓN 1: Tarjeta de Cliente y Recepción */}
             <div className="p-4 rounded-2xl bg-neutral-50/80 dark:bg-neutral-900/60 border border-neutral-200/70 dark:border-neutral-800/80 space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-800/60">

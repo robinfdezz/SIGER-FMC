@@ -97,9 +97,10 @@ frontend/
 * **Microcomponente de Confirmación Inline (`InlineConfirmButton`):**
   - Para acciones críticas o de confirmación (guardar configuraciones de sucursal/empresa, despachar y cobrar órdenes, autoasignarse órdenes de taller), preferir la doble confirmación interactiva en el mismo botón (`¿Guardar? [✓] [✕]` / `¿Confirmar entrega? [✓] [✕]`).
   - Soporta tamaño `size="md"` para formularios y modales principales, e integra validaciones previas (`onBeforeConfirm`) antes de alternar el estado.
-* **Estados de Carga con Esqueletos Preciso (Shimmer Skeletons):**
-  - En vistas de consulta pública o paneles con estructura geométrica fija, utilizar `react-loading-skeleton` con `<SkeletonTheme>` adaptado a tema claro (`#e5e7eb` / `#f3f4f6`) y oscuro (`#262626` / `#404040`).
-  - El esqueleto debe calcar la geometría, dimensiones de tarjetas, nodos de stepper y tablas 1:1 respecto a la vista final, eliminando saltos bruscos de diseño (*CLS*).
+* **Estados de Carga con Esqueletos Nativos (Skeletons Atómicos y Cero CLS):**
+  - Queda estrictamente prohibido el uso de librerías externas de esqueletos (como `react-loading-skeleton`). Se utiliza la primitiva atómica unificada `<Skeleton className="..." />` (`frontend/src/components/common/Skeleton.jsx`) con pulso suave (`animate-pulse`) y tonalidades calibradas para tema claro (`bg-neutral-200/80`) y oscuro (`dark:bg-neutral-800/80`).
+  - **Componentes Dedicados vs. Inline:** Pantallas analíticas multi-grid utilizan componentes dedicados (`DashboardSkeleton.jsx`, `ReportesSkeleton.jsx`); vistas tabulares consumen `<TableSkeleton rows={...} columns={...} />`; mientras que vistas CRUD (`ClientsPage`, `WorkersPage`), paneles de configuración y modales estructuran su skeleton de forma anatómica inline (`{loading ? <Skeleton /> : <Content />}`).
+  - El esqueleto debe calcar la geometría, dimensiones de tarjetas, nodos de stepper y tablas 1:1 respecto a la vista final, garantizando un desplazamiento acumulativo de diseño nulo (**Cumulative Layout Shift - CLS = 0%**).
 * **Envoltorio Natural de Texto en Tablas:** En columnas de nombres de clientes y modelos de dispositivos, evitar el uso de `truncate` estricto; utilizar `whitespace-normal break-words leading-snug` con ancho delimitado para permitir el flujo multilínea sin cortes bruscos.
 * **Presentación de Roles en Tablas:** Utilizar el componente oficial `<Badge variant="minimal" color={...} icon={RoleIcon}>{nombreRol}</Badge>` para proyectar un formato en línea limpio con icono y texto a color semántico sin recuadros ni fondos pesados.
 * **Indicadores de Campos Obligatorios:** En formularios, todo asterisco indicador de obligatoriedad debe proyectar explícitamente `<span className="text-red-500">*</span>` en color rojo institucional.
@@ -137,6 +138,16 @@ frontend/
    * `Tecnico`: Solo gestiona tickets asignados o de su sede en el banco de trabajo. No puede crear órdenes de servicio (`403 Forbidden`).
    * `Secretaria`: Apertura de órdenes en mostrador, emisión de comprobantes y cobro/entrega.
    * **Restricción Estricta de Cancelación de Órdenes:** Solo `SuperAdmin` y `Admin_Sucursal` están autorizados para cancelar o dar de baja órdenes de servicio (`POST /api/servicios/:id/cancelar`). Usuarios con rol `Tecnico` o `Secretaria` tienen terminantemente denegada esta acción (`403 Forbidden`).
+5. **Inmutabilidad Absoluta de Estados Terminales (`ENTREGADO` y `CANCELADO_DEVUELTO`):**
+   * Una orden en estado `ENTREGADO` o `CANCELADO_DEVUELTO` representa el cierre definitivo del ciclo de servicio y es 100% inmutable.
+   * El backend (`actualizarEstadoServicio`) rechaza cualquier mutación de estado con `400 Bad Request` (*"No se puede modificar el estado de una orden que ya ha sido entregada / cancelada"*).
+   * La interfaz de taller y detalle bloquea los selectores de cambio de estado y renderiza un banner sobrio y centrado con icono de 32px (`CheckCircle2` o `XCircle`), título `"Orden de Servicio: [Badge Estado]"` y descripción clara del cierre de ciclo.
+6. **Integridad de Clientes en Órdenes de Servicio:**
+   * **Apertura de Órdenes:** Se prohíbe abrir órdenes para clientes inactivos. El frontend filtra clientes inactivos (`activo = false`) y el backend rechaza la creación con HTTP `400 Bad Request`.
+   * **Desactivación de Clientes:** Se prohíbe desactivar clientes con órdenes activas en curso (distintas de `ENTREGADO` y `CANCELADO_DEVUELTO`). El backend responde con HTTP `409 Conflict` detallando los tickets y la UI previene la baja.
+7. **Integridad de Personal y Asignación Técnica:**
+   * Los selectores de asignación filtran exclusivamente personal activo (`activo = true`) con rol `Tecnico`.
+   * Se prohíbe desactivar a un trabajador si posee órdenes asignadas activas en curso (el backend responde con HTTP `409 Conflict` enumerando los tickets y la UI exige su reasignación previa).
 
 ## 6. Identidad Visual, UI/UX y Sistema de Temas
 
@@ -302,7 +313,17 @@ frontend/
      * Si se pasa la prop `icon`, se renderiza con dimensionamiento adaptativo proporcional (`w-3 h-3` para `size="sm"` y `w-3.5 h-3.5` para `size="md"`) heredando el color semántico de la variante.
      * Si no se pasa `icon` y `showDot` es `true`, renderiza el punto indicador circular (`w-1.5 h-1.5 rounded-full`).
      * **Variante Minimalista (`variant="minimal"` / `badgeVariant="minimal"`):** Renderiza una presentación limpia y en línea con texto e icono al color semántico, sin fondos opacos pesados ni bordes gruesos. Estandarizado para roles en tablas maestras y elementos de checklist técnico en modales (`DeviceChecklistPicker`, `OrdenDetalleModal`, `FichaTecnicaModal`).
-   * **Estética:** Bordes suaves `rounded-lg`, padding equilibrado y tipografía `font-medium text-xs`.
+   * **Estética:** Bordes suaves `rounded-lg`, padding equilibrado y tipografía `font-medium text-xs`
+
+8. **`Skeleton.jsx` y `TableSkeleton.jsx` (Primitivas Nativas de Carga y Cero CLS):**
+   * **`Skeleton.jsx` Props:** `className`, `rounded` (`'none' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'`), `...props`.
+   * **`TableSkeleton.jsx` Props:** `rows` (por defecto: `5`), `columns` (por defecto: `6`), `className`.
+   * **Estética:** Animación de pulso continuo (`animate-pulse`), tonalidad adaptativa a tema claro (`bg-neutral-200/80`) y oscuro (`dark:bg-neutral-800/80`). Reemplaza cualquier librería externa manteniendo un desplazamiento de layout nulo (CLS 0%).
+
+9. **`copyToClipboard(text)` (`frontend/src/utils/clipboard.js`):**
+   * **Firma:** `async (text: string) => Promise<boolean>`
+   * **Comportamiento:** Copia universal tolerante a fallos. Intenta `navigator.clipboard.writeText` y recurre automáticamente a un `textarea` invisible temporal con `document.execCommand('copy')` para entornos de desarrollo sobre IP local (ej. `http://192.168.x.x:5173`) o contextos HTTP restringidos.
+   * **Convención en UI:** Acompañar el copiado con microanimación de icono `<Check className="text-emerald-500" />` y notificación toast (`sileo.success`).
 
 ### 8.4 Homologación de Modales de Alta Densidad y Flujos Críticos (`OrdenDetalleModal.jsx`, `CancelarOrdenModal.jsx`)
 

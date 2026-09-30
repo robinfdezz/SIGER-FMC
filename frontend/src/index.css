@@ -200,9 +200,93 @@
   animation: keycap-press-dark 2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
+/* ─────────────────────────────────────────────────────────
+   ANIMACIONES DE ENTRADA Y SALIDA HOMOLOGADAS (INLINE CONFIRM)
+   Transición simétrica, suave y sutil para confirmación inline
+   ───────────────────────────────────────────────────────── */
+@keyframes inline-confirm-in-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes inline-confirm-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(6px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes inline-confirm-out-left {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.95);
+  }
+}
+
+@keyframes inline-confirm-out-right {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(6px) scale(0.95);
+  }
+}
+
+@keyframes inline-confirm-in-center {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-confirm-in-left {
+  animation: inline-confirm-in-left 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-confirm-in-right {
+  animation: inline-confirm-in-right 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-confirm-out-left {
+  animation: inline-confirm-out-left 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-confirm-out-right {
+  animation: inline-confirm-out-right 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-confirm-in-center {
+  animation: inline-confirm-in-center 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-bell-ring,
-  .group:hover .animate-keycap {
-    animation: none;
+  .group:hover .animate-keycap,
+  .animate-confirm-in-left,
+  .animate-confirm-in-right,
+  .animate-confirm-out-left,
+  .animate-confirm-out-right,
+  .animate-confirm-in-center {
+    animation: none !important;
   }
 }

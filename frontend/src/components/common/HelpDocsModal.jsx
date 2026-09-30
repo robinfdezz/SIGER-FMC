@@ -211,7 +211,7 @@ export const HelpDocsModal = ({ isOpen, onClose }) => {
                     {cat.items.map((item, itemIdx) => (
                       <div
                         key={itemIdx}
-                        className="group hover:bg-white dark:hover:bg-neutral-800/70 rounded-xl p-2.5 transition-colors cursor-default flex items-start justify-between gap-3"
+                        className="group hover:bg-white dark:hover:bg-neutral-800/70 rounded-xl p-2.5 transition-colors cursor-default flex items-start justify-between gap-3 border border-transparent hover:border-neutral-200/80 dark:hover:border-neutral-700/70"
                       >
                         <div className="space-y-0.5 min-w-0">
                           <p className="text-xs sm:text-sm font-semibold text-neutral-800 dark:text-neutral-200 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors">

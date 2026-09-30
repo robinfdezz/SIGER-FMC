@@ -11,17 +11,17 @@ import Badge from '../components/common/Badge';
 import Pagination from '../components/common/Pagination';
 import ResetFiltersButton from '../components/common/ResetFiltersButton';
 import AnimatedIconButton from '../components/common/AnimatedIconButton';
+import Skeleton from '../components/common/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { getServicios, getServicioById } from '../services/servicios.service';
 import { getEstados, getSucursales } from '../services/catalogs.service';
 import { getWorkers } from '../services/workers.service';
 import { getCompanyProfile, getBranches } from '../services/configuracion.service';
 import { sileo } from 'sileo';
+import { RotateCw } from 'lucide';
 import {
   Plus,
   Search,
-  RefreshCw,
-  RotateCcw,
   Ticket,
   Printer,
   User,
@@ -280,6 +280,116 @@ const FALLBACK_ESTADOS = [
   { id: 8, codigo_estado: 'CANCELADO', nombre_estado: 'Cancelado / No Reparado', color_badge: '#EF4444', orden_flujo: 8 }
 ];
 
+const TableSkeletonRows = ({ count = 7 }) => {
+  return Array.from({ length: count }).map((_, idx) => (
+    <tr key={`skeleton-row-${idx}`}>
+      {/* Columna 1: Ticket */}
+      <td className="py-3.5 px-2.5 sm:px-3 whitespace-nowrap align-middle">
+        <Skeleton className="h-4 w-24 font-mono" />
+        {idx % 3 === 0 && (
+          <Skeleton className="h-3.5 w-16 rounded-full mt-1.5" />
+        )}
+      </td>
+
+      {/* Columna 2: Cliente */}
+      <td className="py-3.5 px-3 sm:px-4 whitespace-nowrap align-middle">
+        <Skeleton className="h-4 w-28 sm:w-36" />
+        <Skeleton className="h-3 w-20 sm:w-24 mt-1.5" />
+      </td>
+
+      {/* Columna 3: Equipo */}
+      <td className="py-3.5 px-3 sm:px-4 whitespace-nowrap align-middle">
+        <div className="flex items-center gap-2">
+          <Skeleton className="w-4 h-4 shrink-0" />
+          <Skeleton className="h-4 w-32 sm:w-40" />
+        </div>
+        <Skeleton className="h-3 w-36 sm:w-48 mt-1.5 ml-6" />
+      </td>
+
+      {/* Columna 4: Estado */}
+      <td className="py-3.5 px-3 sm:px-4 whitespace-nowrap align-middle">
+        <Skeleton className="h-6 w-24 sm:w-28 rounded-full" />
+      </td>
+
+      {/* Columna 5: Prioridad */}
+      <td className="py-3.5 px-3 sm:px-4 whitespace-nowrap align-middle">
+        <Skeleton className="h-6 w-16 sm:w-20 rounded-full" />
+      </td>
+
+      {/* Columna 6: Fecha */}
+      <td className="py-3.5 px-2.5 sm:px-3 whitespace-nowrap align-middle">
+        <Skeleton className="h-3.5 w-16 sm:w-20" />
+        <Skeleton className="h-3 w-12 mt-1.5" />
+      </td>
+
+      {/* Columna 7: Acciones */}
+      <td className="py-3.5 px-2 sm:px-2.5 whitespace-nowrap text-center align-middle">
+        <div className="flex items-center justify-center gap-1.5">
+          <Skeleton className="w-7 h-7 rounded-lg" />
+          <Skeleton className="w-7 h-7 rounded-lg" />
+        </div>
+      </td>
+    </tr>
+  ));
+};
+
+const ServiciosHeaderFiltersSkeleton = ({ isSuperAdmin, isTecnico }) => {
+  return (
+    <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-5">
+      {/* Fila Superior: Título, subtítulo y botones de acción */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
+        <div className="space-y-2">
+          <Skeleton className="h-6 sm:h-7 w-48 sm:w-56 rounded-lg" />
+          <Skeleton className="h-3.5 sm:h-4 w-64 sm:w-80" />
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          <Skeleton className="w-9 h-9 rounded-xl" />
+          {!isTecnico && (
+            <Skeleton className="h-10 w-32 rounded-xl" />
+          )}
+        </div>
+      </div>
+
+      {/* Fila Inferior: Buscador Dinámico y Filtros */}
+      <div className="space-y-3">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          {/* Buscador Prominente Dinámico */}
+          <Skeleton className="h-10 max-w-md lg:max-w-lg w-full rounded-xl" />
+
+          {/* Selectores Dinámicos y Botón Limpiar */}
+          <div className="flex flex-wrap items-center gap-2 justify-start lg:justify-end">
+            <Skeleton className="h-10 w-[185px] sm:w-[205px] rounded-xl" />
+            <Skeleton className="h-10 w-[140px] sm:w-[155px] rounded-xl" />
+            {isSuperAdmin && (
+              <Skeleton className="h-10 w-[145px] sm:w-[165px] rounded-xl" />
+            )}
+            <Skeleton className="h-10 w-[140px] sm:w-[160px] rounded-xl" />
+            <Skeleton className="h-10 w-10 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PaginationSkeleton = () => {
+  return (
+    <div className="p-4 border-t border-neutral-100 dark:border-neutral-800/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-8 w-24 rounded-lg" />
+        <Skeleton className="h-4 w-36" />
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Skeleton className="h-8 w-8 rounded-lg" />
+        <Skeleton className="h-8 w-8 rounded-lg" />
+        <Skeleton className="h-8 w-8 rounded-lg" />
+        <Skeleton className="h-8 w-8 rounded-lg" />
+      </div>
+    </div>
+  );
+};
+
 export const ServiciosPage = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
@@ -314,6 +424,7 @@ export const ServiciosPage = () => {
 
   // Estado de la tabla y paginación
   const [ordenes, setOrdenes] = useState([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshSuccess, setRefreshSuccess] = useState(false);
@@ -449,6 +560,7 @@ export const ServiciosPage = () => {
       return false;
     } finally {
       setIsLoading(false);
+      setInitialLoading(false);
     }
   }, [debouncedSearch, selectedEstado, selectedPrioridad, selectedBranch, selectedTecnico, page, limit]);
 
@@ -660,8 +772,35 @@ export const ServiciosPage = () => {
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
-        {/* Contenedor Superior Integrado (Encabezado + Filtros) */}
-        <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-5">
+        {initialLoading ? (
+          <>
+            <ServiciosHeaderFiltersSkeleton isSuperAdmin={isSuperAdmin} isTecnico={isTecnico} />
+            <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl shadow-xs overflow-hidden flex flex-col">
+              <div className="w-full overflow-x-auto overflow-y-auto h-[560px] relative">
+                <table className="w-full min-w-[760px] text-left border-collapse">
+                  <thead className="sticky top-0 z-10 bg-neutral-50 dark:bg-[#141416] shadow-xs">
+                    <tr className="border-b border-neutral-200 dark:border-neutral-800 text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider font-inter">
+                      <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap w-[11%] min-w-[105px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Ticket</th>
+                      <th className="py-3 px-3 sm:px-4 whitespace-nowrap w-[20%] min-w-[165px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Cliente</th>
+                      <th className="py-3 px-3 sm:px-4 whitespace-nowrap w-[22%] min-w-[165px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Equipo</th>
+                      <th className="py-3 px-3 sm:px-4 whitespace-nowrap w-[17%] min-w-[130px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Estado</th>
+                      <th className="py-3 px-3 sm:px-4 whitespace-nowrap w-[13%] min-w-[100px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Prioridad</th>
+                      <th className="py-3 px-2.5 sm:px-3 whitespace-nowrap w-[12%] min-w-[90px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Fecha</th>
+                      <th className="py-3 px-2 sm:px-2.5 whitespace-nowrap text-center w-[5%] min-w-[50px] bg-neutral-50 dark:bg-[#141416] sticky top-0">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
+                    <TableSkeletonRows count={7} />
+                  </tbody>
+                </table>
+              </div>
+              <PaginationSkeleton />
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Contenedor Superior Integrado (Encabezado + Filtros) */}
+            <div className="bg-white dark:bg-[#141416] border border-neutral-200/80 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-5">
           {/* Fila Superior: Título, subtítulo y botones de acción */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
             <div>
@@ -675,7 +814,7 @@ export const ServiciosPage = () => {
 
             <div className="flex items-center gap-2.5 shrink-0">
               <AnimatedIconButton
-                icon={RotateCcw}
+                icon={RotateCw}
                 loading={isRefreshing}
                 success={refreshSuccess}
                 onSuccessEnd={() => setRefreshSuccess(false)}
@@ -840,14 +979,7 @@ export const ServiciosPage = () => {
               </thead>
               <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-inter text-sm">
                 {isLoading ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-neutral-400">
-                      <div className="flex flex-col items-center justify-center gap-3">
-                        <RefreshCw className="animate-spin text-red-500" size={28} />
-                        <span className="text-sm">Cargando órdenes...</span>
-                      </div>
-                    </td>
-                  </tr>
+                  <TableSkeletonRows count={7} />
                 ) : sortedServicios.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-neutral-400">
@@ -1096,6 +1228,8 @@ export const ServiciosPage = () => {
             isLoading={isLoading}
           />
         </div>
+          </>
+        )}
       </div>
 
       {/* Modal de Detalle / Ficha de la Orden */}

@@ -355,6 +355,11 @@ La arquitectura de seguridad de SIGER-FMC implementa control de acceso basado en
     }
   }
   ```
+- **Errores:**
+  - `400 Bad Request`: ID inválido o intento de auto-desactivar la cuenta propia de sesión activa.
+  - `403 Forbidden`: Intento de alternar el estado de trabajadores de otra sucursal.
+  - `404 Not Found`: Trabajador no encontrado.
+  - `409 Conflict`: El trabajador posee órdenes activas en curso asignadas en el taller (distintas de `ENTREGADO` y `CANCELADO_DEVUELTO`). Se responde detallando los tickets pendientes y se bloquea la desactivación.
 
 ---
 
@@ -562,6 +567,7 @@ La arquitectura de seguridad de SIGER-FMC implementa control de acceso basado en
   - `400 Bad Request`: ID inválido.
   - `403 Forbidden`: Intento de alternar estado por parte de roles no administrativos (`Secretaria` o `Tecnico`).
   - `404 Not Found`: Cliente no encontrado.
+  - `409 Conflict`: El cliente posee órdenes de servicio activas en curso (distintas de `ENTREGADO` y `CANCELADO_DEVUELTO`). Se responde con la lista de tickets pendientes y se bloquea la desactivación.
 
 ---
 
@@ -789,7 +795,7 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
   }
   ```
 - **Errores:**
-  - `400 Bad Request`: Falta de campos obligatorios (`categoria_id`, `falla_reportada`, `marca_equipo`, etc.) o fecha estimada de entrega anterior a la fecha actual.
+  - `400 Bad Request`: Falta de campos obligatorios (`categoria_id`, `falla_reportada`, `marca_equipo`, etc.), fecha estimada de entrega anterior a la fecha actual, o cliente inactivo (`activo = false`) (*"No se puede aperturar una orden para un cliente inactivo. Por favor active al cliente previamente."*).
   - `403 Forbidden`: Usuario con rol `Tecnico` o usuario sin sucursal asignada.
 
 ---
@@ -946,6 +952,8 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
 - **Aislamiento Multi-Sucursal Estricto:**
   - Si el usuario no es `SuperAdmin`, la consulta valida `WHERE id = :id AND sucursal_id = req.user.sucursal_id`.
   - Intentar modificar órdenes de otra sede retorna `404 Not Found` (*"Orden de servicio no encontrada en esta sucursal"*).
+- **Inmutabilidad Absoluta de Estados Terminales:**
+  - Si el estado actual de la orden es `ENTREGADO` o `CANCELADO_DEVUELTO`, la petición se rechaza taxativamente con `400 Bad Request` (*"No se puede modificar el estado de una orden que ya ha sido entregada."* o *"No se puede modificar el estado de una orden cancelada."*). Los estados terminales son irreversibles.
 - **Regla de Asignación Obligatoria:**
   - No es posible avanzar el estado desde `RECIBIDO` hacia estados operativos superiores (`EN_DIAGNOSTICO`, `ESPERA_REPUESTO`, `EN_REPARACION`, etc.) si la orden no tiene al menos un técnico asignado en `tecnicos_asignados`.
   - Si no hay técnicos asignados, la petición retorna `400 Bad Request`:
@@ -966,6 +974,10 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
     "servicio": { ... }
   }
   ```
+- **Errores:**
+  - `400 Bad Request`: Orden en estado terminal inmutable (`ENTREGADO` o `CANCELADO_DEVUELTO`), o intento de avanzar sin técnicos asignados.
+  - `403 Forbidden`: Intento de cambiar estado por usuario sin permisos.
+  - `404 Not Found`: Orden de servicio no encontrada o no pertenece a la sucursal del usuario.
 
 ---
 
