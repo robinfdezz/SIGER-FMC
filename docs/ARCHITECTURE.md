@@ -818,3 +818,56 @@ export async function copyToClipboard(text) {
 ### 10.2 Pautas de Integración en UI
 - **Feedback Inmediato:** Toda acción de copiado debe estar acompañada de una microanimación con el icono `<Check />` y un toast informativo (`sileo.success({ title: 'Código copiado', description: ticket })`).
 - **Respeto a Políticas de Seguridad de Lectura:** El pegado programático (`navigator.clipboard.readText()`) requiere permisos explícitos del usuario que suelen ser bloqueados en contextos HTTP locales. La interfaz nunca debe asumir que la lectura automática es infalible: ante cualquier bloqueo de permisos, enfoca el campo de entrada y guía al usuario con una notificación no intrusiva a usar `Ctrl + V`.
+
+---
+
+## 11. Subsistema Anti-Bot y Widget Flotante de Cloudflare Turnstile (`TurnstileWidget.jsx`)
+
+Para proteger la consulta pública (`/estado`) y la pantalla de inicio de sesión (`/login`) contra ataques de fuerza bruta y automatizaciones no deseadas sin degradar la experiencia de usuario, SIGER-FMC implementa una arquitectura desacoplada de verificación anti-bot basada en Cloudflare Turnstile:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│               Consumo en Vistas (LoginPage / EstadoOrdenPage)          │
+│          <TurnstileWidget onVerify={...} onError={...} />              │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   Aislamiento DOM vía React Portal                     │
+│                  createPortal(widgetMarkup, document.body)             │
+│   - Desacople total del contexto de apilamiento (z-[9999])             │
+│   - Inmunidad a filtros CSS del padre (backdrop-blur, transform)       │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+         ┌──────────────────────────┴──────────────────────────┐
+         ▼                                                     ▼
+┌─────────────────────────────────┐   ┌─────────────────────────────────┐
+│     Física y Estados React      │   │    Blindaje Visual y Layout     │
+│ - Curva elástica (spring cubic) │   │ - Ancho estricto 320px (CLS 0%) │
+│ - Permanencia de 4s post-check  │   │ - Anti-Render Loop (useRef)     │
+│ - Hover interactivo con pausa   │   │ - Carga asíncrona no bloqueante │
+│   y reinicio de temporizador    │   │ - Soporte nativo para Dark Mode │
+└─────────────────────────────────┘   └─────────────────────────────────┘
+```
+
+### 11.1 Aislamiento de Stacking Context con React Portal (`document.body`)
+- **Desafío en CSS:** Cualquier elemento ancestro con propiedades como `backdrop-filter` (ej. `backdrop-blur-sm` en tarjetas de formulario), `transform` o `filter` genera un nuevo *containing block*, atrapando los descendientes con `position: fixed` e impidiendo su posicionamiento relativo al viewport.
+- **Solución Arquitectónica:** El componente renderiza su estructura flotante mediante `createPortal(widgetMarkup, document.body)` con posicionamiento `fixed bottom-6 right-6 z-[9999]`, garantizando su anclaje en la esquina inferior derecha global con total independencia de la jerarquía de componentes que lo invoque.
+
+### 11.2 Blindaje de Layout y Anti-Render Loop
+- **Estabilidad de Ancho Rígida (Zero CLS):** El contenedor y la tarjeta flotante fijan dimensiones estrictas (`w-[320px] max-w-[320px] min-w-[320px] box-border p-2.5`), mientras que el nodo receptor del iframe (`containerRef`) garantiza `w-[300px] min-h-[65px]`. Esto suprime cualquier salto de layout o colapso a 0px mientras carga el script o el iframe de Cloudflare.
+- **Prevención de Bucles de Renderizado (Anti-Render Loop):**
+  - Los callbacks recibidos por props (`onVerify`, `onError`, `onExpire`) se sincronizan en referencias mutables (`onVerifyRef`, `onErrorRef`, `onExpireRef`).
+  - La inicialización del widget cuenta con una guardia estricta: si `widgetIdRef.current` ya existe, se omite cualquier nueva invocación a `window.turnstile.render(...)`.
+  - El efecto de inicialización depende únicamente de primitivas estables (`[scriptLoaded, siteKey, theme]`), evitando que re-renders del componente padre desmonten o reinicien el widget.
+  - Al desmontar, se ejecuta de forma segura `window.turnstile.remove(widgetIdRef.current)` y se anulan los handlers de carga del script.
+
+### 11.3 Física de Animación y Temporizador Interactivo con Hover
+- **Curva Elástica (Spring Physics):**
+  - Entrada: Desplazamiento desde el borde derecho (`translateX(120%)` a `translateX(0)`) gobernado por `cubic-bezier(0.34, 1.56, 0.64, 1)` con aceleración elástica suave.
+  - Salida: Deslizamiento suave de regreso a `translateX(120%)` mediante `cubic-bezier(0.4, 0, 0.2, 1)`.
+- **Temporizador Inteligente con Control de Hover:**
+  - Tras validarse exitosamente la verificación (`callback`), el widget se mantiene visible durante **4000 ms** (4 segundos) para que el usuario aprecie el estado completado.
+  - Al posicionar el cursor sobre el widget (`onMouseEnter`), cualquier temporizador de salida se cancela y se restaura la visibilidad en caso de haber iniciado el repliegue.
+  - Al retirar el cursor (`onMouseLeave`), la cuenta regresiva de 4 segundos se reinicia desde cero si la verificación ya fue completada.
+  - En caso de expiración o error, los temporizadores de salida se cancelan y el widget permanece activo en pantalla para permitir el reintento.
