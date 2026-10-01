@@ -6,6 +6,30 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [1.2.0] - 2026-10-01
+
+### Added
+- **Subsistema de Widget Flotante Anti-Bot (`TurnstileWidget.jsx`):**
+  - **Aislamiento DOM con React Portal:** Montaje directo sobre `document.body` mediante `createPortal(..., document.body)` con posicionamiento `fixed bottom-6 right-6 z-[9999]`, eliminando interferencias de contextos de apilamiento causados por filtros CSS ancestros (`backdrop-blur`, `transform`, `filter`).
+  - **Física de Animación Elástica (Spring):** Transición de entrada suave con aceleración y rebote elástico mediante curva Bezier (`cubic-bezier(0.34, 1.56, 0.64, 1)`) y salida acelerada hacia la derecha (`translateX(120%)`).
+  - **Temporizador Interactivo con Control de Hover:**
+    - Ventana de permanencia post-verificación de 4 segundos (4000 ms) para visualizar la confirmación de Cloudflare antes de la salida automática.
+    - Pausa inmediata al posar el cursor (`onMouseEnter`), cancelando cualquier temporizador de salida y restaurando la visibilidad activa.
+    - Reinicio completo de la cuenta regresiva de 4 segundos al retirar el cursor (`onMouseLeave`) si la verificación ya fue completada con éxito.
+  - **Identidad Visual Corporativa:** Cabecera sobria con icono `ShieldCheck` en rojo corporativo (`text-red-600 dark:text-red-500`) y texto *"Verificación de seguridad"*, eliminando etiquetas redundantes de terceros.
+
+### Fixed & Optimized
+- **Prevención de Bucles de Renderizado (Anti-Render Loop):**
+  - Desacoplamiento de callbacks pasados por props (`onVerify`, `onError`, `onExpire`) mediante referencias mutables (`useRef`), impidiendo que re-renderizados del componente padre disparen desmontajes e inicializaciones repetitivas de Turnstile.
+  - Incorporación de guardia de inicialización única (`widgetIdRef.current` check) para bloquear llamadas redundantes a `window.turnstile.render(...)`.
+- **Blindaje contra Layout Shifts y Colapsos Visuales (CLS 0%):**
+  - Dimensiones estrictas en contenedor y tarjeta (`w-[320px] max-w-[320px] min-w-[320px] box-border p-2.5`) y caja interna de iframe (`w-[300px] min-h-[65px]`), suprimiendo parpadeos y deformaciones mientras carga el widget.
+- **Limpieza Rigurosa de Recursos y Memoria:**
+  - Desmontaje seguro del widget mediante `window.turnstile.remove(widgetIdRef.current)`.
+  - Anulación de event listeners en carga asíncrona de scripts (`onload`/`onerror` a null) y reseteo garantizado de temporizadores de salida (`clearTimeout`).
+
+---
+
 ## [1.1.0] - 2026-09-30
 
 ### Added
