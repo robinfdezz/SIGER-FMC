@@ -7,7 +7,6 @@ import { MorphIcon } from 'morphicons/react';
 import { Menu, X } from 'lucide';
 import GlobalSearch from './GlobalSearch';
 import NotificationBell from './NotificationBell';
-import packageJson from '../../package.json';
 
 const getRoleConfig = (rolNombre) => {
   switch (rolNombre) {
@@ -52,7 +51,7 @@ const Navbar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
 
   return (
     <header className="h-16 w-full bg-white dark:bg-dark-surface border-b border-zinc-200 dark:border-dark-border px-4 lg:px-6 flex items-center gap-3 lg:gap-6 flex-shrink-0 z-30 transition-colors duration-200">
-      {/* Izquierda: Logo institucional y versión */}
+      {/* Izquierda: Logo institucional */}
       <div className="flex items-center gap-3 shrink-0">
         <div className="flex items-center gap-3 sm:gap-3.5">
           <img
@@ -65,9 +64,6 @@ const Navbar = ({ mobileMenuOpen, setMobileMenuOpen }) => {
             alt="SIGER-FMC"
             className="h-9 w-auto hidden dark:block"
           />
-          <span className="text-xs sm:text-[13px] font-mono font-medium text-zinc-400 dark:text-zinc-500 select-none tracking-tight">
-            v{packageJson.version}
-          </span>
         </div>
       </div>
 

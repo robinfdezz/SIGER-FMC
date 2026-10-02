@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Modal from './Modal';
 import AnimatedTabs from './AnimatedTabs';
 import KeycapSequence from './KeycapSequence';
+import packageJson from '../../../package.json';
 import {
   ShieldQuestion,
   Keyboard,
@@ -335,7 +336,10 @@ export const HelpDocsModal = ({ isOpen, onClose }) => {
       </div>
 
       {/* Footer del Modal */}
-      <div className="p-3 sm:p-4 px-5 sm:px-7 border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 shrink-0 flex items-center justify-end">
+      <div className="p-3 sm:p-4 px-5 sm:px-7 border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 shrink-0 flex items-center justify-between">
+        <span className="text-xs font-mono font-medium text-neutral-400 dark:text-neutral-500 select-none tracking-tight">
+          v{packageJson.version}
+        </span>
         <button
           type="button"
           onClick={onClose}
