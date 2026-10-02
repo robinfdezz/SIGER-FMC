@@ -170,13 +170,19 @@ const INITIAL_FORM = {
 const DRAFT_STORAGE_KEY = 'siger_fmc_nueva_orden_draft';
 const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 horas
 
-const loadDraftFromStorage = () => {
+const loadDraftFromStorage = (currentUserId) => {
   try {
     const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === 'object') {
-      // 1. Caducidad: Si el borrador supera las 24 horas, descartarlo de sessionStorage
+      // 1. Aislamiento por usuario: Si el borrador pertenece a otro usuario, descartarlo y limpiarlo
+      if (currentUserId && parsed.userId && String(parsed.userId) !== String(currentUserId)) {
+        sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+        return null;
+      }
+
+      // 2. Caducidad: Si el borrador supera las 24 horas, descartarlo de sessionStorage
       if (parsed.savedAt) {
         const savedTime = new Date(parsed.savedAt).getTime();
         if (Number.isFinite(savedTime) && Date.now() - savedTime > DRAFT_MAX_AGE_MS) {
@@ -185,7 +191,7 @@ const loadDraftFromStorage = () => {
         }
       }
 
-      // 2. Blindaje: Si no es garantía, forzar estado inicial limpio para evitar reseteos involuntarios
+      // 3. Blindaje: Si no es garantía, forzar estado inicial limpio para evitar reseteos involuntarios
       if (parsed.form && !parsed.form.es_garantia) {
         parsed.form.servicio_origen_id = null;
         parsed.form.servicio_origen_codigo = '';
@@ -222,7 +228,7 @@ export const NuevaOrdenPage = () => {
     }
   }, [isTecnico, navigate]);
 
-  const initialDraftRef = useRef(loadDraftFromStorage());
+  const initialDraftRef = useRef(loadDraftFromStorage(user?.id));
   const initialDraft = initialDraftRef.current;
 
   const [currentStep, setCurrentStep] = useState(() => {
@@ -296,6 +302,8 @@ export const NuevaOrdenPage = () => {
     }
   }, [user]);
 
+  const activeSucursalId = branchData?.id || user?.sucursal_id;
+
   useEffect(() => {
     getCategorias().then(res => {
       if (res.ok) setCategorias(res.data || []);
@@ -312,13 +320,27 @@ export const NuevaOrdenPage = () => {
         setBranchData(userBranch);
       }
     }).catch(() => { });
+  }, [user?.sucursal_id, user?.sucursal_nombre]);
 
-    getWorkers({ activo: true }).then(res => {
+  useEffect(() => {
+    const params = { activo: true };
+    if (activeSucursalId) {
+      params.sucursal_id = activeSucursalId;
+    }
+
+    getWorkers(params).then(res => {
       const rawList = res?.data?.data || res?.data || (Array.isArray(res) ? res : []);
       const list = Array.isArray(rawList) ? rawList : [];
 
-      // 1. Filtrar solo trabajadores activos
-      const activos = list.filter(w => w.activo === true || w.activo === 'true' || w.activo === 1 || w.activo === undefined);
+      // 1. Filtrar solo trabajadores activos y que pertenezcan a la sucursal activa o sean globales (sucursal_id === null / undefined)
+      const activos = list.filter(w => {
+        const isActivo = w.activo === true || w.activo === 'true' || w.activo === 1 || w.activo === undefined;
+        if (!isActivo) return false;
+        if (activeSucursalId && w.sucursal_id != null) {
+          return Number(w.sucursal_id) === Number(activeSucursalId);
+        }
+        return true;
+      });
 
       // 2. Asignables: Técnicos (rol_id 4) y Administradores (rol_id 1, 2) — Excluye 'Secretaria' (rol_id 3)
       const asignables = activos.filter(w => {
@@ -345,7 +367,7 @@ export const NuevaOrdenPage = () => {
     }).catch((err) => {
       console.error('Error al cargar técnicos:', err);
     });
-  }, [user?.sucursal_id]);
+  }, [activeSucursalId]);
 
   const toggleTecnico = (id) => {
     const current = form.tecnicos_ids || [];
@@ -360,6 +382,16 @@ export const NuevaOrdenPage = () => {
     setForm(prev => ({ ...prev, [key]: val }));
     setErrors(prev => ({ ...prev, [key]: undefined }));
   }, []);
+
+  // Deseleccionar técnicos previamente seleccionados que ya no pertenezcan a la sucursal activa
+  useEffect(() => {
+    if (form.tecnicos_ids?.length > 0 && tecnicosDisponibles.length > 0) {
+      const validIds = form.tecnicos_ids.filter(id => tecnicosDisponibles.some(t => t.id === id));
+      if (validIds.length !== form.tecnicos_ids.length) {
+        set('tecnicos_ids', validIds);
+      }
+    }
+  }, [tecnicosDisponibles, set]);
 
   // ── Sincronización automática de borrador en sessionStorage con debounce (300ms) ──
   useEffect(() => {
@@ -385,6 +417,7 @@ export const NuevaOrdenPage = () => {
 
         if (isFormDirty) {
           const draftPayload = {
+            userId: user?.id,
             currentStep,
             form,
             ticketValidation,
@@ -402,7 +435,7 @@ export const NuevaOrdenPage = () => {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [form, currentStep, ticketValidation, isSubmitting, showPostModal]);
+  }, [form, currentStep, ticketValidation, isSubmitting, showPostModal, user?.id]);
 
   // ── Descartar borrador y restablecer formulario a su estado inicial ──
   const handleClearDraft = useCallback(() => {
@@ -1511,8 +1544,9 @@ export const NuevaOrdenPage = () => {
                       step="0.01"
                       value={form.costo_previsto}
                       onChange={(e) => set('costo_previsto', e.target.value)}
+                      onWheel={(e) => e.target.blur()}
                       placeholder="0.00"
-                      className={`${inputClass} ${errors.costo_previsto ? 'border-red-500 dark:border-red-500' : ''}`}
+                      className={`${inputClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${errors.costo_previsto ? 'border-red-500 dark:border-red-500' : ''}`}
                     />
                     {errors.costo_previsto && (
                       <p className="text-[11px] text-red-500 mt-1 font-inter">{errors.costo_previsto}</p>
@@ -1526,8 +1560,9 @@ export const NuevaOrdenPage = () => {
                       step="0.01"
                       value={form.monto_anticipo}
                       onChange={(e) => set('monto_anticipo', e.target.value)}
+                      onWheel={(e) => e.target.blur()}
                       placeholder="0.00"
-                      className={inputClass}
+                      className={`${inputClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                     />
                   </div>
                   <div>
@@ -1538,8 +1573,9 @@ export const NuevaOrdenPage = () => {
                       step="0.01"
                       value={form.monto_descuento}
                       onChange={(e) => set('monto_descuento', e.target.value)}
+                      onWheel={(e) => e.target.blur()}
                       placeholder="0.00"
-                      className={inputClass}
+                      className={`${inputClass} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                     />
                   </div>
                 </div>

@@ -182,6 +182,7 @@ export const AuthProvider = ({ children }) => {
         sessionStorage.removeItem('siger_token');
         sessionStorage.removeItem('siger_user');
         sessionStorage.removeItem('siger_notif_last_unread');
+        sessionStorage.removeItem('siger_fmc_nueva_orden_draft');
 
         if (rememberMe) {
           localStorage.setItem('siger_token', receivedToken);
@@ -218,6 +219,7 @@ export const AuthProvider = ({ children }) => {
     sessionStorage.removeItem('siger_token');
     sessionStorage.removeItem('siger_user');
     sessionStorage.removeItem('siger_notif_last_unread');
+    sessionStorage.removeItem('siger_fmc_nueva_orden_draft');
   };
 
   const clearError = () => setError(null);

@@ -25,7 +25,15 @@ app.use(cors({
   origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'cf-turnstile-response', 'x-turnstile-token', 'X-Requested-With']
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'Cache-Control',
+    'Pragma',
+    'cf-turnstile-response',
+    'x-turnstile-token',
+    'X-Requested-With'
+  ]
 }));
 
 // Middlewares estándar

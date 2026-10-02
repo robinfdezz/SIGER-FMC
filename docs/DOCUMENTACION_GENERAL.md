@@ -24,7 +24,7 @@ A continuación se detalla la estructura y el propósito de cada documento en el
 ## 🛠️ Stack Tecnológico Consolidado
 
 - **Backend:** Node.js, Express.js, PostgreSQL (`pg` Connection Pool), JWT, BcryptJS, Cloudinary SDK v2, Multer, Resend (correo transaccional), Cloudflare Turnstile (Anti-Bot condicional).
-- **Frontend:** React 18, Vite, React Router v6, Tailwind CSS, Lucide React, Morphicons, react-loading-skeleton, Sileo, Axios.
+- **Frontend:** React 18, Vite, React Router v6, Tailwind CSS, Lucide React, Morphicons, Sileo, Axios.
 - **Base de Datos:** PostgreSQL (`siger_fmc_db`).
 - **Almacenamiento Multimedia:** Cloudinary (Streaming en memoria, WebP `500x500`, calidad auto, carpetas `siger-fmc/personal-fmc`, `siger-fmc/recepcion` y `siger-fmc/evidencias-tickets`).
 - **Alertas:** Campanita in-app (`notificaciones`) + correos Resend (cliente y técnico en asignación/finalización).

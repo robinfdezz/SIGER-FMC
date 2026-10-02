@@ -123,6 +123,14 @@ const getReportesResumen = async (req, res) => {
              AND es.codigo_estado != 'CANCELADO_DEVUELTO'
          ), 0)::numeric(12,2) AS total_anticipos,
 
+         -- Total Valor de Órdenes Entregadas (Costo definitivo de órdenes liquidadas en el período)
+         COALESCE(SUM(
+           COALESCE(NULLIF(sr.costo_final_confirmado, 0), (COALESCE(sr.monto_liquidado, 0) + COALESCE(sr.monto_anticipo, 0)), 0)
+         ) FILTER (
+           WHERE sr.fecha_entrega_real IS NOT NULL
+             AND (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date BETWEEN $1::date AND $2::date
+         ), 0)::numeric(12,2) AS total_valor_entregadas,
+
          -- Mano de obra confirmada de órdenes entregadas (neta pura sin repuestos)
          COALESCE(SUM(
            GREATEST(0, (
@@ -155,7 +163,24 @@ const getReportesResumen = async (req, res) => {
 
          -- Saldo pendiente actual de órdenes en proceso (flujo 1 a 6)
          COALESCE(SUM(
-           GREATEST(0, (COALESCE(sr.costo_final_confirmado, sr.costo_previsto, 0) + COALESCE(sr.monto_impuesto, 0) - COALESCE(sr.monto_descuento, 0) - COALESCE(sr.monto_anticipo, 0)))
+           GREATEST(0, (
+             CASE
+               WHEN COALESCE(sr.costo_final_confirmado, 0) > 0
+                 THEN sr.costo_final_confirmado
+               ELSE (
+                 COALESCE(sr.costo_previsto, 0)
+                 + COALESCE((
+                     SELECT SUM(isc.costo_adicional_repuesto)
+                     FROM incidencias_servicio isc
+                     WHERE isc.servicio_id = sr.id
+                       AND isc.activo = TRUE
+                       AND isc.aprobado_por_cliente = TRUE
+                   ), 0)
+                 - COALESCE(sr.monto_descuento, 0)
+               )
+             END
+             - COALESCE(sr.monto_anticipo, 0)
+           ))
          ) FILTER (
            WHERE es.orden_flujo BETWEEN 1 AND 6
          ), 0)::numeric(12,2) AS saldo_pendiente,
@@ -403,6 +428,7 @@ const getReportesResumen = async (req, res) => {
     const totalLiquidado = parseFloat(kpiRow.total_liquidado || 0);
     const totalAnticipos = parseFloat(kpiRow.total_anticipos || 0);
     const totalFacturado = Math.round((totalLiquidado + totalAnticipos) * 100) / 100;
+    const totalValorEntregadas = parseFloat(kpiRow.total_valor_entregadas || 0);
     const totalManoObra = parseFloat(kpiRow.total_mano_obra || 0);
     const totalDescuentos = parseFloat(kpiRow.total_descuentos || 0);
     const totalImpuestos = parseFloat(kpiRow.total_impuestos || 0);
@@ -413,7 +439,7 @@ const getReportesResumen = async (req, res) => {
     const ordenesCanceladas = parseInt(kpiRow.ordenes_canceladas || 0, 10);
 
     const ticketPromedio = ordenesLiquidadas > 0
-      ? Math.round((totalFacturado / ordenesLiquidadas) * 100) / 100
+      ? Math.round((totalValorEntregadas / ordenesLiquidadas) * 100) / 100
       : 0;
 
     return res.status(200).json({
@@ -430,6 +456,7 @@ const getReportesResumen = async (req, res) => {
           total_facturado: totalFacturado,
           total_liquidado: totalLiquidado,
           total_anticipos: totalAnticipos,
+          total_valor_entregadas: totalValorEntregadas,
           total_mano_obra: totalManoObra,
           total_repuestos: totalRepuestos,
           total_descuentos: totalDescuentos,
