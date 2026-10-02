@@ -20,24 +20,12 @@ const reportesRoutes = require('./routes/reportes.routes');
 
 const app = express();
 
-// Configuración de CORS
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  process.env.CLIENT_URL
-].filter(Boolean);
-
+// Configuración de CORS (Permite localhost, https://siger-fmc.pages.dev y cualquier origen con credenciales)
 app.use(cors({
-  origin: (origin, callback) => {
-    // Permitir peticiones sin origen (como Postman o apps móviles) o si está en la lista permitida
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
-      return callback(null, true);
-    }
-    return callback(new Error('No permitido por la política de CORS'));
-  },
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'cf-turnstile-response', 'x-turnstile-token', 'X-Requested-With']
 }));
 
 // Middlewares estándar
