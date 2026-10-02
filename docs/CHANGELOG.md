@@ -6,7 +6,26 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
-## [1.2.0] - 2026-10-01
+## [1.0.0] - 2026-10-02 (Actualizaciones y Blindaje Operativo)
+
+### Added & Security
+- **Aislamiento y Seguridad de Borradores de Órdenes (`NuevaOrdenPage.jsx`, `AuthContext.jsx`, `api.js`):**
+  - **Aislamiento por Identificador de Usuario:** Inclusión de `userId: user?.id` dentro del payload serializado en `sessionStorage` (`siger_fmc_nueva_orden_draft`). En la inicialización y restauración del borrador (`loadDraftFromStorage`), se valida que el borrador pertenezca estrictamente al usuario autenticado; de pertenecer a otro usuario, se descarta y elimina de inmediato.
+  - **Limpieza Rigurosa en Cierre de Sesión e Inicio:** En `AuthContext.jsx`, la función `logout()` y el proceso de autenticación (`login()`) limpian taxativamente la clave del borrador de `sessionStorage`.
+  - **Saneamiento Automático ante Expiración (401 Unauthorized):** En el interceptor global de Axios (`api.js`), al detectar una sesión revocada o vencida con redirección a `/login?expired=true`, se purga el borrador en memoria.
+- **Validación Estricta y Aislamiento por Sucursal en Asignación de Técnicos:**
+  - **Frontend (`NuevaOrdenPage.jsx`):** La consulta a `getWorkers` ahora envía dinámicamente el parámetro `sucursal_id: activeSucursalId` derivado de la sucursal activa de la orden (`branchData?.id || user?.sucursal_id`). Además, se aplica un filtro local complementario que garantiza que únicamente figuren en el selector trabajadores de la sede activa o con alcance global (`sucursal_id == null`), saneando automáticamente cualquier técnico seleccionado que ya no pertenezca a la sucursal.
+  - **Backend (`servicios.controller.js`):** En `createServicio`, se incorporó validación atómica dentro de la transacción sobre el arreglo `cleanTecnicosIds`. Se verifica que los colaboradores existan, se encuentren activos, carezcan de roles administrativos no operativos, y que su `sucursal_id` coincida de manera estricta con `finalSucursalId`. Cualquier discrepancia dispara un `ROLLBACK` inmediato y respuesta con código `400 Bad Request` (*"El técnico ... pertenece a otra sucursal y no puede ser asignado a esta orden."*).
+
+### Changed & UI Hardening
+- **Integración del Rol de Secretaría en Métricas Financieras del Dashboard:**
+  - **Backend (`servicios.controller.js`):** En `getDashboardStats`, se extendió la condición `canViewFinances` para incluir al rol `Secretaria` (`rol === 'secretaria' || rol.includes('secre')`), computando y devolviendo los ingresos mensuales correspondientes a su sucursal de recepción.
+  - **Frontend (`DashboardPage.jsx`):** Se adaptó la regla visual para que las secretarias puedan consultar la tarjeta de "Ingresos del Mes" y la curva analítica `IncomeAreaChart` con métricas de su sede en tiempo real.
+- **Blindaje Universal contra Alteración de Inputs Numéricos Monetarios:**
+  - **Bloqueo de Modificación Accidental por Rueda del Ratón:** Integración del listener `onWheel={(e) => e.target.blur()}` en todos los campos monetarios de apertura y liquidación (`costo_previsto`, `monto_anticipo`, `monto_descuento` en `NuevaOrdenPage.jsx`, `montoRecibido` en `EntregaServicioModal.jsx`, `costoAdicional` en `FichaTecnicaModal.jsx` y centralizado en `Input.jsx` para `type="number"`).
+  - **Supresión de Flechas Incrementales (Spin Buttons):** Inyección de clases utilitarias de Tailwind (`[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`) y reglas de resiliencia en la capa base de CSS (`index.css` con `-webkit-appearance: none` y `-moz-appearance: textfield`) para garantizar neutralidad visual en Chrome, Edge, Firefox y Safari.
+
+### Optimizaciones de Seguridad y Widget Anti-Bot (2026-10-01)
 
 ### Added
 - **Subsistema de Widget Flotante Anti-Bot (`TurnstileWidget.jsx`):**
@@ -28,9 +47,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   - Desmontaje seguro del widget mediante `window.turnstile.remove(widgetIdRef.current)`.
   - Anulación de event listeners en carga asíncrona de scripts (`onload`/`onerror` a null) y reseteo garantizado de temporizadores de salida (`clearTimeout`).
 
----
-
-## [1.1.0] - 2026-09-30
+### Estandarización de Skeletons e Integridad de Negocio (2026-09-30)
 
 ### Added
 - **Estandarización y Arquitectura Atómica de Skeleton Loaders:**
@@ -79,9 +96,7 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   - *Backend (`servicios.controller.js` / máquina de estados):* Al procesar cualquier cambio o actualización de estado en `actualizarEstadoServicio`, se evalúa el estado actual. Si la orden ya se encuentra en estado `ENTREGADO` o `CANCELADO_DEVUELTO`, se rechaza taxativamente cualquier transición con error `400 Bad Request` (*"No se puede modificar el estado de una orden que ya ha sido entregada/cancelada"*).
   - *Frontend (`FichaTecnicaModal.jsx`, `BancoTrabajoPage.jsx`):* Deshabilitación total de los selectores y botones de cambio de estado cuando la orden se encuentra en un estado terminal inmutable.
 
----
-
-## [1.0.0] - 2026-09-27
+### Lanzamiento Oficial Base (2026-09-27)
 
 ### Added
 - **Módulo Integral de Informes y Auditoría Financiera (`/reportes` & `/api/reportes`):**

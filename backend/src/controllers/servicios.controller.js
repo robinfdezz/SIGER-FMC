@@ -304,6 +304,58 @@ const createServicio = async (req, res) => {
       }
     }
 
+    // ── Validación de técnicos asignados y correspondencia de sucursal ──
+    const cleanTecnicosIds = Array.isArray(tecnicos_ids)
+      ? tecnicos_ids.map(Number).filter(function(n) { return Number.isInteger(n) && n > 0; })
+      : [];
+
+    if (cleanTecnicosIds.length > 0) {
+      const tecsRes = await client.query(
+        `SELECT dt.id, dt.nombre, dt.apellido, dt.activo, dt.sucursal_id, r.nombre_rol AS rol_nombre
+         FROM datos_trabajadores dt
+         LEFT JOIN roles_equipo r ON r.id = dt.rol_id
+         WHERE dt.id = ANY($1::int[])`,
+        [cleanTecnicosIds]
+      );
+
+      if (tecsRes.rows.length !== cleanTecnicosIds.length) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          ok: false,
+          message: 'Uno o más técnicos seleccionados no existen en el sistema.'
+        });
+      }
+
+      const rolesNoPermitidos = ['secretaria', 'recepcionista', 'recepcion', 'cajero'];
+      for (const tec of tecsRes.rows) {
+        if (!tec.activo) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            ok: false,
+            message: `El técnico ${tec.nombre} ${tec.apellido} está inactivo y no puede ser asignado.`
+          });
+        }
+
+        const tecRole = String(tec.rol_nombre || '').toLowerCase();
+        if (rolesNoPermitidos.some((r) => tecRole.includes(r))) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            ok: false,
+            message: `El usuario ${tec.nombre} ${tec.apellido} tiene un rol administrativo y no puede ser asignado como técnico operativo.`
+          });
+        }
+
+        // Validar que el técnico pertenezca a la misma sucursal de la orden (o sea superadmin / rol global con sucursal_id null)
+        if (tec.sucursal_id && finalSucursalId && Number(tec.sucursal_id) !== Number(finalSucursalId)) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            ok: false,
+            message: `El técnico ${tec.nombre} ${tec.apellido} pertenece a otra sucursal y no puede ser asignado a esta orden.`
+          });
+        }
+      }
+    }
+
     // ── 1. Obtener el ID del estado inicial "En Recepcion" ───
     const estadoRes = await client.query(
       "SELECT id FROM estados_servicio WHERE codigo_estado = 'RECIBIDO' OR orden_flujo = 1 ORDER BY orden_flujo ASC LIMIT 1"
@@ -408,10 +460,6 @@ const createServicio = async (req, res) => {
     var nuevaOrden = insertRes.rows[0];
 
     // ── 4. Registrar entrada inicial en historial_estados ────
-    var cleanTecnicosIds = Array.isArray(tecnicos_ids)
-      ? tecnicos_ids.map(Number).filter(function(n) { return Number.isInteger(n) && n > 0; })
-      : [];
-
     var notaHistorial = cleanTecnicosIds.length > 0
       ? 'Orden de servicio creada en recepcion con ' + cleanTecnicosIds.length + ' tecnico(s) asignado(s).'
       : 'Orden de servicio creada en recepcion.';
@@ -3753,7 +3801,7 @@ const getDashboardResumen = async (req, res) => {
     const isSuperAdmin = isUserSuperAdmin(req.user);
     const userRole = String(req.user?.rol_nombre || req.user?.rol || '').toLowerCase();
     const isTecnico = userRole.includes('tecnic');
-    const canViewFinances = !isTecnico && (isSuperAdmin || userRole === 'admin_sucursal' || userRole.includes('admin'));
+    const canViewFinances = !isTecnico && (isSuperAdmin || userRole === 'admin_sucursal' || userRole.includes('admin') || userRole.includes('secretari'));
     const userId = req.user?.id ? parseInt(req.user.id, 10) : null;
 
     let sucursalId = null;

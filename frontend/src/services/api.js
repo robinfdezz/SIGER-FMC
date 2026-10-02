@@ -46,6 +46,7 @@ api.interceptors.response.use(
         sessionStorage.removeItem('siger_token');
         localStorage.removeItem('siger_user');
         sessionStorage.removeItem('siger_user');
+        sessionStorage.removeItem('siger_fmc_nueva_orden_draft');
         window.location.href = '/login?expired=true';
       }
     }

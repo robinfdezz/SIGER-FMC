@@ -15,9 +15,17 @@ const Input = forwardRef(({
   className = '',
   id,
   type = 'text',
+  onWheel,
   ...props
 }, ref) => {
   const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, '-')}` : undefined);
+
+  const handleWheel = (e) => {
+    if (type === 'number') {
+      e.target.blur();
+    }
+    onWheel?.(e);
+  };
 
   const handleChange = (e) => {
     if (!allowEmojis && type !== 'password' && typeof e.target.value === 'string') {
@@ -71,7 +79,12 @@ const Input = forwardRef(({
         type={type}
         onChange={handleChange}
         onPaste={handlePaste}
+        onWheel={handleWheel}
         className={`w-full px-3.5 py-2.5 bg-neutral-50 dark:bg-[#1C1C1F] border rounded-xl text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 text-sm font-inter transition-all duration-200 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 dark:focus:border-red-500 ${
+          type === 'number'
+            ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'
+            : ''
+        } ${
           error
             ? 'border-red-500 dark:border-red-500 focus:border-red-500'
             : 'border-neutral-200/90 dark:border-neutral-800'

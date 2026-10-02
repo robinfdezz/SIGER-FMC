@@ -546,8 +546,9 @@ export const EntregaServicioModal = ({
                             min="0"
                             value={montoRecibido}
                             onChange={(e) => setMontoRecibido(e.target.value)}
+                            onWheel={(e) => e.target.blur()}
                             placeholder="0.00"
-                            className={`w-full pl-10 pr-3 py-2 rounded-xl border text-sm font-mono focus:outline-none focus:ring-2 transition-colors ${montoInsuficiente
+                            className={`w-full pl-10 pr-3 py-2 rounded-xl border text-sm font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none focus:ring-2 transition-colors ${montoInsuficiente
                                 ? 'border-red-500 bg-red-50/20 text-red-700 dark:text-red-300 focus:ring-red-500/20'
                                 : 'border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:border-red-500 focus:ring-red-500/20'
                               }`}

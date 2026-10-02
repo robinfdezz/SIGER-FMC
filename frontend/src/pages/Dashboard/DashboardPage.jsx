@@ -1167,7 +1167,7 @@ const DashboardPage = () => {
   const isSuperAdmin = user?.rol_nombre === 'SuperAdmin';
   const roleName = String(user?.rol_nombre || '').toLowerCase();
   const isTecnico = roleName.includes('tecnic') || Boolean(data?.kpis?.es_tecnico);
-  const canViewFinances = Boolean(data?.kpis?.can_view_finances ?? (!isTecnico && (isSuperAdmin || roleName.includes('admin'))));
+  const canViewFinances = Boolean(data?.kpis?.can_view_finances ?? (!isTecnico && (isSuperAdmin || roleName.includes('admin') || roleName.includes('secretari'))));
 
   const [sucursales, setSucursales] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState('all');

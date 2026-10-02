@@ -23,6 +23,7 @@ El acceso y las capacidades dentro de la plataforma se rigen por cuatro roles es
    * Gestión administrativa y operativa local de una sucursal específica. Supervisión del equipo de trabajo, asignación de órdenes y métricas de su sede.
 3. **Secretaria / Recepción (`rol_id: 3`):**
    * Atención al cliente en mostrador, búsqueda y registro de clientes, creación formal de tickets de entrada (`FMC-YYYY-XXXX`), emisión de comprobantes térmicos y stickers adhesivos, cobro de anticipos y gestión de entregas finales. Confinada a su sucursal asignada.
+   * **Visualización Financiera en Dashboard:** Autorizada (`canViewFinances: true`) para consultar la tarjeta de ingresos del mes y la gráfica de tendencia `IncomeAreaChart` con las métricas de recaudación de su sede en tiempo real.
 4. **Tecnico (`rol_id: 4`):**
    * Acceso al banco de trabajo técnico: diagnóstico, actualización de estados de reparación, reporte de repuestos/incidencias y carga de evidencias fotográficas.
    * **Modo Solo Lectura en Recepción:** No posee permisos para crear órdenes de servicio (bloqueo estricto `403 Forbidden`). Confinado a su sucursal y con lectura habilitada en trabajadores (`GET /api/trabajadores`) para filtros operativos.
@@ -66,6 +67,11 @@ Para mantener la integridad operativa del taller y la trazabilidad de los diagn�
 * **Exclusión Estricta de Asignación Técnica:** La asignación o desasignación de técnicos se realiza única y exclusivamente en el Tablero de Taller (`BancoTrabajoPage.jsx`). El modal de edición no interviene ni modifica asignaciones de personal.
 * **Restricción de Fecha Estimada de Entrega:** Tanto en la creación como en la edición de órdenes, no se permite ingresar ni guardar fechas anteriores al día en curso (`fecha_estimada_entrega >= hoy`).
 
+### 4.2 Políticas de Apertura de Órdenes y Asignación Técnica (`NuevaOrdenPage.jsx`)
+* **Aislamiento Estricto de Asignación por Sucursal:** La lista de colaboradores técnicos disponibles se filtra tanto en frontend como en backend por la sucursal de la orden (`finalSucursalId`). Ningún usuario (incluyendo `SuperAdmin`) puede asignar técnicos pertenecientes a otra sede distinta a la de la orden.
+* **Seguridad y Aislamiento de Borradores en Memoria:** El formulario autoguarda el progreso en `sessionStorage` vinculándolo al identificador del usuario (`userId: user?.id`). Si un usuario cierra sesión (`logout`), o la sesión caduca (`401`), el borrador se purga automáticamente. Al cargar la vista, si existe un borrador de un usuario diferente en la misma pestaña, se descarta y elimina de inmediato para evitar contaminación entre sesiones.
+* **Blindaje de Entradas Numéricas:** Todos los campos monetarios (`Costo Estimado`, `Anticipo`, `Descuento`, `Monto Recibido`, `Costo Adicional`) cuentan con desenfoque automático ante el desplazamiento de la rueda del ratón (`onWheel blur`) y ocultación de flechas incrementales nativas (spin buttons) para prevenir alteraciones accidentales durante el scroll.
+
 ---
 
 ## 5. Módulos y Entidades Clave
@@ -87,13 +93,13 @@ Para mantener la integridad operativa del taller y la trazabilidad de los diagn�
   * Eliminación inmediata en la nube al descartar fotos en la interfaz (`eliminarFotoTemporal`).
   * Recolector de basura (*Garbage Collector*) programado cada 30 minutos y política de retención histórica de 15 días en base de datos.
 * **`categorias_dispositivos`:** Clasificación de equipos atendidos (Smartphone, Tablet/iPad, Laptop, Consola de Videojuegos, Smartwatch, Otros).
-* **Portal de Seguimiento Público (`EstadoOrdenPage.jsx`):** Consulta web pública en tiempo real (`/estado` y `/estado/:codigo`) accesible vía escaneo de código QR generado por `TicketQR.jsx` con enlace dinámico corporativo, protegida por Cloudflare Turnstile y con transiciones de carga fluidas mediante `react-loading-skeleton`.
+* **Portal de Seguimiento Público (`EstadoOrdenPage.jsx`):** Consulta web pública en tiempo real (`/estado` y `/estado/:codigo`) accesible vía escaneo de código QR generado por `TicketQR.jsx` con enlace dinámico corporativo, protegida por Cloudflare Turnstile y con transiciones de carga fluidas mediante esqueletos anatómicos nativos (`Skeleton.jsx`).
 * **Comprobantes Térmicos de Salida (`ReciboEntregaTermico.jsx`):** Emisión térmica oficial de 58mm y 80mm al liquidar y despachar equipos, con desglose de mano de obra, repuestos aprobados, garantías y firmas.
 
 ---
 
 ## 6. Stack Tecnológico
-* **Frontend:** React, Tailwind CSS, Vite, Lucide Icons, Morphicons, QRCode.react (`qrcode.react`), react-loading-skeleton, Sileo (Toaster).
+* **Frontend:** React, Tailwind CSS, Vite, Lucide Icons, Morphicons, QRCode.react (`qrcode.react`), Sileo (Toaster), Skeleton nativo.
 * **Backend:** Node.js, Express.js.
 * **Base de Datos:** PostgreSQL (`siger_fmc_db`) vía driver nativo `pg` con Connection Pooling y retención histórica automatizada.
 * **Gestión Multimedia:** Cloudinary SDK v2 + Multer (MemoryStorage), compresión adaptativa a WebP (`siger-fmc/personal-fmc`, `siger-fmc/recepcion` y `siger-fmc/evidencias-tickets`), sincronización móvil de fotos vía QR, subida unificada desde PC y recolección autónoma de imágenes huérfanas.

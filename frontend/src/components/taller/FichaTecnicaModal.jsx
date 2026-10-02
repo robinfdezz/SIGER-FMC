@@ -1358,8 +1358,9 @@ export const FichaTecnicaModal = ({
                           step="0.01"
                           value={costoAdicional}
                           onChange={(e) => setCostoAdicional(e.target.value)}
+                          onWheel={(e) => e.target.blur()}
                           placeholder="0.00"
-                          className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:border-red-500 focus:ring-red-500/20 transition-colors"
+                          className="w-full px-3.5 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none focus:ring-2 focus:border-red-500 focus:ring-red-500/20 transition-colors"
                         />
                       </div>
                     </div>

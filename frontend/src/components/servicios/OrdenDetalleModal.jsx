@@ -99,6 +99,16 @@ const formatDateTime = (dateStr) => {
 };
 
 /**
+ * Formateo estándar de moneda para KPIs económicos
+ */
+const formatCurrency = (amount) => {
+  return Number(amount || 0).toLocaleString('es-DO', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
+/**
  * Mapeo de icono según categoría de dispositivo
  */
 const getCategoryIcon = (categoria = '') => {
@@ -477,7 +487,7 @@ export const OrdenDetalleModal = ({
   // Cálculos económicos
   const economia = useMemo(() => {
     if (!currentOrder) {
-      return { costoBase: 0, repuestosTotal: 0, repuestosList: [], descuento: 0, anticipo: 0, total: 0, balance: 0 };
+      return { costoBase: 0, repuestosTotal: 0, repuestosList: [], descuento: 0, anticipo: 0, total: 0, balance: 0, totalPagado: 0, esEntregado: false, tieneSaldoPendiente: false };
     }
 
     const costoBase = Number(currentOrder.costo_previsto || 0);
@@ -504,6 +514,7 @@ export const OrdenDetalleModal = ({
     const esCancelado = flujoEstado === 8 || codEstado.includes('CANCEL') || nomEstado.includes('cancelad');
 
     const montoLiquidado = Number(currentOrder.monto_liquidado || 0);
+    const costoFinalConfirmado = Number(currentOrder.costo_final_confirmado || 0);
 
     let balance = 0;
     if (esEntregado || esCancelado) {
@@ -514,6 +525,14 @@ export const OrdenDetalleModal = ({
       balance = Math.max(0, total - anticipo);
     }
 
+    // Total efectivamente pagado / ingresado por la orden
+    const cobradoEfectivo = anticipo + montoLiquidado;
+    const totalPagado = costoFinalConfirmado > 0
+      ? costoFinalConfirmado
+      : cobradoEfectivo > 0
+        ? cobradoEfectivo
+        : total;
+
     return {
       costoBase,
       repuestosTotal,
@@ -522,7 +541,9 @@ export const OrdenDetalleModal = ({
       anticipo,
       total,
       balance,
-      esEntregado
+      totalPagado,
+      esEntregado,
+      tieneSaldoPendiente: !esEntregado && !esCancelado && balance > 0
     };
   }, [currentOrder]);
 
@@ -996,41 +1017,79 @@ export const OrdenDetalleModal = ({
                 Resumen Económico y Repuestos
               </span>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-neutral-50/60 dark:bg-neutral-800/40 border border-neutral-200/70 dark:border-neutral-700/70 rounded-xl p-3.5">
-                  <span className="text-[11px] font-semibold tracking-wider text-neutral-500 uppercase mb-1 block">
+              <div className={`grid grid-cols-2 ${(economia.repuestosTotal > 0 && economia.descuento > 0) ? 'sm:grid-cols-3 lg:grid-cols-5' : (economia.repuestosTotal > 0 || economia.descuento > 0) ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3`}>
+                <div className="bg-neutral-50/60 dark:bg-neutral-800/40 border border-neutral-200/70 dark:border-neutral-700/70 rounded-xl p-3.5 flex flex-col justify-between">
+                  <span className="text-[11px] font-semibold tracking-wider text-neutral-500 uppercase mb-1.5 block">
                     Presupuesto Base
                   </span>
-                  <p className="text-base sm:text-lg font-mono font-semibold text-neutral-900 dark:text-neutral-100">
-                    RD$ {economia.costoBase.toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-                  </p>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 select-none font-mono">
+                      RD$
+                    </span>
+                    <span className="text-lg sm:text-xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
+                      {formatCurrency(economia.costoBase)}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="bg-neutral-50/60 dark:bg-neutral-800/40 border border-neutral-200/70 dark:border-neutral-700/70 rounded-xl p-3.5">
-                  <span className="text-[11px] font-semibold tracking-wider text-neutral-500 uppercase mb-1 block">
-                    Repuestos / Extras
-                  </span>
-                  <p className="text-base sm:text-lg font-mono font-semibold text-neutral-900 dark:text-neutral-100">
-                    +RD$ {economia.repuestosTotal.toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-
-                <div className="bg-neutral-50/60 dark:bg-neutral-800/40 border border-neutral-200/70 dark:border-neutral-700/70 rounded-xl p-3.5">
-                  <span className="text-[11px] font-semibold tracking-wider text-neutral-500 uppercase mb-1 block">
+                <div className="bg-neutral-50/60 dark:bg-neutral-800/40 border border-neutral-200/70 dark:border-neutral-700/70 rounded-xl p-3.5 flex flex-col justify-between">
+                  <span className="text-[11px] font-semibold tracking-wider text-neutral-500 uppercase mb-1.5 block">
                     Anticipo Abonado
                   </span>
-                  <p className="text-base sm:text-lg font-mono font-semibold text-neutral-900 dark:text-neutral-100">
-                    -RD$ {economia.anticipo.toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-                  </p>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xs sm:text-sm font-bold text-rose-600 dark:text-rose-400 select-none font-mono">
+                      -RD$
+                    </span>
+                    <span className="text-lg sm:text-xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
+                      {formatCurrency(economia.anticipo)}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="bg-neutral-50/60 dark:bg-neutral-800/40 border border-neutral-200/70 dark:border-neutral-700/70 rounded-xl p-3.5">
-                  <span className="text-[11px] font-semibold tracking-wider text-neutral-500 uppercase mb-1 block">
-                    Balance Pendiente
+                {economia.repuestosTotal > 0 && (
+                  <div className="bg-neutral-50/60 dark:bg-neutral-800/40 border border-neutral-200/70 dark:border-neutral-700/70 rounded-xl p-3.5 flex flex-col justify-between">
+                    <span className="text-[11px] font-semibold tracking-wider text-neutral-500 uppercase mb-1.5 block">
+                      Repuestos / Extras
+                    </span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 select-none font-mono">
+                        +RD$
+                      </span>
+                      <span className="text-lg sm:text-xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
+                        {formatCurrency(economia.repuestosTotal)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {economia.descuento > 0 && (
+                  <div className="bg-neutral-50/60 dark:bg-neutral-800/40 border border-neutral-200/70 dark:border-neutral-700/70 rounded-xl p-3.5 flex flex-col justify-between">
+                    <span className="text-[11px] font-semibold tracking-wider text-neutral-500 uppercase mb-1.5 block">
+                      Descuento
+                    </span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs sm:text-sm font-bold text-rose-600 dark:text-rose-400 select-none font-mono">
+                        -RD$
+                      </span>
+                      <span className="text-lg sm:text-xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
+                        {formatCurrency(economia.descuento)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className={`${economia.tieneSaldoPendiente ? 'bg-neutral-50/60 dark:bg-neutral-800/40 border-neutral-200/70 dark:border-neutral-700/70' : 'bg-emerald-50/35 dark:bg-emerald-950/20 border-emerald-200/70 dark:border-emerald-800/40'} border rounded-xl p-3.5 flex flex-col justify-between transition-colors`}>
+                  <span className={`text-[11px] font-semibold tracking-wider ${economia.tieneSaldoPendiente ? 'text-neutral-500' : 'text-emerald-700 dark:text-emerald-400'} uppercase mb-1.5 block`}>
+                    {economia.tieneSaldoPendiente ? 'Balance Pendiente' : 'Total Pagado'}
                   </span>
-                  <p className="text-base sm:text-lg font-mono font-bold text-neutral-900 dark:text-white">
-                    RD$ {economia.balance.toLocaleString('es-DO', { minimumFractionDigits: 2 })}
-                  </p>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className={`text-xs sm:text-sm font-bold select-none font-mono ${economia.tieneSaldoPendiente ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                      RD$
+                    </span>
+                    <span className="text-lg sm:text-xl font-extrabold text-neutral-900 dark:text-neutral-100 font-outfit tracking-tight tabular-nums leading-none">
+                      {formatCurrency(economia.tieneSaldoPendiente ? economia.balance : economia.totalPagado)}
+                    </span>
+                  </div>
                 </div>
               </div>
 

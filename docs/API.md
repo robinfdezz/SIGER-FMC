@@ -728,6 +728,7 @@ Control integral de recepción de equipos, apertura de órdenes de trabajo, segu
   - Si el usuario no es `SuperAdmin`, se fuerza estrictamente:
     `sucursal_id = req.user.sucursal_id`
     `usuario_recepcion_id = req.user.id` (sin admitir sobreescritura desde el body).
+  - **Validación Estricta de Asignación:** Todo técnico indicado en `tecnicos_ids` debe encontrarse activo y pertenecer a la misma `sucursal_id` de la orden (o poseer alcance global con `sucursal_id IS NULL`). De pertenecer a otra sucursal, la transacción se revierte con `400 Bad Request`.
   - El código de ticket generado es único e inmutable en formato estándar `FMC-YYYY-XXXX`.
 - **Body (JSON):**
   ```json
@@ -1323,7 +1324,7 @@ Permite a clientes o recepcionistas escanear un código QR desde cualquier dispo
 
 ### 5.18 Resumen Operativo del Dashboard
 - **Ruta:** `GET /api/servicios/dashboard`
-- **Acceso:** Privado (JWT). `SuperAdmin` ve todas las sedes (filtro opcional `?sucursal_id=`); resto confinado a su `sucursal_id`.
+- **Acceso:** Privado (JWT). `SuperAdmin` ve todas las sedes (filtro opcional `?sucursal_id=`); resto confinado a su `sucursal_id`. Los roles `SuperAdmin`, `Admin_Sucursal` y `Secretaria` computan y reciben métricas financieras de su sede (`can_view_finances = true`).
 - **Query params:**
   - `sucursal_id` (INT | `all`): Solo aplica a `SuperAdmin`.
 - **Respuesta Exitosa (`200 OK`):**
