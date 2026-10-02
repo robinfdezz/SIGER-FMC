@@ -3857,30 +3857,35 @@ const getDashboardResumen = async (req, res) => {
           `SELECT
              COALESCE(SUM(sr.monto_liquidado) FILTER (
                WHERE sr.fecha_entrega_real IS NOT NULL
+                 AND es.codigo_estado != 'CANCELADO_DEVUELTO'
                  AND DATE_TRUNC('month', sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')
                    = DATE_TRUNC('month', NOW() AT TIME ZONE 'America/Santo_Domingo')
              ), 0)::numeric(12,2) AS liquidado_mes,
              COALESCE(SUM(sr.monto_anticipo) FILTER (
-               WHERE DATE_TRUNC('month', sr.created_at AT TIME ZONE 'America/Santo_Domingo')
+               WHERE es.codigo_estado != 'CANCELADO_DEVUELTO'
+                 AND DATE_TRUNC('month', sr.created_at AT TIME ZONE 'America/Santo_Domingo')
                    = DATE_TRUNC('month', NOW() AT TIME ZONE 'America/Santo_Domingo')
                  AND COALESCE(sr.monto_anticipo, 0) > 0
              ), 0)::numeric(12,2) AS anticipos_mes,
              COALESCE(SUM(sr.monto_liquidado) FILTER (
                WHERE sr.fecha_entrega_real IS NOT NULL
+                 AND es.codigo_estado != 'CANCELADO_DEVUELTO'
                  AND DATE_TRUNC('month', sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')
                    = DATE_TRUNC('month', (NOW() AT TIME ZONE 'America/Santo_Domingo') - INTERVAL '1 month')
              ), 0)::numeric(12,2) AS liquidado_mes_anterior,
              COALESCE(SUM(sr.monto_anticipo) FILTER (
-               WHERE DATE_TRUNC('month', sr.created_at AT TIME ZONE 'America/Santo_Domingo')
+               WHERE es.codigo_estado != 'CANCELADO_DEVUELTO'
+                 AND DATE_TRUNC('month', sr.created_at AT TIME ZONE 'America/Santo_Domingo')
                    = DATE_TRUNC('month', (NOW() AT TIME ZONE 'America/Santo_Domingo') - INTERVAL '1 month')
                  AND COALESCE(sr.monto_anticipo, 0) > 0
              ), 0)::numeric(12,2) AS anticipos_mes_anterior
            FROM servicios_recepcion sr
+           JOIN estados_servicio es ON es.id = sr.estado_actual_id
            WHERE sr.activo = TRUE${branchClause}`,
           branchParams
         );
 
-    // 3. Sparkline de Ingresos 14 días (Optimizado con LEFT JOIN sin subqueries correlacionadas)
+    // 3. Sparkline de Ingresos 14 días (Flujo de caja diario: anticipos cobrados + montos liquidados)
     const sparklinePromise = !canViewFinances
       ? Promise.resolve({ rows: [] })
       : pool.query(
@@ -3891,21 +3896,38 @@ const getDashboardResumen = async (req, res) => {
                INTERVAL '1 day'
              )::date AS dia
            ),
+           anticipos AS (
+             SELECT
+               (sr.created_at AT TIME ZONE 'America/Santo_Domingo')::date AS dia,
+               SUM(sr.monto_anticipo) AS monto
+             FROM servicios_recepcion sr
+             JOIN estados_servicio es ON es.id = sr.estado_actual_id
+             WHERE sr.activo = TRUE
+               AND es.codigo_estado != 'CANCELADO_DEVUELTO'
+               AND COALESCE(sr.monto_anticipo, 0) > 0
+               AND (sr.created_at AT TIME ZONE 'America/Santo_Domingo')::date >= ((NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '13 days')::date
+               ${branchClause}
+             GROUP BY (sr.created_at AT TIME ZONE 'America/Santo_Domingo')::date
+           ),
            liquidaciones AS (
              SELECT
                (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date AS dia,
                SUM(sr.monto_liquidado) AS monto
              FROM servicios_recepcion sr
+             JOIN estados_servicio es ON es.id = sr.estado_actual_id
              WHERE sr.activo = TRUE
+               AND es.codigo_estado != 'CANCELADO_DEVUELTO'
                AND sr.fecha_entrega_real IS NOT NULL
-               AND sr.fecha_entrega_real >= (NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '13 days'
+               AND COALESCE(sr.monto_liquidado, 0) > 0
+               AND (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date >= ((NOW() AT TIME ZONE 'America/Santo_Domingo')::date - INTERVAL '13 days')::date
                ${branchClause}
              GROUP BY (sr.fecha_entrega_real AT TIME ZONE 'America/Santo_Domingo')::date
            )
            SELECT
              d.dia::text AS fecha,
-             COALESCE(l.monto, 0)::numeric(12,2) AS monto
+             (COALESCE(a.monto, 0) + COALESCE(l.monto, 0))::numeric(12,2) AS monto
            FROM dias d
+           LEFT JOIN anticipos a ON a.dia = d.dia
            LEFT JOIN liquidaciones l ON l.dia = d.dia
            ORDER BY d.dia ASC`,
           branchParams
