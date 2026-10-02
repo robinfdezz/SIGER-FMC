@@ -19,11 +19,13 @@ import {
   ChevronRight,
   ShieldCheck,
   Shield,
+  ShieldQuestion,
   ClipboardList,
   User,
   Contact,
   BarChart3
 } from 'lucide-react';
+import HelpDocsModal from './common/HelpDocsModal';
 
 const getRoleConfig = (rolNombre) => {
   switch (rolNombre) {
@@ -54,6 +56,7 @@ const MENU_ITEMS = [
 const DashboardLayout = ({ children }) => {
   useGlobalShortcuts();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
@@ -197,8 +200,20 @@ const DashboardLayout = ({ children }) => {
               </div>
             </div>
 
-            {/* Acciones: Botón de Tema Compacto + Botón de Logout */}
+            {/* Acciones: Botón de Ayuda + Botón de Tema Compacto + Botón de Logout */}
             <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setIsHelpModalOpen(true);
+                }}
+                type="button"
+                aria-label="Ayuda y Guía"
+                className="p-2.5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-colors cursor-pointer flex items-center justify-center"
+              >
+                <ShieldQuestion className="w-5 h-5" />
+              </button>
+
               <button
                 onClick={toggleTheme}
                 type="button"
@@ -220,7 +235,6 @@ const DashboardLayout = ({ children }) => {
                   logout();
                 }}
                 className="p-2.5 rounded-xl text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors flex-shrink-0 cursor-pointer flex items-center justify-center"
-                title="Cerrar sesión"
                 aria-label="Cerrar sesión"
               >
                 <LogOut className="w-5 h-5" />
@@ -233,12 +247,17 @@ const DashboardLayout = ({ children }) => {
 
       {/* 3. Cuerpo Desktop: Sidebar persistente + Contenido principal */}
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
-        <Sidebar />
+        <Sidebar onOpenHelp={() => setIsHelpModalOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
           {children}
         </main>
       </div>
 
+      {/* Centro de Ayuda y Guía */}
+      <HelpDocsModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+      />
     </div>
   );
 };

@@ -21,7 +21,6 @@ import {
   ShieldQuestion,
   BarChart3
 } from 'lucide-react';
-import HelpDocsModal from './common/HelpDocsModal';
 
 const MENU_ITEMS = [
   { id: 'dashboard', name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -34,7 +33,7 @@ const MENU_ITEMS = [
   { id: 'config', name: 'Configuración', path: '/configuracion', icon: Settings, allowedRoles: ['SuperAdmin', 'Admin_Sucursal'] },
 ];
 
-const Sidebar = () => {
+const Sidebar = ({ onOpenHelp }) => {
   const location = useLocation();
   const { isDark, toggleTheme } = useTheme();
   const { user } = useAuth();
@@ -51,8 +50,6 @@ const Sidebar = () => {
     const saved = localStorage.getItem('siger_sidebar_mode');
     return saved === 'hover' || saved === 'collapsed' ? saved : 'expanded';
   });
-
-  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   const [isHovered, setIsHovered] = useState(false);
   const [showConfigMenu, setShowConfigMenu] = useState(false);
@@ -187,13 +184,12 @@ const Sidebar = () => {
           position="right"
           enabled={!isExpanded}
         >
-          <button
-            type="button"
-            onClick={() => setIsHelpModalOpen(true)}
-            aria-label="Ayuda y Guía"
-            title="Ayuda y Guía"
-            className="w-10 h-10 flex items-center justify-center rounded-lg aspect-square text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 opacity-65 hover:opacity-100 transition-all cursor-pointer shrink-0"
-          >
+            <button
+              type="button"
+              onClick={onOpenHelp}
+              aria-label="Ayuda y Guía"
+              className="w-10 h-10 flex items-center justify-center rounded-lg aspect-square text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer shrink-0"
+            >
             <ShieldQuestion className="w-5 h-5 transition-colors" />
           </button>
         </Tooltip>
@@ -284,11 +280,6 @@ const Sidebar = () => {
 
       </div>
 
-      {/* Modal de Centro de Ayuda y Documentación */}
-      <HelpDocsModal
-        isOpen={isHelpModalOpen}
-        onClose={() => setIsHelpModalOpen(false)}
-      />
     </aside>
   );
 };
