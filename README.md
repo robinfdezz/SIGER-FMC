@@ -16,7 +16,7 @@ Sistema web integral y especializado para la administración y control operativo
 
 ---
 
-## 📂 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 SIGER-FMC/
