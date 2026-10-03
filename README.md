@@ -1,4 +1,4 @@
-# 🚀 SIGER-FMC - Sistema Integral de Gestión y Reparación (v1.0.0)
+# SIGER-FMC - Sistema Integral de Gestión y Reparación (v1.0.0)
 
 Sistema web integral y especializado para la administración y control operativo del taller de servicio técnico **Franyer Mobile Center, S.R.L.**
 
