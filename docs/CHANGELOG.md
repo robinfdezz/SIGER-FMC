@@ -6,6 +6,24 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [1.0.0] - 2026-10-08 (Sincronización QR Antibot, Resiliencia Vite y Flujo de Caja)
+
+### Fixed & Security
+- **Blindaje de Concurrencia y Sincronización QR con Widget Anti-Bot (`EstadoOrdenPage.jsx`):**
+  - **Desacoplamiento de Verificación:** `handleTurnstileVerify` únicamente persiste el token en el estado (`setTurnstileToken(token)`), eliminando disparos prematuros de búsqueda antes de la estabilización del ciclo de vida de React.
+  - **Control de Consulta Única con Referencia:** Incorporación de `hasAutoFetchedRef` para asegurar que el escaneo por QR ejecute estrictamente una sola petición por ticket, evitando la invalidación del token de Cloudflare por duplicidad (`timeout-or-duplicate` / 403 Forbidden). Reinicio limpio con `prevCodeRef` al navegar a un código distinto.
+  - **Orquestación en `useEffect`:** Espera obligatoria a la resolución del token de Turnstile cuando el feature flag esté activo, con guarda estricta contra llamadas concurrentes mientras `loading` esté activo.
+  - **Estabilización de Función de Búsqueda:** Desacoplamiento del token en `fetchTicket` mediante `turnstileTokenRef`, fijando sus dependencias en `[]` para evitar recreaciones de función y bucles de renderizado.
+  - **Resolución de Pantalla en Blanco:** Inclusión de `useRef` en la importación de React, subsanando el error de referencia en tiempo de ejecución.
+- **Unificación Contable de Flujo de Caja en Gráfica de Ingresos (`servicios.controller.js`):**
+  - **Gráfica de Tendencia (14 días):** Corrección de la consulta diaria del sparkline para computar el flujo de caja real unificando en una serie agregada tanto los anticipos cobrados en caja (`monto_anticipo` por `created_at`) como los saldos cobrados en retiro (`monto_liquidado` por `fecha_entrega_real`).
+  - **Exclusión de Cancelaciones:** Filtrado estricto `es.codigo_estado != 'CANCELADO_DEVUELTO'` en todos los acumuladores financieros del dashboard para evitar que anticipos reintegrados sumen al balance.
+- **Resiliencia de Compilación y Servidor de Desarrollo (`vite.config.js`):**
+  - **Corrección de Enlaces NTFS en Windows:** Eliminación de la directiva `preserveSymlinks: true` en `vite.config.js` para garantizar la resolución homogénea de rutas canónicas en uniones de directorio (Junctions).
+  - **Pre-empaquetado Explícito:** Configuración de `optimizeDeps.include` con las librerías base del ecosistema (`react`, `react-dom`, `react-router-dom`, `axios`, `lucide-react`, `morphicons/react`, `qrcode.react`, `sileo`), previniendo colapsos de re-optimización dinámica en caliente (`TypeError: Cannot read properties of undefined (reading 'imports')`).
+
+---
+
 ## [1.0.0] - 2026-10-02 (Actualizaciones y Blindaje Operativo)
 
 ### Added & Security
