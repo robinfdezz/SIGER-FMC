@@ -136,13 +136,21 @@ export const EstadoOrdenPage = () => {
     return () => window.removeEventListener('keydown', handleEsc, true);
   }, [activePhoto]);
 
+  const turnstileTokenRef = useRef(turnstileToken);
+  useEffect(() => {
+    turnstileTokenRef.current = turnstileToken;
+  }, [turnstileToken]);
+
+  const hasAutoFetchedRef = useRef(false);
+  const prevCodeRef = useRef('');
+
   const fetchTicket = useCallback(async (codeToFetch, token = null) => {
     if (!codeToFetch) return;
     setLoading(true);
     setError(null);
 
     try {
-      const tokenToUse = token || turnstileToken;
+      const tokenToUse = token || turnstileTokenRef.current;
       const res = await getServicioByTicket(codeToFetch, tokenToUse);
       if (res && res.ok && res.data) {
         setOrden(res.data);
@@ -161,31 +169,42 @@ export const EstadoOrdenPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [turnstileToken]);
+  }, []);
 
-  // Si la vista carga automáticamente el ticket desde la URL:
-  // - Si VITE_ENABLE_TURNSTILE es false, consulta de forma directa e inmediata.
-  // - Si está activo, consulta una vez obtenido el token.
+  // Búsqueda automática orquestada desde URL (QR o parámetro de ruta/query)
+  // - Espera a que el código y el token antibot (si aplica) estén listos.
+  // - Evita llamadas duplicadas o concurrentes mediante hasAutoFetchedRef y loading.
   useEffect(() => {
-    if (codeFromUrl) {
-      setInputCode(codeFromUrl);
-      if (!isTurnstileEnabled) {
-        fetchTicket(codeFromUrl);
-      } else if (turnstileToken) {
-        fetchTicket(codeFromUrl, turnstileToken);
-      }
-    } else {
+    if (prevCodeRef.current !== codeFromUrl) {
+      prevCodeRef.current = codeFromUrl;
+      hasAutoFetchedRef.current = false;
+    }
+
+    if (!codeFromUrl) {
       setOrden(null);
       setError(null);
+      return;
     }
-  }, [codeFromUrl, isTurnstileEnabled, turnstileToken, fetchTicket]);
 
-  // Callback cuando Turnstile se resuelve exitosamente
+    setInputCode(codeFromUrl);
+
+    // Si Turnstile está activo, esperar obligatoriamente a que el token de seguridad esté disponible
+    if (isTurnstileEnabled && !turnstileToken) {
+      return;
+    }
+
+    // Evitar ejecuciones duplicadas si ya se consultó automáticamente este ticket o si hay una petición en curso
+    if (hasAutoFetchedRef.current || loading) {
+      return;
+    }
+
+    hasAutoFetchedRef.current = true;
+    fetchTicket(codeFromUrl, turnstileToken);
+  }, [codeFromUrl, isTurnstileEnabled, turnstileToken, loading, fetchTicket]);
+
+  // Callback cuando Turnstile se resuelve exitosamente: solo actualiza el estado del token
   const handleTurnstileVerify = (token) => {
     setTurnstileToken(token);
-    if (codeFromUrl && !orden && !loading) {
-      fetchTicket(codeFromUrl, token);
-    }
   };
 
   // Manejo de búsqueda
